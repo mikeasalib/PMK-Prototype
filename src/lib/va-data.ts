@@ -139,7 +139,11 @@ export interface LifecycleBlock {
 export interface LifecyclePhase {
   id: string;
   name: string;
+  /** Human-readable window, e.g. "Jul 6 – Jul 31, 2026". */
   window: string;
+  /** Machine-readable bounds, so phase state is derived rather than stored. */
+  startsOn: string; // YYYY-MM-DD
+  endsOn: string;
   sprints: string;
   status: PhaseStatus;
   goal: string;
@@ -154,6 +158,8 @@ export const LIFECYCLE: LifecyclePhase[] = [
     id: "P1",
     name: "Phase 1 · Discovery & Requirements",
     window: "Jun 8 – Jul 3, 2026",
+    startsOn: "2026-06-08",
+    endsOn: "2026-07-03",
     sprints: "S1–S2",
     status: "complete",
     goal: "Lock scope across all five workstreams; establish contract-level dependency and reporting cadence.",
@@ -176,6 +182,8 @@ export const LIFECYCLE: LifecyclePhase[] = [
     id: "P2",
     name: "Phase 2 · Foundations & Architecture",
     window: "Jul 6 – Jul 31, 2026",
+    startsOn: "2026-07-06",
+    endsOn: "2026-07-31",
     sprints: "S3–S4",
     status: "in_progress",
     goal: "Approve architecture intents, unblock repo + platform access, finalize magic-link + SNS specs so build can start on schedule.",
@@ -199,6 +207,8 @@ export const LIFECYCLE: LifecyclePhase[] = [
     id: "P3",
     name: "Phase 3 · Build-Out & Integration",
     window: "Aug 3 – Aug 28, 2026",
+    startsOn: "2026-08-03",
+    endsOn: "2026-08-28",
     sprints: "S5–S6",
     status: "upcoming",
     goal: "Ship code-complete increments for every workstream; wire cross-site integration; land QuickSubmit + VLM SSO releases.",
@@ -222,6 +232,8 @@ export const LIFECYCLE: LifecyclePhase[] = [
     id: "P4",
     name: "Phase 4 · TRR & System Integration Test",
     window: "Aug 31 – Sep 25, 2026",
+    startsOn: "2026-08-31",
+    endsOn: "2026-09-25",
     sprints: "S7–S8",
     status: "upcoming",
     goal: "Test Readiness Review across all workstreams; complete integration testing; enter UAT 1.",
@@ -244,6 +256,8 @@ export const LIFECYCLE: LifecyclePhase[] = [
     id: "P5",
     name: "Phase 5 · UAT & Production Readiness — October deliverable",
     window: "Sep 28 – Oct 23, 2026",
+    startsOn: "2026-09-28",
+    endsOn: "2026-10-23",
     sprints: "S9–S10",
     status: "upcoming",
     goal: "Complete UAT 1 → UAT 2, PRR sign-off, ORR entry. This is the full deliverable to VA — code freeze end of October.",
@@ -268,6 +282,8 @@ export const LIFECYCLE: LifecyclePhase[] = [
     id: "P6",
     name: "Phase 6 · ORR, Prod Checkout & Launch",
     window: "Oct 26 – Nov 11, 2026",
+    startsOn: "2026-10-26",
+    endsOn: "2026-11-11",
     sprints: "S11",
     status: "upcoming",
     goal: "Production checkout, ORR completion, launch, and contract close by the Nov 11 hard deadline.",
