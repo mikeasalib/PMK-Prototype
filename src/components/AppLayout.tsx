@@ -10,6 +10,7 @@ import {
   GitBranch,
   AlertTriangle,
   Users,
+  FileOutput,
   HelpCircle,
 } from "lucide-react";
 import { DataSourcesFooter } from "./DataSourcesFooter";
@@ -26,6 +27,7 @@ const NAV = [
   { to: "/lifecycle", label: "Lifecycle plan", icon: GitBranch },
   { to: "/risks", label: "Risks & blockers", icon: AlertTriangle },
   { to: "/stakeholders", label: "Stakeholders & Glossary", icon: Users },
+  { to: "/artifacts", label: "Artifacts", icon: FileOutput },
 ] as const;
 
 // Green nav chrome — mirrors Cedar's admin shell, kept green so the internal

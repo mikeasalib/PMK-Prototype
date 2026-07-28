@@ -64,6 +64,24 @@ export interface ProgramConfig {
   workstreams: Workstream[];
   /** Colour for a workstream key that is not in the roster above. */
   unknownWorkstreamColor: string;
+  /** How to attribute an issue to a workstream when the source doesn't say. */
+  classifier: WorkstreamClassifier;
+}
+
+export interface WorkstreamClassifier {
+  /**
+   * Pattern the source itself uses, e.g. "WS3" in an issue title. Capture group
+   * 1 is appended to `prefix`.
+   *
+   * Never give these patterns the `g` flag. A module-level RegExp with /g keeps
+   * `lastIndex` between calls, so it would match on odd calls and miss on even
+   * ones — invisible to a typecheck and painful to find.
+   */
+  explicit: { pattern: RegExp; prefix: string } | null;
+  /** Ordered fallbacks, first match wins. Tested against the UPPERCASED title. */
+  keywords: Array<{ pattern: RegExp; workstream: string }>;
+  /** Used when nothing matches. Must be a key in `workstreams`. */
+  fallback: string;
 }
 
 export const PROGRAM: ProgramConfig = {
@@ -147,6 +165,17 @@ export const PROGRAM: ProgramConfig = {
     },
   ],
   unknownWorkstreamColor: "#565c65",
+  classifier: {
+    explicit: { pattern: /\bWS([1-5])\b/, prefix: "WS" },
+    keywords: [
+      { pattern: /MYVA|HOMEPAGE|PROTOTYPE|DESIGN|TYPOGRAPHY|FONT/, workstream: "WS3" },
+      { pattern: /QUICKSUBMIT|VR&E|VLM|TRACKER|SNS/, workstream: "WS4" },
+      { pattern: /HEALTH CHAT|PEP|WS5/, workstream: "WS5" },
+      { pattern: /AUTH|LOGIN|MAGIC LINK|IDENTITY|SEARCH/, workstream: "WS2" },
+      { pattern: /API|ARCHITECTURE|FEATURE FLAG|GITHUB|BRANCH/, workstream: "WS1" },
+    ],
+    fallback: "Admin",
+  },
 };
 
 const WORKSTREAM_BY_KEY: Record<string, Workstream> = Object.fromEntries(
@@ -174,6 +203,39 @@ export function workstreamOf(key: string | null | undefined): Workstream {
 /** Workstream keys in display order. */
 export function workstreamKeys(): string[] {
   return PROGRAM.workstreams.map((w) => w.key);
+}
+
+/**
+ * What the source literally said, or null. Used on the WRITE path, where the
+ * value is persisted.
+ *
+ * Deliberately narrower than classifyWorkstream and NOT to be merged with it: if
+ * sync stored keyword guesses, linear_issues.workstream would stop being "what
+ * Linear said", and a later change to the keyword rules could no longer
+ * re-derive old rows.
+ */
+export function parseSourceWorkstream(title: string): string | null {
+  const c = PROGRAM.classifier.explicit;
+  if (!c) return null;
+  const m = title.toUpperCase().match(c.pattern);
+  return m ? c.prefix + m[1] : null;
+}
+
+/**
+ * Best available attribution for display: an explicit value if the source has
+ * one, then the source's own pattern, then keyword heuristics, then the
+ * fallback. Used on the READ path, so a rule change re-derives everything.
+ */
+export function classifyWorkstream(title: string, explicit?: string | null): string {
+  if (explicit) return explicit;
+  const t = title.toUpperCase();
+  const c = PROGRAM.classifier;
+  if (c.explicit) {
+    const m = t.match(c.explicit.pattern);
+    if (m) return c.explicit.prefix + m[1];
+  }
+  for (const r of c.keywords) if (r.pattern.test(t)) return r.workstream;
+  return c.fallback;
 }
 
 /** Page title for a route: "Sprint board — VA Program Intel". */

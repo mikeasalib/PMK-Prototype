@@ -2,6 +2,8 @@
 // Never imported from client code.
 
 import { SOURCES } from "./program.sources.server";
+// Narrow on purpose: only what the source literally said gets persisted.
+import { parseSourceWorkstream } from "./program.config";
 
 const GATEWAY = SOURCES.gatewayUrl;
 
@@ -11,11 +13,6 @@ function headers(connKey: string) {
     "X-Connection-Api-Key": connKey,
     "Content-Type": "application/json",
   };
-}
-
-function parseWorkstream(title: string): string | null {
-  const m = title.match(/\bWS([1-5])\b/i);
-  return m ? `WS${m[1]}` : null;
 }
 
 async function getAdmin() {
@@ -91,7 +88,7 @@ export async function syncLinear(): Promise<SyncSourceResult> {
         state_type: state?.type ?? null,
         priority: (n.priority as number) ?? null,
         assignee: assignee?.name ?? null,
-        workstream: parseWorkstream(title),
+        workstream: parseSourceWorkstream(title),
         cycle_number: cycle?.number ?? null,
         cycle_name: cycle?.name ?? null,
         labels: labels.map((l) => l.name),
@@ -134,7 +131,9 @@ export async function syncGranola(): Promise<SyncSourceResult> {
       notes?: Array<{ id: string; title?: string; updated_at?: string; created_at?: string }>;
     };
     const seen = new Set<string>();
-    const unique = (data.notes ?? []).filter((n) => (seen.has(n.id) ? false : (seen.add(n.id), true)));
+    const unique = (data.notes ?? []).filter((n) =>
+      seen.has(n.id) ? false : (seen.add(n.id), true),
+    );
     const rows = unique.map((n) => ({
       source_id: n.id,
       title: n.title ?? "(untitled)",
@@ -153,7 +152,13 @@ export async function syncGranola(): Promise<SyncSourceResult> {
     await logRun(r);
     return r;
   } catch (e) {
-    const r = { key: "granola" as const, ok: false, count: 0, scope, message: (e as Error).message };
+    const r = {
+      key: "granola" as const,
+      ok: false,
+      count: 0,
+      scope,
+      message: (e as Error).message,
+    };
     await logRun(r);
     return r;
   }
@@ -161,7 +166,9 @@ export async function syncGranola(): Promise<SyncSourceResult> {
 
 function notionTitle(block: Record<string, unknown>): string {
   const type = block.type as string;
-  const inner = block[type] as { title?: string; rich_text?: Array<{ plain_text?: string }> } | undefined;
+  const inner = block[type] as
+    | { title?: string; rich_text?: Array<{ plain_text?: string }> }
+    | undefined;
   if (inner?.title) return inner.title;
   if (inner?.rich_text?.length) return inner.rich_text.map((t) => t.plain_text ?? "").join("");
   return "(untitled)";

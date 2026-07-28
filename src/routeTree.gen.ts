@@ -16,6 +16,7 @@ import { Route as RisksRouteImport } from './routes/risks'
 import { Route as ProgramOverviewRouteImport } from './routes/program-overview'
 import { Route as LifecycleRouteImport } from './routes/lifecycle'
 import { Route as DependenciesRouteImport } from './routes/dependencies'
+import { Route as ArtifactsRouteImport } from './routes/artifacts'
 import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -54,6 +55,11 @@ const DependenciesRoute = DependenciesRouteImport.update({
   path: '/dependencies',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ArtifactsRoute = ArtifactsRouteImport.update({
+  id: '/artifacts',
+  path: '/artifacts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ActivityRoute = ActivityRouteImport.update({
   id: '/activity',
   path: '/activity',
@@ -68,6 +74,7 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
+  '/artifacts': typeof ArtifactsRoute
   '/dependencies': typeof DependenciesRoute
   '/lifecycle': typeof LifecycleRoute
   '/program-overview': typeof ProgramOverviewRoute
@@ -79,6 +86,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
+  '/artifacts': typeof ArtifactsRoute
   '/dependencies': typeof DependenciesRoute
   '/lifecycle': typeof LifecycleRoute
   '/program-overview': typeof ProgramOverviewRoute
@@ -91,6 +99,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
+  '/artifacts': typeof ArtifactsRoute
   '/dependencies': typeof DependenciesRoute
   '/lifecycle': typeof LifecycleRoute
   '/program-overview': typeof ProgramOverviewRoute
@@ -104,6 +113,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/activity'
+    | '/artifacts'
     | '/dependencies'
     | '/lifecycle'
     | '/program-overview'
@@ -115,6 +125,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/activity'
+    | '/artifacts'
     | '/dependencies'
     | '/lifecycle'
     | '/program-overview'
@@ -126,6 +137,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/activity'
+    | '/artifacts'
     | '/dependencies'
     | '/lifecycle'
     | '/program-overview'
@@ -138,6 +150,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ActivityRoute: typeof ActivityRoute
+  ArtifactsRoute: typeof ArtifactsRoute
   DependenciesRoute: typeof DependenciesRoute
   LifecycleRoute: typeof LifecycleRoute
   ProgramOverviewRoute: typeof ProgramOverviewRoute
@@ -198,6 +211,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DependenciesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/artifacts': {
+      id: '/artifacts'
+      path: '/artifacts'
+      fullPath: '/artifacts'
+      preLoaderRoute: typeof ArtifactsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/activity': {
       id: '/activity'
       path: '/activity'
@@ -218,6 +238,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActivityRoute: ActivityRoute,
+  ArtifactsRoute: ArtifactsRoute,
   DependenciesRoute: DependenciesRoute,
   LifecycleRoute: LifecycleRoute,
   ProgramOverviewRoute: ProgramOverviewRoute,
