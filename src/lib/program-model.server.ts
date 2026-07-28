@@ -27,6 +27,8 @@ export interface AssembleResult {
   gates: GateReadiness[];
   /** Per-source outcome, so the UI can say what did and did not contribute. */
   sources: Array<{ key: string; ok: boolean; message: string }>;
+  /** "linear" when the schedule came from real milestones, "config" on fallback. */
+  milestoneOrigin: string;
 }
 
 /**
@@ -81,6 +83,46 @@ export async function assembleProgramModel(asOf = today()): Promise<AssembleResu
     sources.push({ key: "linear", ok: false, message: (e as Error).message });
   }
 
+  // ---- Linear project milestones. The real dated backbone; falls back to
+  //      config only if Linear has none, and says which was used.
+  let milestones = milestonesFromConfig(asOf);
+  let milestoneOrigin = "config";
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("linear_milestones")
+      .select("source_id, name, target_date, progress, url, synced_at")
+      .order("target_date", { ascending: true });
+    if (error) throw new Error(error.message);
+
+    if (data?.length) {
+      const { milestonesFromLinear } = await import("./program-model.adapters");
+      const out = milestonesFromLinear(data, asOf);
+      if (out.milestones.length) {
+        milestones = out.milestones;
+        milestoneOrigin = "linear";
+      }
+      const undated = out.undated ? `, ${out.undated} undated omitted` : "";
+      sources.push({
+        key: "linear:milestones",
+        ok: true,
+        message: `${out.milestones.length} milestones${undated}`,
+      });
+    } else {
+      sources.push({
+        key: "linear:milestones",
+        ok: false,
+        message: "none synced — schedule falls back to config dates",
+      });
+    }
+  } catch (e) {
+    sources.push({
+      key: "linear:milestones",
+      ok: false,
+      message: `${(e as Error).message} — schedule falls back to config dates`,
+    });
+  }
+
   // ---- Risk register, read live from Notion
   let risks: ProgramModel["risks"] = [];
   try {
@@ -105,7 +147,7 @@ export async function assembleProgramModel(asOf = today()): Promise<AssembleResu
       origin: { kind: "config" as const },
     })),
     phases,
-    milestones: milestonesFromConfig(asOf),
+    milestones,
     workItems,
     risks,
     decisions: [],
@@ -121,5 +163,10 @@ export async function assembleProgramModel(asOf = today()): Promise<AssembleResu
     },
   };
 
-  return { model, gates: upcomingGateReadiness(phases, workItems, { asOf }), sources };
+  return {
+    model,
+    gates: upcomingGateReadiness(phases, workItems, { asOf }),
+    sources,
+    milestoneOrigin,
+  };
 }

@@ -67,6 +67,17 @@ export const getSyncedSnapshot = createServerFn({ method: "GET" }).handler(
   },
 );
 
+export type StoredLinearMilestone = {
+  source_id: string;
+  name: string;
+  description: string | null;
+  target_date: string | null;
+  progress: number | null;
+  sort_order: number | null;
+  url: string | null;
+  synced_at: string;
+};
+
 export type StoredLinearIssue = {
   id: string;
   source_id: string;
@@ -107,7 +118,9 @@ export const getStoredData = createServerFn({ method: "GET" }).handler(async () 
   const [linear, notion, granola] = await Promise.all([
     supabaseAdmin
       .from("linear_issues")
-      .select("id, source_id, identifier, title, state_name, state_type, priority, assignee, workstream, labels, url, source_updated_at, synced_at")
+      .select(
+        "id, source_id, identifier, title, state_name, state_type, priority, assignee, workstream, labels, url, source_updated_at, synced_at",
+      )
       .order("source_updated_at", { ascending: false }),
     supabaseAdmin
       .from("notion_pages")

@@ -54,6 +54,7 @@ export async function syncLinear(): Promise<SyncSourceResult> {
       body: JSON.stringify({
         query: `query {
           project(id: "${SOURCES.linear.projectId}") {
+            url
             issues(first: 250) {
               nodes {
                 id identifier title url priority updatedAt
@@ -63,13 +64,25 @@ export async function syncLinear(): Promise<SyncSourceResult> {
                 labels { nodes { name } }
               }
             }
+            projectMilestones(first: 100) {
+              nodes {
+                id name description targetDate progress sortOrder
+                createdAt updatedAt
+              }
+            }
           }
         }`,
       }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = (await res.json()) as {
-      data?: { project?: { issues?: { nodes?: Array<Record<string, unknown>> } } };
+      data?: {
+        project?: {
+          url?: string;
+          issues?: { nodes?: Array<Record<string, unknown>> };
+          projectMilestones?: { nodes?: Array<Record<string, unknown>> };
+        };
+      };
       errors?: Array<{ message: string }>;
     };
     if (data.errors?.length) throw new Error(data.errors[0].message);
@@ -97,12 +110,37 @@ export async function syncLinear(): Promise<SyncSourceResult> {
         synced_at: new Date().toISOString(),
       };
     });
+    // Project milestones. These are the real dated backbone every artifact
+    // shares; before this they came from hand-maintained config.
+    const projectUrl = data.data?.project?.url ?? null;
+    const msNodes = data.data?.project?.projectMilestones?.nodes ?? [];
+    const msRows = msNodes.map((m) => ({
+      source_id: m.id as string,
+      name: (m.name as string) ?? "(untitled)",
+      description: (m.description as string) ?? null,
+      // Linear allows an undated milestone. Keep NULL rather than substituting
+      // a date, so a reader can tell "undated" from "due today".
+      target_date: (m.targetDate as string) ?? null,
+      progress: typeof m.progress === "number" ? m.progress : null,
+      sort_order: typeof m.sortOrder === "number" ? m.sortOrder : null,
+      url: projectUrl,
+      source_created_at: (m.createdAt as string) ?? null,
+      source_updated_at: (m.updatedAt as string) ?? null,
+      synced_at: new Date().toISOString(),
+    }));
+
     const admin = await getAdmin();
     if (rows.length) {
       const { error } = await admin.from("linear_issues").upsert(rows, { onConflict: "source_id" });
       if (error) throw new Error(error.message);
     }
-    const message = `${rows.length} ${SOURCES.linear.itemNoun}`;
+    if (msRows.length) {
+      const { error } = await admin
+        .from("linear_milestones")
+        .upsert(msRows, { onConflict: "source_id" });
+      if (error) throw new Error(error.message);
+    }
+    const message = `${rows.length} ${SOURCES.linear.itemNoun}, ${msRows.length} milestones`;
     const r = { key: "linear" as const, ok: true, count: rows.length, scope, message };
     await logRun(r);
     return r;

@@ -101,6 +101,57 @@ export function milestonesFromConfig(asOf: string = today()): MilestoneRecord[] 
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }
 
+/**
+ * Milestones from Linear, which is the real source. Preferred over
+ * milestonesFromConfig wherever both exist — config dates were hand-maintained
+ * and are known to disagree with Linear in two places.
+ *
+ * Undated milestones are dropped from the schedule rather than given a
+ * placeholder date, and reported separately so the caller can say how many were
+ * left out instead of silently shortening the schedule.
+ */
+export function milestonesFromLinear(
+  rows: Array<{
+    source_id: string;
+    name: string;
+    target_date: string | null;
+    progress: number | null;
+    url: string | null;
+    synced_at: string;
+  }>,
+  asOf: string = today(),
+): { milestones: MilestoneRecord[]; undated: number } {
+  const dated = rows.filter((r) => r.target_date);
+  const milestones = dated
+    .map((r) => ({
+      id: r.source_id,
+      // Progress arrives as a 0..1 fraction; show it the way Linear does.
+      label:
+        r.progress !== null && r.progress > 0
+          ? `${r.name} (${Math.round(r.progress * 100)}%)`
+          : r.name,
+      date: r.target_date!,
+      state: (asOf > r.target_date! ? "complete" : "upcoming") as MilestoneRecord["state"],
+      owner: null,
+      workstream: null,
+      dependsOn: [],
+      origin: {
+        kind: "sourced" as const,
+        refs: [
+          {
+            system: "linear" as const,
+            id: r.source_id,
+            url: r.url ?? undefined,
+            fetchedAt: r.synced_at,
+          },
+        ],
+      },
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  return { milestones, undated: rows.length - dated.length };
+}
+
 /** Heuristic: does this work item look like it is blocking something? */
 export function looksBlocking(item: Pick<WorkItemRecord, "title" | "labels">): boolean {
   if (item.labels.some((l) => /block/i.test(l))) return true;
