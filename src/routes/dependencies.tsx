@@ -6,11 +6,12 @@ import { WORKSTREAMS, type WorkstreamKey } from "@/lib/va-data";
 import { useStoredData, bucketOf, inferWorkstream, priorityLabel, priorityColor, type StoredLinearIssue } from "@/hooks/use-stored-data";
 import { relativeTime } from "@/hooks/use-program-data";
 import { CROSS_DEPS, HEALTH_COLOR, HEALTH_LABEL } from "@/lib/workstream-updates";
+import { pageTitle } from "@/lib/program.config";
 
 export const Route = createFileRoute("/dependencies")({
   head: () => ({
     meta: [
-      { title: "Dependency map — VA Program Intel" },
+      { title: pageTitle("Dependency map") },
       { name: "description", content: "Live view of open work grouped by workstream and blockers pinned on top." },
     ],
   }),

@@ -9,12 +9,13 @@ import {
   type RiskStatus,
   type WorkstreamKey,
 } from "@/lib/va-data";
+import { PROGRAM, pageTitle } from "@/lib/program.config";
 
 export const Route = createFileRoute("/risks")({
   head: () => ({
     meta: [
-      { title: "Risks & blockers — VA Program Intel" },
-      { name: "description", content: "Active risk and blocker register for the VA.gov modernization program." },
+      { title: pageTitle("Risks & blockers") },
+      { name: "description", content: `Active risk and blocker register for the ${PROGRAM.domainLabel} program.` },
     ],
   }),
   component: RisksPage,

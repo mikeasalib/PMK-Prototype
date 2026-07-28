@@ -5,9 +5,10 @@ import { WORKSTREAMS, type WorkstreamKey } from "@/lib/va-data";
 import { useStoredData, bucketOf, inferWorkstream, priorityLabel, priorityColor, type LinearBucket, type StoredLinearIssue } from "@/hooks/use-stored-data";
 import { relativeTime } from "@/hooks/use-program-data";
 import { WORKSTREAM_UPDATES, HEALTH_COLOR, HEALTH_LABEL } from "@/lib/workstream-updates";
+import { pageTitle } from "@/lib/program.config";
 
 export const Route = createFileRoute("/sprint-board")({
-  head: () => ({ meta: [{ title: "Sprint board — VA Program Intel" }] }),
+  head: () => ({ meta: [{ title: pageTitle("Sprint board") }] }),
   component: SprintBoard,
 });
 

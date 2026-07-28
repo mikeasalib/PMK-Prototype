@@ -4,11 +4,12 @@ import { AppLayout, PageHeader } from "@/components/AppLayout";
 import { WORKSTREAMS, type WorkstreamKey } from "@/lib/va-data";
 import { useStoredData, inferWorkstream } from "@/hooks/use-stored-data";
 import { relativeTime } from "@/hooks/use-program-data";
+import { pageTitle } from "@/lib/program.config";
 
 export const Route = createFileRoute("/activity")({
   head: () => ({
     meta: [
-      { title: "Activity feed — VA Program Intel" },
+      { title: pageTitle("Activity feed") },
       { name: "description", content: "Reverse-chronological program event stream from Linear, Notion and Granola." },
     ],
   }),

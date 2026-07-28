@@ -3,11 +3,12 @@ import { useState } from "react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
 import { WsTag } from "@/components/va-ui";
 import { LIFECYCLE, WORKSTREAMS, type PhaseStatus, type WorkstreamKey } from "@/lib/va-data";
+import { PROGRAM, pageTitle } from "@/lib/program.config";
 
 export const Route = createFileRoute("/lifecycle")({
   head: () => ({
     meta: [
-      { title: "Lifecycle plan — VA Program Intel" },
+      { title: pageTitle("Lifecycle plan") },
       { name: "description", content: "End-to-end delivery plan through October deliverable and Nov 11 launch." },
     ],
   }),
@@ -51,7 +52,7 @@ function LifecyclePage() {
         <Kpi label="Phases complete" value={`${done} / ${total}`} sub={`${pctDone}% of program`} />
         <Kpi label="Active phase" value={active > 0 ? "Phase 2 · Foundations" : "—"} sub="S4 – S5" />
         <Kpi label="October deliverable" value="Phase 5 · UAT / PRR" sub="Sep 28 – Oct 23 · code freeze" />
-        <Kpi label="Launch deadline" value="Nov 11, 2026" sub="Phase 6 · ORR & launch" />
+        <Kpi label="Launch deadline" value={PROGRAM.keyDates.launchLabel} sub="Phase 6 · ORR & launch" />
       </div>
 
       {/* Timeline strip */}
