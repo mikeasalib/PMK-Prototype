@@ -5,7 +5,6 @@ import { WsTag } from "@/components/va-ui";
 import {
   RISKS,
   WORKSTREAMS,
-  type Risk,
   type RiskSeverity,
   type RiskStatus,
   type WorkstreamKey,
@@ -244,6 +243,3 @@ function Pill({ color, label }: { color: string; label: string }) {
     </span>
   );
 }
-
-// Silence unused Risk import warning
-export type _R = Risk;
