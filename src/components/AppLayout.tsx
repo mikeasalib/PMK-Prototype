@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { DataSourcesFooter } from "./DataSourcesFooter";
 import { RefreshButton } from "./RefreshButton";
+import { PROGRAM } from "@/lib/program.config";
 
 const NAV = [
   { to: "/", label: "What's important", icon: Star },
@@ -29,7 +30,7 @@ const NAV = [
 
 // Green nav chrome — mirrors Cedar's admin shell, kept green so the internal
 // tool reads as clearly distinct from the external-facing product.
-const NAV_BG = "#1f3d2b";
+const NAV_BG = PROGRAM.navColor;
 const NAV_ACTIVE = "rgba(255,255,255,0.13)";
 const NAV_HOVER = "rgba(255,255,255,0.07)";
 
@@ -51,10 +52,10 @@ export function AppLayout({ children }: { children?: ReactNode }) {
               lineHeight: 1.2,
             }}
           >
-            VA Website Redesign
+            {PROGRAM.name}
           </div>
           <div className="mt-1 text-[11px]" style={{ color: "rgba(255,255,255,0.6)" }}>
-            Kaizen Laboratories Inc.
+            {PROGRAM.org}
           </div>
         </div>
 

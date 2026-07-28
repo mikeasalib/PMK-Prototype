@@ -1,4 +1,5 @@
 import { useProgramData, relativeTime, absoluteTime } from "@/hooks/use-program-data";
+import { PROGRAM } from "@/lib/program.config";
 
 const SOURCES = [
   { key: "granola", label: "Granola" },
@@ -47,7 +48,7 @@ export function DataSourcesFooter() {
         Last refresh · {relativeTime(lastSyncedAt)}
       </div>
       <div className="mt-2" style={{ color: "#8a9099" }}>
-        Contract 36C10G24D0048 · Nov 11, 2026
+        {`Contract ${PROGRAM.contract.displayNumber} · ${PROGRAM.keyDates.launchLabel}`}
       </div>
     </div>
   );

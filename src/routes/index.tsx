@@ -1,20 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
 import { useStoredData, bucketOf, priorityLabel, priorityColor, inferWorkstream, type StoredLinearIssue } from "@/hooks/use-stored-data";
-import { WORKSTREAMS } from "@/lib/va-data";
 import { relativeTime } from "@/hooks/use-program-data";
+import { PROGRAM, pageTitle, workstreamOf } from "@/lib/program.config";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "What's important — VA Program Intel" },
-      { name: "description", content: "Top hits of what is happening right now on the VA.gov modernization program." },
+      { title: pageTitle("What's important") },
+      { name: "description", content: `Top hits of what is happening right now on the ${PROGRAM.domainLabel} program.` },
     ],
   }),
   component: WhatsImportant,
 });
 
-const LAUNCH = new Date("2026-11-11").getTime();
+const LAUNCH = new Date(PROGRAM.keyDates.launch).getTime();
 
 function daysUntil(iso: string) {
   return Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000);
@@ -50,7 +50,7 @@ function WhatsImportant() {
         className="grid grid-cols-4 gap-3 px-6 py-4"
         style={{ borderBottom: "1px solid #dfe1e2", backgroundColor: "#f7f7f5" }}
       >
-        <Kpi label="Days to launch" value={String(daysToLaunch)} sub="Nov 11, 2026" danger={daysToLaunch < 120} />
+        <Kpi label="Days to launch" value={String(daysToLaunch)} sub={PROGRAM.keyDates.launchLabel} danger={daysToLaunch < 120} />
         <Kpi label="In progress" value={String(active.length)} sub={`of ${totalTracked} tracked`} />
         <Kpi label="Completed" value={String(doneCount)} sub="issues closed" />
         <Kpi label="High priority open" value={String(urgent.length)} sub="Urgent + High" danger={urgent.length > 5} />
@@ -104,9 +104,9 @@ function WhatsImportant() {
           <Panel title="Next milestones" accent="#3a5a40">
             <ul className="space-y-2 text-[12px]">
               <MilestoneRow label="Sprint 4 end" date="2026-07-31" />
-              <MilestoneRow label="Sprint 5 start" date="2026-08-03" />
-              <MilestoneRow label="Code freeze / UAT start" date="2026-09-28" />
-              <MilestoneRow label="Public launch" date="2026-11-11" danger />
+              <MilestoneRow label="Sprint 5 start" date={PROGRAM.keyDates.nextSprintStart} />
+              <MilestoneRow label="Code freeze / UAT start" date={PROGRAM.keyDates.codeFreeze} />
+              <MilestoneRow label="Public launch" date={PROGRAM.keyDates.launch} danger />
             </ul>
           </Panel>
         </div>
@@ -147,7 +147,7 @@ function Empty({ text }: { text: string }) {
 
 function IssueRow({ issue, showPriority }: { issue: StoredLinearIssue; showPriority?: boolean }) {
   const ws = inferWorkstream(issue);
-  const wsColor = WORKSTREAMS[ws as keyof typeof WORKSTREAMS]?.color ?? "#565c65";
+  const wsColor = workstreamOf(ws).color;
   return (
     <li className="py-2">
       <div className="flex items-baseline gap-2">

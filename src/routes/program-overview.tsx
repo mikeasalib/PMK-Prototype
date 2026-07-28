@@ -1,28 +1,22 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
 import { WsPip, WsTag } from "@/components/va-ui";
-import { WORKSTREAMS, type WorkstreamKey } from "@/lib/va-data";
+import type { WorkstreamKey } from "@/lib/va-data";
 import { useStoredData, bucketOf, inferWorkstream } from "@/hooks/use-stored-data";
 import { WORKSTREAM_UPDATES, WORKSTREAM_UPDATES_SOURCE, HEALTH_COLOR, HEALTH_LABEL } from "@/lib/workstream-updates";
+import { PROGRAM, pageTitle, workstreamKeys, workstreamOf } from "@/lib/program.config";
 
 export const Route = createFileRoute("/program-overview")({
   head: () => ({
     meta: [
-      { title: "Program overview — VA Program Intel" },
-      { name: "description", content: "VA.gov modernization program status — milestones, sprint progress, workstream burn-down." },
+      { title: pageTitle("Program overview") },
+      { name: "description", content: `${PROGRAM.domainLabel} program status — milestones, sprint progress, workstream burn-down.` },
     ],
   }),
   component: Overview,
 });
 
-const SPRINT_MILESTONES = [
-  { key: "S4", label: "Sprint 4", start: "2026-07-20", end: "2026-07-31" },
-  { key: "S5", label: "Sprint 5", start: "2026-08-03", end: "2026-08-14" },
-  { key: "S6", label: "Sprint 6", start: "2026-08-17", end: "2026-08-28" },
-  { key: "S7", label: "Sprint 7", start: "2026-08-31", end: "2026-09-11" },
-  { key: "S8", label: "Sprint 8 · UAT/PRR", start: "2026-09-14", end: "2026-10-23" },
-  { key: "S9", label: "ORR · Launch", start: "2026-10-26", end: "2026-11-11" },
-];
+const SPRINT_MILESTONES = PROGRAM.sprintStrip;
 
 function daysFromNow(iso: string) {
   const [y, m, d] = iso.split("-").map(Number);
@@ -42,7 +36,7 @@ function Overview() {
   const backlog = linear.filter((i) => bucketOf(i) === "backlog").length;
   const pctDone = total ? Math.round((done / total) * 100) : 0;
 
-  const wsKeys: WorkstreamKey[] = ["WS1", "WS2", "WS3", "WS4", "WS5", "Admin"];
+  const wsKeys: WorkstreamKey[] = workstreamKeys();
   const wsRows = wsKeys.map((ws) => {
     const items = linear.filter((i) => inferWorkstream(i) === ws);
     return {
@@ -59,7 +53,7 @@ function Overview() {
     <AppLayout>
       <PageHeader
         title="Program overview"
-        subtitle="VA.gov modernization · Contract 36C10G24D0048 · live from Linear"
+        subtitle={`${PROGRAM.domainLabel} · Contract ${PROGRAM.contract.displayNumber} · live from Linear`}
       />
 
       {/* Milestone strip */}
@@ -127,9 +121,9 @@ function Overview() {
             </h2>
             <div className="grid grid-cols-4 gap-3">
               <Milestone label="Sprint 4 end" date={activeSprint.end} days={daysFromNow(activeSprint.end)} />
-              <Milestone label="Sprint 5 start" date="2026-08-03" days={daysFromNow("2026-08-03")} />
-              <Milestone label="Code freeze" date="2026-09-28" days={daysFromNow("2026-09-28")} />
-              <Milestone label="Public launch" date="2026-11-11" days={daysFromNow("2026-11-11")} danger />
+              <Milestone label="Sprint 5 start" date={PROGRAM.keyDates.nextSprintStart} days={daysFromNow(PROGRAM.keyDates.nextSprintStart)} />
+              <Milestone label="Code freeze" date={PROGRAM.keyDates.codeFreeze} days={daysFromNow(PROGRAM.keyDates.codeFreeze)} />
+              <Milestone label="Public launch" date={PROGRAM.keyDates.launch} days={daysFromNow(PROGRAM.keyDates.launch)} danger />
             </div>
           </section>
 
@@ -166,14 +160,14 @@ function Overview() {
                   const blended = r.total > 0
                     ? Math.round((linearRatio * 0.6 + signalRatio * 0.4) * 100)
                     : Math.round(signalRatio * 100);
-                  const color = WORKSTREAMS[r.ws].color;
+                  const color = workstreamOf(r.ws).color;
                   const health = update?.health ?? "on_track";
                   return (
                     <tr key={r.ws} style={{ borderTop: "1px solid #eee" }}>
                       <td className="px-2 py-2">
                         <div className="flex items-center gap-2">
                           <WsPip ws={r.ws} />
-                          <span>{WORKSTREAMS[r.ws].label}</span>
+                          <span>{workstreamOf(r.ws).label}</span>
                         </div>
                       </td>
                       <td className="px-2 py-2">

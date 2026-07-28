@@ -8,10 +8,11 @@ import {
   GLOSSARY_SOURCE,
   type GlossaryCategory,
 } from "@/lib/va-glossary";
+import { pageTitle } from "@/lib/program.config";
 
 export const Route = createFileRoute("/stakeholders")({
   head: () => ({
-    meta: [{ title: "Stakeholders & glossary — VA Program Intel" }],
+    meta: [{ title: pageTitle("Stakeholders & glossary") }],
   }),
   component: Stakeholders,
 });

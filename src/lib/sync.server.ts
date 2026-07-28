@@ -1,10 +1,9 @@
 // Server-only helpers: fetch from providers, upsert into DB via service role.
 // Never imported from client code.
 
-const GATEWAY = "https://connector-gateway.lovable.dev";
-const GRANOLA_VA_FOLDER = "fol_QyIIASIUKJmme3";
-const LINEAR_PROJECT_ID = "3e9eebbb-e77c-473f-8509-4f8f3d0df140";
-const NOTION_VA_HUB_ID = "35968467f30f80ef87dbc6e3585b52de";
+import { SOURCES } from "./program.sources.server";
+
+const GATEWAY = SOURCES.gatewayUrl;
 
 function headers(connKey: string) {
   return {
@@ -44,7 +43,7 @@ async function logRun(r: SyncSourceResult) {
 }
 
 export async function syncLinear(): Promise<SyncSourceResult> {
-  const scope = `project Department of Veterans Affairs (DEP)`;
+  const scope = SOURCES.linear.scopeLabel;
   const key = process.env.LINEAR_API_KEY;
   if (!key) {
     const r = { key: "linear" as const, ok: false, count: 0, scope, message: "not connected" };
@@ -57,7 +56,7 @@ export async function syncLinear(): Promise<SyncSourceResult> {
       headers: headers(key),
       body: JSON.stringify({
         query: `query {
-          project(id: "${LINEAR_PROJECT_ID}") {
+          project(id: "${SOURCES.linear.projectId}") {
             issues(first: 250) {
               nodes {
                 id identifier title url priority updatedAt
@@ -106,7 +105,8 @@ export async function syncLinear(): Promise<SyncSourceResult> {
       const { error } = await admin.from("linear_issues").upsert(rows, { onConflict: "source_id" });
       if (error) throw new Error(error.message);
     }
-    const r = { key: "linear" as const, ok: true, count: rows.length, scope, message: `${rows.length} DEP issues` };
+    const message = `${rows.length} ${SOURCES.linear.itemNoun}`;
+    const r = { key: "linear" as const, ok: true, count: rows.length, scope, message };
     await logRun(r);
     return r;
   } catch (e) {
@@ -117,7 +117,7 @@ export async function syncLinear(): Promise<SyncSourceResult> {
 }
 
 export async function syncGranola(): Promise<SyncSourceResult> {
-  const scope = `folder "VA Project" (${GRANOLA_VA_FOLDER})`;
+  const scope = `folder "${SOURCES.granola.folderLabel}" (${SOURCES.granola.folderId})`;
   const key = process.env.GRANOLA_API_KEY;
   if (!key) {
     const r = { key: "granola" as const, ok: false, count: 0, scope, message: "not connected" };
@@ -126,7 +126,7 @@ export async function syncGranola(): Promise<SyncSourceResult> {
   }
   try {
     const res = await fetch(
-      `${GATEWAY}/granola/v1/notes?limit=100&folder_id=${GRANOLA_VA_FOLDER}`,
+      `${GATEWAY}/granola/v1/notes?limit=100&folder_id=${SOURCES.granola.folderId}`,
       { headers: headers(key) },
     );
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -148,7 +148,8 @@ export async function syncGranola(): Promise<SyncSourceResult> {
       const { error } = await admin.from("granola_notes").upsert(rows, { onConflict: "source_id" });
       if (error) throw new Error(error.message);
     }
-    const r = { key: "granola" as const, ok: true, count: rows.length, scope, message: `${rows.length} VA notes` };
+    const message = `${rows.length} ${SOURCES.granola.itemNoun}`;
+    const r = { key: "granola" as const, ok: true, count: rows.length, scope, message };
     await logRun(r);
     return r;
   } catch (e) {
@@ -167,7 +168,7 @@ function notionTitle(block: Record<string, unknown>): string {
 }
 
 export async function syncNotion(): Promise<SyncSourceResult> {
-  const scope = `hub "VA" (children of ${NOTION_VA_HUB_ID.slice(0, 8)}…)`;
+  const scope = `hub "${SOURCES.notion.hubLabel}" (children of ${SOURCES.notion.rootPageId.slice(0, 8)}…)`;
   const key = process.env.NOTION_API_KEY;
   if (!key) {
     const r = { key: "notion" as const, ok: false, count: 0, scope, message: "not connected" };
@@ -178,7 +179,7 @@ export async function syncNotion(): Promise<SyncSourceResult> {
     let cursor: string | undefined;
     const blocks: Array<Record<string, unknown>> = [];
     do {
-      const u = new URL(`${GATEWAY}/notion/v1/blocks/${NOTION_VA_HUB_ID}/children`);
+      const u = new URL(`${GATEWAY}/notion/v1/blocks/${SOURCES.notion.rootPageId}/children`);
       u.searchParams.set("page_size", "100");
       if (cursor) u.searchParams.set("start_cursor", cursor);
       const res = await fetch(u.toString(), { headers: headers(key) });
@@ -201,7 +202,7 @@ export async function syncNotion(): Promise<SyncSourceResult> {
         title: notionTitle(b),
         url: `https://www.notion.so/${id.replace(/-/g, "")}`,
         parent_type: type,
-        parent_id: NOTION_VA_HUB_ID,
+        parent_id: SOURCES.notion.rootPageId,
         source_updated_at: (b.last_edited_time as string) ?? null,
         synced_at: new Date().toISOString(),
       };

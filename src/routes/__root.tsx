@@ -12,6 +12,7 @@ import { Toaster } from "sonner";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { PROGRAM } from "@/lib/program.config";
 
 function NotFoundComponent() {
   return (
@@ -73,23 +74,23 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
+const ROOT_TITLE = `${PROGRAM.appName} — ${PROGRAM.orgShort}`;
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "VA Program Intel — Kaizen Laboratories" },
+      { title: ROOT_TITLE },
       {
         name: "description",
-        content:
-          "Program management intelligence suite for the Kaizen VA.gov modernization contract.",
+        content: `Program management intelligence suite for the Kaizen ${PROGRAM.domainLabel} contract.`,
       },
-      { name: "author", content: "Kaizen Laboratories Inc." },
-      { property: "og:title", content: "VA Program Intel — Kaizen Laboratories" },
+      { name: "author", content: PROGRAM.org },
+      { property: "og:title", content: ROOT_TITLE },
       {
         property: "og:description",
-        content:
-          "Sprint tracking, dependencies, blockers, and stakeholders for the VA.gov modernization program.",
+        content: `Sprint tracking, dependencies, blockers, and stakeholders for the ${PROGRAM.domainLabel} program.`,
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
