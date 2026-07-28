@@ -29,19 +29,30 @@ export interface AssembleResult {
   sources: Array<{ key: string; ok: boolean; message: string }>;
 }
 
-/** Linear's state_type -> the normalised bucket used across the model. */
+/**
+ * Linear's state_type -> the normalised bucket used across the model.
+ *
+ * "duplicate" is a real state on this board (two live DEP issues carry it) and
+ * must not fall through to backlog — a duplicate is not open work, and counting
+ * it as such inflates every open-item total in every artifact.
+ */
 function bucketOf(stateType: string | null): string {
   switch ((stateType ?? "").toLowerCase()) {
     case "completed":
       return "done";
     case "canceled":
+    case "duplicate":
       return "canceled";
     case "started":
       return "in_progress";
     case "unstarted":
       return "todo";
-    default:
+    case "backlog":
       return "backlog";
+    default:
+      // Unknown state types are surfaced as-is rather than silently bucketed,
+      // so a new Linear workflow state shows up as odd instead of as backlog.
+      return (stateType ?? "unknown").toLowerCase();
   }
 }
 
@@ -60,10 +71,11 @@ export async function assembleProgramModel(asOf = today()): Promise<AssembleResu
       .order("source_updated_at", { ascending: false });
     if (error) throw new Error(error.message);
 
-    const { classifyWorkstream } = await import("./program.config");
-    workItems = (data ?? []).map((r) =>
-      workItemFromLinear(r, bucketOf(r.state_type), classifyWorkstream(r.title, r.workstream)),
-    );
+    const { classifyWorkstreamDetailed } = await import("./program.config");
+    workItems = (data ?? []).map((r) => {
+      const a = classifyWorkstreamDetailed(r.title, r.workstream);
+      return workItemFromLinear(r, bucketOf(r.state_type), a.workstream, a.basis);
+    });
     sources.push({ key: "linear", ok: true, message: `${workItems.length} issues` });
   } catch (e) {
     sources.push({ key: "linear", ok: false, message: (e as Error).message });

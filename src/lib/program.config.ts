@@ -167,12 +167,18 @@ export const PROGRAM: ProgramConfig = {
   unknownWorkstreamColor: "#565c65",
   classifier: {
     explicit: { pattern: /\bWS([1-5])\b/, prefix: "WS" },
+    // Short keywords carry \b. Measured against 50 real DEP titles, the
+    // unanchored forms misfired: SEARCH matched inside RESEARCH, sending two
+    // accessibility-research tickets to WS2 (identity/login). AUTH inside
+    // AUTHOR and API inside RAPID/CAPITAL are the same trap waiting to happen.
     keywords: [
-      { pattern: /MYVA|HOMEPAGE|PROTOTYPE|DESIGN|TYPOGRAPHY|FONT/, workstream: "WS3" },
-      { pattern: /QUICKSUBMIT|VR&E|VLM|TRACKER|SNS/, workstream: "WS4" },
-      { pattern: /HEALTH CHAT|PEP|WS5/, workstream: "WS5" },
-      { pattern: /AUTH|LOGIN|MAGIC LINK|IDENTITY|SEARCH/, workstream: "WS2" },
-      { pattern: /API|ARCHITECTURE|FEATURE FLAG|GITHUB|BRANCH/, workstream: "WS1" },
+      // PROTOTYP, not PROTOTYPE — "prototyping" and "prototypes" are both common
+      // on this board and the exact form matches neither.
+      { pattern: /MYVA|HOMEPAGE|PROTOTYP|DESIGN|TYPOGRAPHY|\bFONTS?\b/, workstream: "WS3" },
+      { pattern: /QUICKSUBMIT|\bQS\b|VR&E|\bVLM\b|TRACKER|\bSNS\b/, workstream: "WS4" },
+      { pattern: /HEALTH CHAT|\bPEP\b|WS5/, workstream: "WS5" },
+      { pattern: /\bAUTH\b|LOGIN|MAGIC LINK|IDENTITY|\bSEARCH\b/, workstream: "WS2" },
+      { pattern: /\bAPIS?\b|ARCHITECTURE|FEATURE FLAG|GITHUB|BRANCH/, workstream: "WS1" },
     ],
     fallback: "Admin",
   },
@@ -227,15 +233,35 @@ export function parseSourceWorkstream(title: string): string | null {
  * fallback. Used on the READ path, so a rule change re-derives everything.
  */
 export function classifyWorkstream(title: string, explicit?: string | null): string {
-  if (explicit) return explicit;
+  return classifyWorkstreamDetailed(title, explicit).workstream;
+}
+
+/** How an attribution was arrived at. Only "stored" and "explicit" are facts. */
+export type AttributionBasis = "stored" | "explicit" | "keyword" | "fallback";
+
+/**
+ * Same result as classifyWorkstream, plus how it was derived.
+ *
+ * This exists because attribution accuracy is genuinely poor on real data:
+ * across 50 live DEP issues only 7 carry an explicit WSn, so most rows are
+ * inference. A report that presents a keyword guess with the same confidence as
+ * a stored value is misleading, so renderers surface the split.
+ */
+export function classifyWorkstreamDetailed(
+  title: string,
+  explicit?: string | null,
+): { workstream: string; basis: AttributionBasis } {
+  if (explicit) return { workstream: explicit, basis: "stored" };
   const t = title.toUpperCase();
   const c = PROGRAM.classifier;
   if (c.explicit) {
     const m = t.match(c.explicit.pattern);
-    if (m) return c.explicit.prefix + m[1];
+    if (m) return { workstream: c.explicit.prefix + m[1], basis: "explicit" };
   }
-  for (const r of c.keywords) if (r.pattern.test(t)) return r.workstream;
-  return c.fallback;
+  for (const r of c.keywords) {
+    if (r.pattern.test(t)) return { workstream: r.workstream, basis: "keyword" };
+  }
+  return { workstream: c.fallback, basis: "fallback" };
 }
 
 /** Page title for a route: "Sprint board — VA Program Intel". */

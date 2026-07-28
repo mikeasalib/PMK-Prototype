@@ -14,7 +14,7 @@
 // SourceRef is a record nobody can stand behind, so `origin: "config"` is a
 // distinct, explicit state rather than an empty refs array.
 
-import { PROGRAM, type Workstream } from "./program.config";
+import { PROGRAM, type AttributionBasis, type Workstream } from "./program.config";
 import type { Health } from "./workstream-updates";
 
 // ---------------------------------------------------------------- provenance
@@ -101,6 +101,12 @@ export interface WorkItemRecord {
   workstream: string;
   priority: number | null;
   labels: string[];
+  /**
+   * How the workstream was arrived at. Only "stored" and "explicit" are facts;
+   * "keyword" and "fallback" are inference. Carried per record so a renderer can
+   * report the split instead of presenting a guess as a reading.
+   */
+  attribution: AttributionBasis;
   origin: Origin;
 }
 
@@ -243,6 +249,7 @@ export function workItemFromLinear(
   },
   bucket: string,
   workstream: string,
+  attribution: AttributionBasis = "keyword",
 ): WorkItemRecord {
   return {
     id: row.source_id,
@@ -254,6 +261,7 @@ export function workItemFromLinear(
     workstream,
     priority: row.priority,
     labels: row.labels ?? [],
+    attribution,
     origin: {
       kind: "sourced",
       refs: [

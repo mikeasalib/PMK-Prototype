@@ -146,7 +146,22 @@ export function renderWeeklyRollup(model: ProgramModel, opts: RollupOptions): st
           `${items.filter((i) => i.bucket !== "done" && i.bucket !== "canceled").length} |`,
       );
     }
-    L.push("");
+    // Attribution honesty. Measured on the live DEP board, only 7 of 50 issues
+    // carry an explicit workstream, so the per-workstream split above is mostly
+    // inference. Saying so is the difference between a reading and a guess.
+    const inferred = model.workItems.filter(
+      (w) => w.attribution === "keyword" || w.attribution === "fallback",
+    ).length;
+    if (inferred) {
+      const pct = Math.round((inferred / model.workItems.length) * 100);
+      L.push(
+        `_Workstream attribution: ${model.workItems.length - inferred} of ` +
+          `${model.workItems.length} come from the issue itself; ${inferred} (${pct}%) are ` +
+          "inferred from the title. Treat the per-workstream split as indicative, " +
+          "not authoritative — tag issues with a workstream at source to fix this._",
+      );
+      L.push("");
+    }
   } else {
     L.push(GAP + " No delivery data synced — Linear has not been read.");
     L.push("");
