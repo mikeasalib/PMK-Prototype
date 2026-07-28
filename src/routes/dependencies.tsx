@@ -2,11 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
 import { WsTag } from "@/components/va-ui";
-import { WORKSTREAMS, type WorkstreamKey } from "@/lib/va-data";
+import type { WorkstreamKey } from "@/lib/va-data";
 import { useStoredData, bucketOf, inferWorkstream, priorityLabel, priorityColor, type StoredLinearIssue } from "@/hooks/use-stored-data";
 import { relativeTime } from "@/hooks/use-program-data";
 import { CROSS_DEPS, HEALTH_COLOR, HEALTH_LABEL } from "@/lib/workstream-updates";
-import { pageTitle } from "@/lib/program.config";
+import { pageTitle, workstreamKeys, workstreamOf } from "@/lib/program.config";
 
 export const Route = createFileRoute("/dependencies")({
   head: () => ({
@@ -18,7 +18,7 @@ export const Route = createFileRoute("/dependencies")({
   component: Dependencies,
 });
 
-const WS_ORDER: WorkstreamKey[] = ["WS1", "WS2", "WS3", "WS4", "WS5", "Admin"];
+const WS_ORDER: WorkstreamKey[] = workstreamKeys();
 
 function Dependencies() {
   const { linear, isLoading } = useStoredData();
@@ -77,7 +77,7 @@ function Dependencies() {
         >
           <option value="all">All workstreams</option>
           {WS_ORDER.map((k) => (
-            <option key={k} value={k}>{WORKSTREAMS[k].label}</option>
+            <option key={k} value={k}>{workstreamOf(k).label}</option>
           ))}
         </select>
         <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "#3a5a40" }}>Assignee</span>
@@ -180,7 +180,7 @@ function Dependencies() {
               >
                 <div className="mb-4 flex items-baseline justify-between">
                   <h2 className="text-sm font-semibold" style={{ color: "#3a5a40", fontFamily: 'Public Sans, system-ui, sans-serif' }}>
-                    {WORKSTREAMS[g.ws].label}
+                    {workstreamOf(g.ws).label}
                   </h2>
                   <span className="text-[11px]" style={{ color: "#565c65" }}>{g.items.length} open</span>
                 </div>
@@ -201,7 +201,7 @@ function Dependencies() {
 function IssueRow({ issue }: { issue: StoredLinearIssue }) {
   const ws = inferWorkstream(issue) as WorkstreamKey;
   return (
-    <li className="rounded bg-white p-2.5" style={{ border: "1px solid #eee", borderLeft: `3px solid ${WORKSTREAMS[ws]?.color ?? "#565c65"}` }}>
+    <li className="rounded bg-white p-2.5" style={{ border: "1px solid #eee", borderLeft: `3px solid ${workstreamOf(ws).color}` }}>
       <div className="flex items-baseline gap-2">
         <a href={issue.url ?? "#"} target="_blank" rel="noreferrer" className="font-mono text-[11px] underline" style={{ color: "#005ea2" }}>
           {issue.identifier}

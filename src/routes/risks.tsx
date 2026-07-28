@@ -4,12 +4,11 @@ import { AppLayout, PageHeader } from "@/components/AppLayout";
 import { WsTag } from "@/components/va-ui";
 import {
   RISKS,
-  WORKSTREAMS,
   type RiskSeverity,
   type RiskStatus,
   type WorkstreamKey,
 } from "@/lib/va-data";
-import { PROGRAM, pageTitle } from "@/lib/program.config";
+import { PROGRAM, pageTitle, workstreamKeys } from "@/lib/program.config";
 
 export const Route = createFileRoute("/risks")({
   head: () => ({
@@ -101,7 +100,7 @@ function RisksPage() {
             style={{ borderColor: "#d5d5d0" }}
           >
             <option value="all">All</option>
-            {(Object.keys(WORKSTREAMS) as WorkstreamKey[]).map((k) => (
+            {workstreamKeys().map((k) => (
               <option key={k} value={k}>{k}</option>
             ))}
           </select>

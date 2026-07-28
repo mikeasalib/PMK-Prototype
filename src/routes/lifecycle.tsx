@@ -2,8 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
 import { WsTag } from "@/components/va-ui";
-import { LIFECYCLE, WORKSTREAMS, type PhaseStatus, type WorkstreamKey } from "@/lib/va-data";
-import { PROGRAM, pageTitle } from "@/lib/program.config";
+import { LIFECYCLE, type PhaseStatus, type WorkstreamKey } from "@/lib/va-data";
+import { PROGRAM, pageTitle, workstreamOf } from "@/lib/program.config";
 
 export const Route = createFileRoute("/lifecycle")({
   head: () => ({
@@ -166,7 +166,7 @@ function LifecyclePage() {
                             className="rounded p-2"
                             style={{
                               border: "1px solid #eee",
-                              borderLeft: `3px solid ${WORKSTREAMS[b.ws as WorkstreamKey].color}`,
+                              borderLeft: `3px solid ${workstreamOf(b.ws).color}`,
                             }}
                           >
                             <div className="flex items-center gap-2">

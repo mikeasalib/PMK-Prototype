@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
 import { WsPip, WsTag } from "@/components/va-ui";
-import { WORKSTREAMS, type WorkstreamKey } from "@/lib/va-data";
+import type { WorkstreamKey } from "@/lib/va-data";
 import { useStoredData, bucketOf, inferWorkstream } from "@/hooks/use-stored-data";
 import { WORKSTREAM_UPDATES, WORKSTREAM_UPDATES_SOURCE, HEALTH_COLOR, HEALTH_LABEL } from "@/lib/workstream-updates";
-import { PROGRAM, pageTitle } from "@/lib/program.config";
+import { PROGRAM, pageTitle, workstreamKeys, workstreamOf } from "@/lib/program.config";
 
 export const Route = createFileRoute("/program-overview")({
   head: () => ({
@@ -36,7 +36,7 @@ function Overview() {
   const backlog = linear.filter((i) => bucketOf(i) === "backlog").length;
   const pctDone = total ? Math.round((done / total) * 100) : 0;
 
-  const wsKeys: WorkstreamKey[] = ["WS1", "WS2", "WS3", "WS4", "WS5", "Admin"];
+  const wsKeys: WorkstreamKey[] = workstreamKeys();
   const wsRows = wsKeys.map((ws) => {
     const items = linear.filter((i) => inferWorkstream(i) === ws);
     return {
@@ -160,14 +160,14 @@ function Overview() {
                   const blended = r.total > 0
                     ? Math.round((linearRatio * 0.6 + signalRatio * 0.4) * 100)
                     : Math.round(signalRatio * 100);
-                  const color = WORKSTREAMS[r.ws].color;
+                  const color = workstreamOf(r.ws).color;
                   const health = update?.health ?? "on_track";
                   return (
                     <tr key={r.ws} style={{ borderTop: "1px solid #eee" }}>
                       <td className="px-2 py-2">
                         <div className="flex items-center gap-2">
                           <WsPip ws={r.ws} />
-                          <span>{WORKSTREAMS[r.ws].label}</span>
+                          <span>{workstreamOf(r.ws).label}</span>
                         </div>
                       </td>
                       <td className="px-2 py-2">

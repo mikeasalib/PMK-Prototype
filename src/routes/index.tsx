@@ -1,9 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
 import { useStoredData, bucketOf, priorityLabel, priorityColor, inferWorkstream, type StoredLinearIssue } from "@/hooks/use-stored-data";
-import { WORKSTREAMS } from "@/lib/va-data";
 import { relativeTime } from "@/hooks/use-program-data";
-import { PROGRAM, pageTitle } from "@/lib/program.config";
+import { PROGRAM, pageTitle, workstreamOf } from "@/lib/program.config";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -148,7 +147,7 @@ function Empty({ text }: { text: string }) {
 
 function IssueRow({ issue, showPriority }: { issue: StoredLinearIssue; showPriority?: boolean }) {
   const ws = inferWorkstream(issue);
-  const wsColor = WORKSTREAMS[ws as keyof typeof WORKSTREAMS]?.color ?? "#565c65";
+  const wsColor = workstreamOf(ws).color;
   return (
     <li className="py-2">
       <div className="flex items-baseline gap-2">

@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
-import { WORKSTREAMS, type WorkstreamKey } from "@/lib/va-data";
+import type { WorkstreamKey } from "@/lib/va-data";
 import { useStoredData, bucketOf, inferWorkstream, priorityLabel, priorityColor, type LinearBucket, type StoredLinearIssue } from "@/hooks/use-stored-data";
 import { relativeTime } from "@/hooks/use-program-data";
 import { WORKSTREAM_UPDATES, HEALTH_COLOR, HEALTH_LABEL } from "@/lib/workstream-updates";
-import { pageTitle } from "@/lib/program.config";
+import { pageTitle, workstreamKeys, workstreamOf } from "@/lib/program.config";
 
 export const Route = createFileRoute("/sprint-board")({
   head: () => ({ meta: [{ title: pageTitle("Sprint board") }] }),
@@ -19,7 +19,7 @@ const COLUMNS: { key: LinearBucket; label: string; color: string }[] = [
   { key: "done", label: "Done", color: "#2e8540" },
 ];
 
-const WS_KEYS: (WorkstreamKey | "all")[] = ["all", "WS1", "WS2", "WS3", "WS4", "WS5", "Admin"];
+const WS_KEYS: (WorkstreamKey | "all")[] = ["all", ...workstreamKeys()];
 
 function SprintBoard() {
   const { linear, isLoading } = useStoredData();
@@ -45,7 +45,7 @@ function SprintBoard() {
         </span>
         {WS_KEYS.map((k) => {
           const active = ws === k;
-          const color = k === "all" ? "#3a5a40" : WORKSTREAMS[k as WorkstreamKey].color;
+          const color = k === "all" ? "#3a5a40" : workstreamOf(k).color;
           return (
             <button
               key={k}
@@ -130,7 +130,7 @@ function SprintBoard() {
 
 function IssueCard({ issue }: { issue: StoredLinearIssue }) {
   const ws = inferWorkstream(issue) as WorkstreamKey;
-  const color = WORKSTREAMS[ws]?.color ?? "#565c65";
+  const color = workstreamOf(ws).color;
   return (
     <div
       className="rounded bg-white p-2"

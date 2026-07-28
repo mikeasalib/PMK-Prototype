@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
-import { WORKSTREAMS, type WorkstreamKey } from "@/lib/va-data";
+import type { WorkstreamKey } from "@/lib/va-data";
 import { useStoredData, inferWorkstream } from "@/hooks/use-stored-data";
 import { relativeTime } from "@/hooks/use-program-data";
-import { pageTitle } from "@/lib/program.config";
+import { pageTitle, workstreamOf } from "@/lib/program.config";
 
 export const Route = createFileRoute("/activity")({
   head: () => ({
@@ -152,7 +152,7 @@ function ActivityFeed() {
                       {e.ws ? (
                         <span
                           className="mt-1 inline-block h-2 w-2 shrink-0 rounded-full"
-                          style={{ backgroundColor: WORKSTREAMS[e.ws].color }}
+                          style={{ backgroundColor: workstreamOf(e.ws).color }}
                           title={e.ws}
                         />
                       ) : (

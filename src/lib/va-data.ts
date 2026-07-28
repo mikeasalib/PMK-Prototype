@@ -1,18 +1,8 @@
 // Seed data for the VA program. VA is currently the only program; see program.config.ts.
 
-export type WorkstreamKey = "WS1" | "WS2" | "WS3" | "WS4" | "WS5" | "Admin";
-
-export const WORKSTREAMS: Record<
-  WorkstreamKey,
-  { label: string; color: string }
-> = {
-  WS1: { label: "WS1 · Architecture & API / Brad", color: "#005ea2" },
-  WS2: { label: "WS2 · Identity & Login / Rain", color: "#2e8540" },
-  WS3: { label: "WS3 · Landing Page & UI / Kaizen", color: "#54278f" },
-  WS4: { label: "WS4 · QuickSubmit / VR&E / VLM", color: "#008480" },
-  WS5: { label: "WS5 · VA Health Chat / OCC", color: "#936f38" },
-  Admin: { label: "Admin · Program", color: "#565c65" },
-};
+// Open-ended: the roster lives in program.config.ts, and linear_issues.workstream
+// is free text. Use workstreamOf() to resolve a key — it never returns undefined.
+export type WorkstreamKey = string;
 
 // Stakeholders
 export interface Contact {
