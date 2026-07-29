@@ -15,6 +15,12 @@ import {
 } from "@/lib/program.config";
 import { daysUntilLocal } from "@/lib/local-date";
 import { seedFor } from "@/lib/program-seed";
+import {
+  phasesFromLifecycle,
+  upcomingGateReadiness,
+  deriveHealth,
+} from "@/lib/program-model.adapters";
+import type { GateReadiness } from "@/lib/program-model";
 import { useFollowUps } from "@/hooks/use-follow-ups";
 import { useProgram } from "./route";
 
@@ -54,6 +60,8 @@ function Overview() {
   const backlog = linear.filter((i) => bucketOf(i) === "backlog").length;
   const pctDone = total ? Math.round((done / total) * 100) : 0;
 
+  const todayIso = now.slice(0, 10);
+
   const wsKeys: WorkstreamKey[] = workstreamKeys(program);
   const wsRows = wsKeys.map((ws) => {
     const items = linear.filter((i) => inferWorkstream(i, program) === ws);
@@ -64,8 +72,28 @@ function Overview() {
       todo: items.filter((i) => bucketOf(i) === "todo").length,
       backlog: items.filter((i) => bucketOf(i) === "backlog").length,
       total: items.length,
+      // Health derived from real signals, not a hand-typed field.
+      health: deriveHealth(
+        items.map((i) => ({
+          bucket: bucketOf(i),
+          title: i.title,
+          labels: i.labels ?? [],
+          priority: i.priority,
+          dueDate: i.due_date ?? null,
+        })),
+        todayIso,
+      ),
     };
   });
+
+  // Gate readiness — the "what's about to hurt" signal, already computed for the
+  // rollup and now surfaced here. Empty for a program with no lifecycle phases
+  // (Ventura), which the panel states rather than showing a blank box.
+  const gates = upcomingGateReadiness(
+    phasesFromLifecycle(program, todayIso),
+    linear.map((i) => ({ bucket: bucketOf(i), title: i.title, labels: i.labels ?? [] })),
+    { asOf: todayIso, program },
+  );
 
   return (
     <AppLayout>
@@ -115,6 +143,15 @@ function Overview() {
           })}
         </div>
       </div>
+
+      {/* What's at risk — gate readiness, worst first. The "asteroid coming at
+          us" signal from the readout: already computed for the rollup, now on
+          the command centre so it is visible during the day. */}
+      {!isLoading && gates.length > 0 ? (
+        <div className="px-6 pt-4">
+          <GateReadinessPanel gates={gates} />
+        </div>
+      ) : null}
 
       {isLoading ? (
         <div className="p-6 text-[13px]" style={{ color: "#565c65" }}>
@@ -205,7 +242,10 @@ function Overview() {
                 Workstream burn-down
               </h2>
               <span className="text-[11px]" style={{ color: "#565c65" }}>
-                Linear tickets + program-truth signals ({seed.workstreamUpdatesSource?.date})
+                Health derived from live Linear signals
+                {seed.workstreamUpdatesSource
+                  ? ` · progress notes ${seed.workstreamUpdatesSource.date}`
+                  : ""}
               </span>
             </div>
             <table className="w-full text-[12px]">
@@ -233,14 +273,18 @@ function Overview() {
                   const progressCount = update?.progress.length ?? 0;
                   const openCount = (update?.risks.length ?? 0) + (update?.nextSteps.length ?? 0);
                   const linearRatio = r.total ? r.done / r.total : 0;
-                  const signalRatio =
-                    progressCount + openCount > 0 ? progressCount / (progressCount + openCount) : 0;
+                  const hasSignals = progressCount + openCount > 0;
+                  const signalRatio = hasSignals ? progressCount / (progressCount + openCount) : 0;
+                  // Blend real completion with logged program-truth signals only
+                  // when there are signals; otherwise pure Linear completion, so a
+                  // program without hand-logged notes is not silently scaled down.
                   const blended =
-                    r.total > 0
-                      ? Math.round((linearRatio * 0.6 + signalRatio * 0.4) * 100)
-                      : Math.round(signalRatio * 100);
+                    r.total === 0
+                      ? 0
+                      : hasSignals
+                        ? Math.round((linearRatio * 0.6 + signalRatio * 0.4) * 100)
+                        : Math.round(linearRatio * 100);
                   const color = workstreamOf(r.ws, program).color;
-                  const health = update?.health ?? "on_track";
                   return (
                     <tr key={r.ws} style={{ borderTop: "1px solid #eee" }}>
                       <td className="px-2 py-2">
@@ -250,16 +294,20 @@ function Overview() {
                         </div>
                       </td>
                       <td className="px-2 py-2">
-                        <span
-                          className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase"
-                          style={{
-                            color: HEALTH_COLOR[health],
-                            backgroundColor: `${HEALTH_COLOR[health]}14`,
-                            border: `1px solid ${HEALTH_COLOR[health]}44`,
-                          }}
-                        >
-                          {HEALTH_LABEL[health]}
-                        </span>
+                        {r.health ? (
+                          <span
+                            className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase"
+                            style={{
+                              color: HEALTH_COLOR[r.health],
+                              backgroundColor: `${HEALTH_COLOR[r.health]}14`,
+                              border: `1px solid ${HEALTH_COLOR[r.health]}44`,
+                            }}
+                          >
+                            {HEALTH_LABEL[r.health]}
+                          </span>
+                        ) : (
+                          <span style={{ color: "#a0a099" }}>—</span>
+                        )}
                       </td>
                       <td className="px-2 py-2 font-mono">{r.done}</td>
                       <td className="px-2 py-2 font-mono">{r.inProgress}</td>
@@ -316,6 +364,74 @@ function Overview() {
  * cleared without leaving the overview), and a link to the full page. Reads the
  * same per-program curation as the Follow-ups route, so a done here shows there.
  */
+/** How the pressure score reads at a glance. Same thresholds as the rollup. */
+function pressureBand(p: number): { label: string; color: string } {
+  const pct = Math.round(p * 100);
+  if (p >= 0.75) return { label: `${pct}% critical`, color: "#b3261e" };
+  if (p >= 0.5) return { label: `${pct}% high`, color: "#bf6a02" };
+  if (p >= 0.25) return { label: `${pct}% moderate`, color: "#8a5a00" };
+  return { label: `${pct}% low`, color: "#2e8540" };
+}
+
+/**
+ * Gate readiness across the open lifecycle phases, worst first. Pressure blends
+ * time remaining, unmet exit criteria, and open blockers — so a gate that is
+ * near, under-met, and blocked rises to the top. Blockers attach only to the
+ * phase actually running; future gates carry none, and a footnote says why.
+ */
+function GateReadinessPanel({ gates }: { gates: GateReadiness[] }) {
+  return (
+    <section
+      className="rounded-md p-4"
+      style={{ backgroundColor: "#fff", border: "1px solid #e5e5e2" }}
+    >
+      <h2
+        className="mb-3 text-sm font-semibold"
+        style={{ color: "#3a5a40", fontFamily: "Public Sans, system-ui, sans-serif" }}
+      >
+        What's at risk — gate readiness
+      </h2>
+      <div className="space-y-2">
+        {gates.map((g) => {
+          const band = pressureBand(g.pressure);
+          return (
+            <div key={g.phaseId} className="flex items-center gap-3">
+              <div className="w-40 shrink-0 truncate text-[12px]" title={g.phaseName}>
+                {g.phaseName}
+              </div>
+              <div
+                className="h-2 flex-1 overflow-hidden rounded-full"
+                style={{ backgroundColor: "#eee" }}
+              >
+                <div
+                  className="h-2 rounded-full"
+                  style={{ width: `${Math.round(g.pressure * 100)}%`, backgroundColor: band.color }}
+                />
+              </div>
+              <div
+                className="w-24 shrink-0 text-right text-[11px] font-semibold"
+                style={{ color: band.color }}
+              >
+                {band.label}
+              </div>
+              <div className="w-40 shrink-0 text-[11px]" style={{ color: "#565c65" }}>
+                {g.daysRemaining >= 0 ? `${g.daysRemaining}d out` : `${-g.daysRemaining}d overdue`}{" "}
+                · {g.exitCriteriaMet}/{g.exitCriteriaTotal} met
+                {g.blockingWorkItems > 0 ? ` · ${g.blockingWorkItems} blocking` : ""}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-2 text-[10px]" style={{ color: "#8a8a80" }}>
+        Pressure = time remaining × unmet exit criteria × open blockers. Blockers count against the
+        phase now running; exit criteria are not individually tracked yet, so "0 met" reads as "not
+        yet demonstrable," not "none done."
+      </div>
+    </section>
+  );
+}
+
 function FollowUpsSummary({ program }: { program: ProgramConfig }) {
   const { hydrated, buckets, setStatus } = useFollowUps(program.id);
   const open = buckets.open;

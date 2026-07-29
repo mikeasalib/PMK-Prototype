@@ -175,13 +175,68 @@ export function looksBlocking(item: Pick<WorkItemRecord, "title" | "labels">): b
   return /\bblock(ed|er|ing)?\b/i.test(item.title);
 }
 
+/** The shape deriveHealth reads from an issue — bucket plus the raw signals. */
+export interface HealthSignalItem {
+  bucket: string;
+  title: string;
+  labels: string[];
+  /** Linear priority: 1 urgent, 2 high, 3 medium, 4 low, 0/none. */
+  priority: number | null;
+  /** YYYY-MM-DD, or null when the issue carries no due date. */
+  dueDate: string | null;
+}
+
+/**
+ * Health for one workstream, derived from real Linear signals rather than a
+ * hand-typed field.
+ *
+ * The burn-down used to read a health value transcribed by hand into
+ * workstream-updates.ts (dated, and absent entirely for any program without that
+ * seed — so every Ventura workstream showed a fake "On track"). This computes it
+ * from what the board actually says:
+ *
+ *   blocked   an open item is a blocker or is past its due date
+ *   at_risk   open urgent/high work is sitting untouched (none in progress), or
+ *             a workstream with several items has finished none
+ *   on_track  otherwise
+ *
+ * Returns null for a workstream with no work — "on track" would overstate an
+ * empty column, so the row shows a dash instead.
+ */
+export function deriveHealth(
+  items: HealthSignalItem[],
+  asOf: string = today(),
+): "on_track" | "at_risk" | "blocked" | null {
+  if (items.length === 0) return null;
+
+  const open = items.filter((i) => i.bucket !== "done" && i.bucket !== "canceled");
+  const anyBlockedOrOverdue = open.some(
+    (i) => looksBlocking(i) || (i.dueDate !== null && i.dueDate < asOf),
+  );
+  if (anyBlockedOrOverdue) return "blocked";
+
+  const openHighPri = open.filter((i) => i.priority === 1 || i.priority === 2);
+  const inProgress = open.filter((i) => i.bucket === "in_progress");
+  const done = items.filter((i) => i.bucket === "done");
+
+  // High-priority work that nobody has started, or a sizable workstream with
+  // nothing finished yet, is at risk without being outright blocked.
+  if (openHighPri.length > 0 && inProgress.length === 0) return "at_risk";
+  if (done.length === 0 && items.length >= 3 && open.length > 0) return "at_risk";
+
+  return "on_track";
+}
+
 /**
  * Gate readiness for every phase that has not closed yet, worst first. This is
  * the "what asteroid is coming at us" list.
  */
 export function upcomingGateReadiness(
   phases: PhaseRecord[],
-  workItems: WorkItemRecord[],
+  // Only the fields the blocker heuristic needs, so a route can pass Linear rows
+  // directly without first building full WorkItemRecords. WorkItemRecord[] still
+  // satisfies this structurally, so the server caller is unchanged.
+  workItems: Array<Pick<WorkItemRecord, "bucket" | "title" | "labels">>,
   opts: {
     asOf?: string;
     exitCriteriaMet?: Record<string, number>;
