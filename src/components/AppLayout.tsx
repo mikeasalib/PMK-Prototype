@@ -159,8 +159,14 @@ export function PageHeader({
         </div>
         <div className="flex shrink-0 items-center gap-3 pt-1">
           {actions}
-          <ProgramSwitcher />
           <RefreshButton />
+          {/* The account control sits in the far corner, the way it does on the
+              customer site — so Refresh moves left of it rather than being the
+              rightmost thing. The extra left margin separates a per-page action
+              from an app-level one. */}
+          <div className="ml-1">
+            <ProgramSwitcher />
+          </div>
         </div>
       </div>
       {search ? <div className="mt-4">{search}</div> : null}

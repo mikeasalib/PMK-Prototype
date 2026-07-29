@@ -2,6 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { CircleUserRound } from "lucide-react";
 import { PROGRAMS, type ProgramConfig } from "@/lib/program.config";
+
+/**
+ * Kaizen's dark green. Fixed rather than taken from program.navColor: the
+ * account control is app chrome, and it should not change colour when you switch
+ * engagements. The sidebar is where per-program colour belongs.
+ */
+const KAIZEN_GREEN = "#1f3d2b";
 import { useProgram } from "@/routes/p/$programId/route";
 
 /**
@@ -55,10 +62,18 @@ export function ProgramSwitcher() {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`${program.name}. Switch program or account.`}
-        className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-[#f0f0ec]"
-        style={{ color: "#1b1b1b" }}
+        className="flex h-9 w-9 items-center justify-center rounded-full transition-all hover:brightness-110"
+        style={{
+          backgroundColor: KAIZEN_GREEN,
+          color: "#ffffff",
+          // A visible ring plus a small lift, so it reads as the one persistent
+          // control on the page rather than another grey icon.
+          boxShadow: open
+            ? `0 0 0 3px rgba(31,61,43,0.28)`
+            : "0 1px 2px rgba(17,47,78,0.18), 0 2px 6px -2px rgba(17,47,78,0.20)",
+        }}
       >
-        <CircleUserRound size={22} strokeWidth={1.5} />
+        <CircleUserRound size={20} strokeWidth={2} />
       </button>
 
       {open ? (
