@@ -3,10 +3,11 @@ import { Check } from "lucide-react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
 import { WsPip } from "@/components/va-ui";
 import type { WorkstreamKey } from "@/lib/va-data";
-import { useStoredData, bucketOf, inferWorkstream } from "@/hooks/use-stored-data";
+import { useStoredData, bucketOf } from "@/hooks/use-stored-data";
 import { HEALTH_COLOR, HEALTH_LABEL } from "@/lib/workstream-updates";
 import {
   PROGRAMS,
+  classifyWorkstreamDetailed,
   pageTitle,
   upcomingMilestones,
   workstreamKeys,
@@ -62,9 +63,22 @@ function Overview() {
 
   const todayIso = now.slice(0, 10);
 
+  // Attribute each issue once, keeping the basis. "stored" or "explicit" mean
+  // the source said which workstream this belongs to; "keyword"/"fallback" mean
+  // the classifier guessed from the title. Health is only as good as bucketing,
+  // so the burn-down needs to say when a row is mostly inference.
+  const attributed = linear.map((i) => {
+    const a = classifyWorkstreamDetailed(i.title, i.workstream, program);
+    return { i, ws: a.workstream, basis: a.basis };
+  });
+
   const wsKeys: WorkstreamKey[] = workstreamKeys(program);
   const wsRows = wsKeys.map((ws) => {
-    const items = linear.filter((i) => inferWorkstream(i, program) === ws);
+    const rows = attributed.filter((a) => a.ws === ws);
+    const items = rows.map((r) => r.i);
+    const inferredCount = rows.filter(
+      (r) => r.basis === "keyword" || r.basis === "fallback",
+    ).length;
     return {
       ws,
       done: items.filter((i) => bucketOf(i) === "done").length,
@@ -83,6 +97,7 @@ function Overview() {
         })),
         todayIso,
       ),
+      inferredPct: items.length ? Math.round((inferredCount / items.length) * 100) : 0,
     };
   });
 
@@ -294,20 +309,40 @@ function Overview() {
                         </div>
                       </td>
                       <td className="px-2 py-2">
-                        {r.health ? (
-                          <span
-                            className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase"
-                            style={{
-                              color: HEALTH_COLOR[r.health],
-                              backgroundColor: `${HEALTH_COLOR[r.health]}14`,
-                              border: `1px solid ${HEALTH_COLOR[r.health]}44`,
-                            }}
-                          >
-                            {HEALTH_LABEL[r.health]}
-                          </span>
-                        ) : (
-                          <span style={{ color: "#a0a099" }}>—</span>
-                        )}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {r.health ? (
+                            <span
+                              className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase"
+                              style={{
+                                color: HEALTH_COLOR[r.health],
+                                backgroundColor: `${HEALTH_COLOR[r.health]}14`,
+                                border: `1px solid ${HEALTH_COLOR[r.health]}44`,
+                              }}
+                            >
+                              {HEALTH_LABEL[r.health]}
+                            </span>
+                          ) : (
+                            <span style={{ color: "#a0a099" }}>—</span>
+                          )}
+                          {/* Attribution honesty. Health depends on bucketing;
+                              when the bucketing is mostly keyword inference
+                              (Ventura carries no stored workstream on any
+                              issue), the health can only be as accurate as
+                              those guesses, and the row says so. */}
+                          {r.inferredPct >= 50 ? (
+                            <span
+                              className="rounded px-1 py-0.5 text-[9px] font-medium"
+                              style={{
+                                color: "#8a5a00",
+                                backgroundColor: "#f2e6cf",
+                                border: "1px solid #e0c98a",
+                              }}
+                              title={`${r.inferredPct}% of issues in this workstream were attributed by keyword from the title, not stored in Linear. Tag issues at source to firm this up.`}
+                            >
+                              {r.inferredPct}% inferred
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="px-2 py-2 font-mono">{r.done}</td>
                       <td className="px-2 py-2 font-mono">{r.inProgress}</td>
@@ -414,9 +449,18 @@ function GateReadinessPanel({ gates }: { gates: GateReadiness[] }) {
               >
                 {band.label}
               </div>
-              <div className="w-40 shrink-0 text-[11px]" style={{ color: "#565c65" }}>
-                {g.daysRemaining >= 0 ? `${g.daysRemaining}d out` : `${-g.daysRemaining}d overdue`}{" "}
-                · {g.exitCriteriaMet}/{g.exitCriteriaTotal} met
+              <div className="w-52 shrink-0 text-[11px]" style={{ color: "#565c65" }}>
+                {g.daysRemaining >= 0 ? `${g.daysRemaining}d out` : `${-g.daysRemaining}d overdue`}
+                {/* Exit criteria are not individually tracked in any source yet,
+                    so exitCriteriaMet is always 0. Labelled a placeholder in
+                    place instead of showing a bare "0/5 met" that reads like a
+                    measurement. */}
+                <span
+                  title="Exit criteria are not individually tracked in Linear or Notion yet — placeholder"
+                  style={{ color: "#8a5a00" }}
+                >
+                  {" · not tracked yet"}
+                </span>
                 {g.blockingWorkItems > 0 ? ` · ${g.blockingWorkItems} blocking` : ""}
               </div>
             </div>
