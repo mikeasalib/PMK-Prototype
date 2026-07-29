@@ -109,11 +109,15 @@ export function ProgramSwitcher() {
  * a hand-made approximation of an official seal would misrepresent it.
  */
 function Seal({ program }: { program: ProgramConfig }) {
-  if (program.seal.src) {
+  // A configured path is not a guarantee the file is there. Falling back on
+  // error keeps the menu readable instead of showing a broken-image glyph.
+  const [failed, setFailed] = useState(false);
+  if (program.seal.src && !failed) {
     return (
       <img
         src={program.seal.src}
         alt={program.seal.alt}
+        onError={() => setFailed(true)}
         className="h-5 w-5 shrink-0 object-contain"
       />
     );

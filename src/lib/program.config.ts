@@ -138,7 +138,7 @@ const VA: ProgramConfig = {
   appName: "VA Program Intel",
   domainLabel: "VA.gov modernization",
   navColor: "#1f3d2b",
-  seal: { src: null, alt: "Department of Veterans Affairs seal" },
+  seal: { src: "/seal-va.png", alt: "Department of Veterans Affairs seal" },
   artifacts: ["rollup", "project-plan", "poam"],
   contract: {
     displayNumber: "36C10G24D0048",
@@ -254,7 +254,7 @@ const VENTURA: ProgramConfig = {
   appName: "Program Intel",
   domainLabel: "Ventura County Parks recreation deployment",
   navColor: "#1f3d2b",
-  seal: { src: null, alt: "County of Ventura Parks logo" },
+  seal: { src: "/seal-ventura.png", alt: "County of Ventura Parks logo" },
   // No POA&M. It is a federal compliance artifact and has no meaning for a
   // county parks reservation system.
   artifacts: ["rollup", "project-plan"],
