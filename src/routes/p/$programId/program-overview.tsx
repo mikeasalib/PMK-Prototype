@@ -1,12 +1,20 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { Check } from "lucide-react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
-import { WsPip, WsTag } from "@/components/va-ui";
+import { WsPip } from "@/components/va-ui";
 import type { WorkstreamKey } from "@/lib/va-data";
 import { useStoredData, bucketOf, inferWorkstream } from "@/hooks/use-stored-data";
 import { HEALTH_COLOR, HEALTH_LABEL } from "@/lib/workstream-updates";
-import { PROGRAMS, pageTitle, workstreamKeys, workstreamOf } from "@/lib/program.config";
+import {
+  PROGRAMS,
+  pageTitle,
+  workstreamKeys,
+  workstreamOf,
+  type ProgramConfig,
+} from "@/lib/program.config";
 import { daysUntilLocal } from "@/lib/local-date";
 import { seedFor } from "@/lib/program-seed";
+import { useFollowUps } from "@/hooks/use-follow-ups";
 import { useProgram } from "./route";
 
 export const Route = createFileRoute("/p/$programId/program-overview")({
@@ -298,118 +306,111 @@ function Overview() {
             </div>
           </section>
 
-          {/* Workstream quick-dive — top 2-3 highlights each */}
-          <section
-            className="lg:col-span-2 rounded-md p-4"
-            style={{ backgroundColor: "#f7f7f5", border: "1px solid #e5e5e2" }}
-          >
-            <div className="mb-3 flex items-baseline justify-between">
-              <h2
-                className="text-sm font-semibold"
-                style={{ color: "#3a5a40", fontFamily: "Public Sans, system-ui, sans-serif" }}
-              >
-                Workstream quick-dive
-              </h2>
-              <span className="text-[11px]" style={{ color: "#565c65" }}>
-                From {seed.workstreamUpdatesSource?.label} · {seed.workstreamUpdatesSource?.date}
-              </span>
-            </div>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {seed.workstreamUpdates.map((u) => (
-                <div
-                  key={u.ws}
-                  className="rounded bg-white p-3"
-                  style={{
-                    border: "1px solid #e5e5e2",
-                    borderLeft: `3px solid ${HEALTH_COLOR[u.health]}`,
-                  }}
-                >
-                  <div className="flex items-baseline justify-between">
-                    <div className="text-[12px] font-semibold" style={{ color: "#3a5a40" }}>
-                      {u.ws} · {u.name}
-                    </div>
-                    <span
-                      className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase"
-                      style={{
-                        color: HEALTH_COLOR[u.health],
-                        backgroundColor: `${HEALTH_COLOR[u.health]}14`,
-                        border: `1px solid ${HEALTH_COLOR[u.health]}44`,
-                      }}
-                    >
-                      {HEALTH_LABEL[u.health]}
-                    </span>
-                  </div>
-                  <div className="mt-0.5 text-[10px]" style={{ color: "#565c65" }}>
-                    Lead: {u.owner}
-                  </div>
-                  <ul className="mt-2 list-disc pl-4 text-[12px]" style={{ color: "#1b1b1b" }}>
-                    {u.highlights.slice(0, 3).map((h, idx) => (
-                      <li key={idx}>{h}</li>
-                    ))}
-                  </ul>
-                  {u.nextSteps.length > 0 && (
-                    <div className="mt-2">
-                      <div
-                        className="text-[10px] font-semibold uppercase tracking-wide"
-                        style={{ color: "#2e8540" }}
-                      >
-                        Next
-                      </div>
-                      <ul
-                        className="mt-0.5 list-disc pl-4 text-[11px]"
-                        style={{ color: "#3d3d3d" }}
-                      >
-                        {u.nextSteps.slice(0, 2).map((n, idx) => (
-                          <li key={idx}>{n}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Active work quick-look */}
-          <section
-            className="lg:col-span-2 rounded-md p-4"
-            style={{ backgroundColor: "#f7f7f5", border: "1px solid #e5e5e2" }}
-          >
-            <h2
-              className="mb-3 text-sm font-semibold"
-              style={{ color: "#3a5a40", fontFamily: "Public Sans, system-ui, sans-serif" }}
-            >
-              What's moving right now
-            </h2>
-            <ul className="space-y-1.5 text-[12px]">
-              {linear
-                .filter((i) => bucketOf(i) === "in_progress")
-                .map((i) => {
-                  const ws = inferWorkstream(i, program) as WorkstreamKey;
-                  return (
-                    <li key={i.id} className="flex items-center gap-2">
-                      <WsTag ws={ws} />
-                      <a
-                        href={i.url ?? "#"}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="font-mono text-[11px] underline"
-                        style={{ color: "#005ea2" }}
-                      >
-                        {i.identifier}
-                      </a>
-                      <span className="truncate">{i.title}</span>
-                      <span className="ml-auto text-[11px]" style={{ color: "#565c65" }}>
-                        {i.assignee ?? "unassigned"}
-                      </span>
-                    </li>
-                  );
-                })}
-            </ul>
-          </section>
+          {/* Follow-ups summary. Replaces the old "Workstream quick-dive" (hand-
+              authored VA narrative, empty for other programs) and "What's moving
+              right now" (a re-list of in-progress issues already covered by
+              What's Important and the sprint board). The command centre is more
+              useful surfacing the sub-issue follow-ups caught between calls. */}
+          <FollowUpsSummary program={program} />
         </div>
       )}
     </AppLayout>
+  );
+}
+
+/**
+ * The command-centre view of Follow-ups: the open items caught between calls,
+ * with a count breakdown, inline "mark done" (so a forgotten to-do can be
+ * cleared without leaving the overview), and a link to the full page. Reads the
+ * same per-program curation as the Follow-ups route, so a done here shows there.
+ */
+function FollowUpsSummary({ program }: { program: ProgramConfig }) {
+  const { hydrated, buckets, setStatus } = useFollowUps(program.id);
+  const open = buckets.open;
+  const weOwe = open.filter((i) => i.direction === "we-owe").length;
+  const theyOwe = open.filter((i) => i.direction === "they-owe").length;
+  const todo = open.filter((i) => i.direction === null).length;
+  const top = open.slice(0, 6);
+
+  return (
+    <section
+      className="lg:col-span-2 rounded-md p-4"
+      style={{ backgroundColor: "#f7f7f5", border: "1px solid #e5e5e2" }}
+    >
+      <div className="mb-3 flex items-baseline justify-between">
+        <h2
+          className="text-sm font-semibold"
+          style={{ color: "#3a5a40", fontFamily: "Public Sans, system-ui, sans-serif" }}
+        >
+          Follow-ups{hydrated ? ` · ${open.length} open` : ""}
+        </h2>
+        <Link
+          to="/p/$programId/follow-ups"
+          params={{ programId: program.id }}
+          className="text-[11px] underline"
+          style={{ color: "#2e5d3a" }}
+        >
+          View all →
+        </Link>
+      </div>
+
+      {!hydrated ? (
+        <div className="text-[12px]" style={{ color: "#8a8a80" }}>
+          Loading…
+        </div>
+      ) : open.length === 0 ? (
+        <div className="text-[12px]" style={{ color: "#565c65" }}>
+          Nothing open — all follow-ups are done or dismissed.
+        </div>
+      ) : (
+        <>
+          <div
+            className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px]"
+            style={{ color: "#565c65" }}
+          >
+            {weOwe ? (
+              <span>
+                <b style={{ color: "#1b1b1b" }}>{weOwe}</b> we owe
+              </span>
+            ) : null}
+            {theyOwe ? (
+              <span>
+                <b style={{ color: "#1b1b1b" }}>{theyOwe}</b> they owe
+              </span>
+            ) : null}
+            {todo ? (
+              <span>
+                <b style={{ color: "#1b1b1b" }}>{todo}</b> to do
+              </span>
+            ) : null}
+          </div>
+          <ul className="space-y-1.5">
+            {top.map((item) => (
+              <li key={item.id} className="flex items-start gap-2.5">
+                <button
+                  type="button"
+                  aria-label="Mark done"
+                  onClick={() => setStatus(item.id, "done")}
+                  className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors hover:bg-[#eef3ee]"
+                  style={{ borderColor: "#c9c9c2", backgroundColor: "#ffffff" }}
+                >
+                  <Check size={11} strokeWidth={3} style={{ opacity: 0 }} />
+                </button>
+                <span className="min-w-0 flex-1 text-[12px]" style={{ color: "#1b1b1b" }}>
+                  {item.title}
+                  {item.owner ? <span style={{ color: "#8a8a80" }}> · {item.owner}</span> : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {open.length > top.length ? (
+            <div className="mt-2 text-[11px]" style={{ color: "#8a8a80" }}>
+              +{open.length - top.length} more
+            </div>
+          ) : null}
+        </>
+      )}
+    </section>
   );
 }
 
