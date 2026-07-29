@@ -1,0 +1,103 @@
+{
+  "programId": "va",
+  "capturedAt": "2026-07-29T19:14:39Z",
+  "note": "Proposed from the VA risk-register mitigations (Notion), each citing its row. DS curates.",
+  "candidates": [
+    {
+      "id": "va-fu-1",
+      "title": "Vivian to reach Andrea Townsend + Lindsey re: GitHub / vets-website access",
+      "direction": "we-owe",
+      "origin": "notion",
+      "source": {
+        "label": "VA Program Risk Register (Notion)"
+      },
+      "capturedAt": "2026-07-29T19:14:39Z",
+      "owner": "Vivian",
+      "detail": "Blocks all Kaizen implementation \u2014 R2"
+    },
+    {
+      "id": "va-fu-2",
+      "title": "Confirm branching strategy: isolated app + Flipper feature flag",
+      "direction": "we-owe",
+      "origin": "notion",
+      "source": {
+        "label": "VA Program Risk Register (Notion)"
+      },
+      "capturedAt": "2026-07-29T19:14:39Z",
+      "owner": "Vivian",
+      "detail": "R2"
+    },
+    {
+      "id": "va-fu-3",
+      "title": "Kick off internal screen-reader test on the prototype ahead of the formal 508 audit",
+      "direction": "we-owe",
+      "origin": "notion",
+      "source": {
+        "label": "VA Program Risk Register (Notion)"
+      },
+      "capturedAt": "2026-07-29T19:14:39Z",
+      "owner": "Michael / Daman",
+      "detail": "508 engagement opens Aug 1 \u2014 R4"
+    },
+    {
+      "id": "va-fu-4",
+      "title": "Finalize senior stakeholder roles from the 7/24 alignment; document who builds each section",
+      "direction": "we-owe",
+      "origin": "notion",
+      "source": {
+        "label": "VA Program Risk Register (Notion)"
+      },
+      "capturedAt": "2026-07-29T19:14:39Z",
+      "owner": "Vivian / Michael",
+      "detail": "R6"
+    },
+    {
+      "id": "va-fu-5",
+      "title": "Hold the WS1 data conversation (reporting API + SNS fallback + data dictionary)",
+      "direction": "we-owe",
+      "origin": "notion",
+      "source": {
+        "label": "VA Program Risk Register (Notion)"
+      },
+      "capturedAt": "2026-07-29T19:14:39Z",
+      "owner": "Michael / Brad",
+      "detail": "Mid next week \u2014 R7"
+    },
+    {
+      "id": "va-fu-6",
+      "title": "Lock the design-system package and hand off early to Matt's team",
+      "direction": "they-owe",
+      "origin": "notion",
+      "source": {
+        "label": "VA Program Risk Register (Notion)"
+      },
+      "capturedAt": "2026-07-29T19:14:39Z",
+      "owner": "Matt Dingee",
+      "detail": "By Aug 1 \u2014 R9"
+    },
+    {
+      "id": "va-fu-7",
+      "title": "Escalate if the WS2 CLEAR contract slips past Aug 1",
+      "direction": "we-owe",
+      "origin": "notion",
+      "source": {
+        "label": "VA Program Risk Register (Notion)"
+      },
+      "capturedAt": "2026-07-29T19:14:39Z",
+      "owner": "Mariam (GovCIO)",
+      "detail": "Threatens ATO readiness \u2014 R5"
+    },
+    {
+      "id": "va-fu-8",
+      "title": "Define action-required vs informational criteria for Needs Attention before build locks",
+      "direction": "we-owe",
+      "origin": "notion",
+      "source": {
+        "label": "VA Program Risk Register (Notion)"
+      },
+      "capturedAt": "2026-07-29T19:14:39Z",
+      "owner": "Daman / Kevin",
+      "detail": "R13"
+    }
+  ]
+}

@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   Users,
   FileOutput,
+  ListTodo,
   HelpCircle,
 } from "lucide-react";
 import { DataSourcesFooter } from "./DataSourcesFooter";
@@ -23,7 +24,14 @@ import { useProgram } from "@/routes/p/$programId/route";
 // route id, not a template string — TanStack fills the param from `params`.
 const NAV = [
   { to: "/p/$programId", label: "What's important", icon: Star },
-  { to: "/p/$programId/team-tasks", label: "Team tasks", icon: ListChecks },
+  {
+    to: "/p/$programId/team-tasks",
+    label: "Team tasks",
+    icon: ListChecks,
+    // Follow-ups are the sub-issue companion to team tasks: the discrete things
+    // caught between calls that never become a Linear issue, so they nest here.
+    children: [{ to: "/p/$programId/follow-ups", label: "Follow-ups", icon: ListTodo }],
+  },
   { to: "/p/$programId/program-overview", label: "Program overview", icon: LayoutDashboard },
   { to: "/p/$programId/sprint-board", label: "Sprint board", icon: LayoutGrid },
   { to: "/p/$programId/dependencies", label: "Dependency map", icon: Share2 },
@@ -37,6 +45,46 @@ const NAV = [
 const NAV_BG_FALLBACK = "#1f3d2b";
 const NAV_ACTIVE = "rgba(255,255,255,0.13)";
 const NAV_HOVER = "rgba(255,255,255,0.07)";
+
+interface NavLeaf {
+  to: string;
+  label: string;
+  icon: typeof Star;
+}
+
+/** One nav link, at top level or indented as a subnav child. Extracted so the
+ *  parent and its children render identically apart from the indent. */
+function renderNavLink(n: NavLeaf, indented: boolean, programId: string, pathname: string) {
+  const Icon = n.icon;
+  const href = n.to.replace("$programId", programId);
+  // The index route is a prefix of every sibling, so it is only "active" on an
+  // exact match — otherwise it would highlight everywhere.
+  const active = n.to === "/p/$programId" ? pathname === href : pathname.startsWith(href);
+  return (
+    <Link
+      to={n.to}
+      params={{ programId }}
+      className="flex items-center gap-3 rounded-lg py-2 text-[13px] transition-colors"
+      style={{
+        // Indented children sit under the parent's label, with a smaller icon.
+        paddingLeft: indented ? 34 : 12,
+        paddingRight: 12,
+        backgroundColor: active ? NAV_ACTIVE : "transparent",
+        color: active ? "#ffffff" : "rgba(255,255,255,0.82)",
+        fontWeight: active ? 600 : 500,
+      }}
+      onMouseEnter={(e) => {
+        if (!active) e.currentTarget.style.backgroundColor = NAV_HOVER;
+      }}
+      onMouseLeave={(e) => {
+        if (!active) e.currentTarget.style.backgroundColor = "transparent";
+      }}
+    >
+      <Icon size={indented ? 15 : 18} strokeWidth={active ? 2.25 : 2} />
+      <span>{n.label}</span>
+    </Link>
+  );
+}
 
 export function AppLayout({ children }: { children?: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -70,32 +118,14 @@ export function AppLayout({ children }: { children?: ReactNode }) {
 
         <nav className="flex-1 space-y-0.5 px-2 py-1">
           {NAV.map((n) => {
-            const Icon = n.icon;
-            // The index route is a prefix of every sibling, so it can only be
-            // "active" on an exact match — otherwise it highlights everywhere.
-            const href = n.to.replace("$programId", program.id);
-            const active = n.to === "/p/$programId" ? pathname === href : pathname.startsWith(href);
+            const children = "children" in n ? n.children : undefined;
             return (
-              <Link
-                key={n.to}
-                to={n.to}
-                params={{ programId: program.id }}
-                className="flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] transition-colors"
-                style={{
-                  backgroundColor: active ? NAV_ACTIVE : "transparent",
-                  color: active ? "#ffffff" : "rgba(255,255,255,0.82)",
-                  fontWeight: active ? 600 : 500,
-                }}
-                onMouseEnter={(e) => {
-                  if (!active) e.currentTarget.style.backgroundColor = NAV_HOVER;
-                }}
-                onMouseLeave={(e) => {
-                  if (!active) e.currentTarget.style.backgroundColor = "transparent";
-                }}
-              >
-                <Icon size={18} strokeWidth={active ? 2.25 : 2} />
-                <span>{n.label}</span>
-              </Link>
+              <div key={n.to}>
+                {renderNavLink(n, false, program.id, pathname)}
+                {children?.map((c) => (
+                  <div key={c.to}>{renderNavLink(c, true, program.id, pathname)}</div>
+                ))}
+              </div>
             );
           })}
         </nav>
