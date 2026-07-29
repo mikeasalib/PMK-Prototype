@@ -50,16 +50,66 @@ export type Database = {
         }
         Relationships: []
       }
+      linear_milestones: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          progress: number | null
+          sort_order: number | null
+          source_created_at: string | null
+          source_id: string
+          source_updated_at: string | null
+          synced_at: string
+          target_date: string | null
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          progress?: number | null
+          sort_order?: number | null
+          source_created_at?: string | null
+          source_id: string
+          source_updated_at?: string | null
+          synced_at?: string
+          target_date?: string | null
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          progress?: number | null
+          sort_order?: number | null
+          source_created_at?: string | null
+          source_id?: string
+          source_updated_at?: string | null
+          synced_at?: string
+          target_date?: string | null
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: []
+      }
       linear_issues: {
         Row: {
           assignee: string | null
           created_at: string
           cycle_name: string | null
           cycle_number: number | null
+          due_date: string | null
           id: string
           identifier: string
           labels: string[] | null
           priority: number | null
+          source_created_at: string | null
           source_id: string
           source_updated_at: string | null
           state_name: string | null
@@ -75,10 +125,12 @@ export type Database = {
           created_at?: string
           cycle_name?: string | null
           cycle_number?: number | null
+          due_date?: string | null
           id?: string
           identifier: string
           labels?: string[] | null
           priority?: number | null
+          source_created_at: string | null
           source_id: string
           source_updated_at?: string | null
           state_name?: string | null
@@ -94,10 +146,12 @@ export type Database = {
           created_at?: string
           cycle_name?: string | null
           cycle_number?: number | null
+          due_date?: string | null
           id?: string
           identifier?: string
           labels?: string[] | null
           priority?: number | null
+          source_created_at?: string | null
           source_id?: string
           source_updated_at?: string | null
           state_name?: string | null

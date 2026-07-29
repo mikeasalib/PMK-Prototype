@@ -2,6 +2,8 @@
 // Never imported from client code.
 
 import { SOURCES } from "./program.sources.server";
+// Narrow on purpose: only what the source literally said gets persisted.
+import { parseSourceWorkstream } from "./program.config";
 
 const GATEWAY = SOURCES.gatewayUrl;
 
@@ -11,11 +13,6 @@ function headers(connKey: string) {
     "X-Connection-Api-Key": connKey,
     "Content-Type": "application/json",
   };
-}
-
-function parseWorkstream(title: string): string | null {
-  const m = title.match(/\bWS([1-5])\b/i);
-  return m ? `WS${m[1]}` : null;
 }
 
 async function getAdmin() {
@@ -57,13 +54,20 @@ export async function syncLinear(): Promise<SyncSourceResult> {
       body: JSON.stringify({
         query: `query {
           project(id: "${SOURCES.linear.projectId}") {
+            url
             issues(first: 250) {
               nodes {
-                id identifier title url priority updatedAt
+                id identifier title url priority updatedAt createdAt dueDate
                 state { name type }
                 assignee { name }
                 cycle { number name }
                 labels { nodes { name } }
+              }
+            }
+            projectMilestones(first: 100) {
+              nodes {
+                id name description targetDate progress sortOrder
+                createdAt updatedAt
               }
             }
           }
@@ -72,7 +76,13 @@ export async function syncLinear(): Promise<SyncSourceResult> {
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = (await res.json()) as {
-      data?: { project?: { issues?: { nodes?: Array<Record<string, unknown>> } } };
+      data?: {
+        project?: {
+          url?: string;
+          issues?: { nodes?: Array<Record<string, unknown>> };
+          projectMilestones?: { nodes?: Array<Record<string, unknown>> };
+        };
+      };
       errors?: Array<{ message: string }>;
     };
     if (data.errors?.length) throw new Error(data.errors[0].message);
@@ -91,21 +101,50 @@ export async function syncLinear(): Promise<SyncSourceResult> {
         state_type: state?.type ?? null,
         priority: (n.priority as number) ?? null,
         assignee: assignee?.name ?? null,
-        workstream: parseWorkstream(title),
+        workstream: parseSourceWorkstream(title),
         cycle_number: cycle?.number ?? null,
         cycle_name: cycle?.name ?? null,
         labels: labels.map((l) => l.name),
         url: (n.url as string) ?? null,
+        // Nullable and left that way: most issues carry no due date, and a NULL
+        // means "no commitment made", not "due today".
+        due_date: (n.dueDate as string) ?? null,
+        source_created_at: (n.createdAt as string) ?? null,
         source_updated_at: (n.updatedAt as string) ?? null,
         synced_at: new Date().toISOString(),
       };
     });
+    // Project milestones. These are the real dated backbone every artifact
+    // shares; before this they came from hand-maintained config.
+    const projectUrl = data.data?.project?.url ?? null;
+    const msNodes = data.data?.project?.projectMilestones?.nodes ?? [];
+    const msRows = msNodes.map((m) => ({
+      source_id: m.id as string,
+      name: (m.name as string) ?? "(untitled)",
+      description: (m.description as string) ?? null,
+      // Linear allows an undated milestone. Keep NULL rather than substituting
+      // a date, so a reader can tell "undated" from "due today".
+      target_date: (m.targetDate as string) ?? null,
+      progress: typeof m.progress === "number" ? m.progress : null,
+      sort_order: typeof m.sortOrder === "number" ? m.sortOrder : null,
+      url: projectUrl,
+      source_created_at: (m.createdAt as string) ?? null,
+      source_updated_at: (m.updatedAt as string) ?? null,
+      synced_at: new Date().toISOString(),
+    }));
+
     const admin = await getAdmin();
     if (rows.length) {
       const { error } = await admin.from("linear_issues").upsert(rows, { onConflict: "source_id" });
       if (error) throw new Error(error.message);
     }
-    const message = `${rows.length} ${SOURCES.linear.itemNoun}`;
+    if (msRows.length) {
+      const { error } = await admin
+        .from("linear_milestones")
+        .upsert(msRows, { onConflict: "source_id" });
+      if (error) throw new Error(error.message);
+    }
+    const message = `${rows.length} ${SOURCES.linear.itemNoun}, ${msRows.length} milestones`;
     const r = { key: "linear" as const, ok: true, count: rows.length, scope, message };
     await logRun(r);
     return r;
@@ -134,7 +173,9 @@ export async function syncGranola(): Promise<SyncSourceResult> {
       notes?: Array<{ id: string; title?: string; updated_at?: string; created_at?: string }>;
     };
     const seen = new Set<string>();
-    const unique = (data.notes ?? []).filter((n) => (seen.has(n.id) ? false : (seen.add(n.id), true)));
+    const unique = (data.notes ?? []).filter((n) =>
+      seen.has(n.id) ? false : (seen.add(n.id), true),
+    );
     const rows = unique.map((n) => ({
       source_id: n.id,
       title: n.title ?? "(untitled)",
@@ -153,7 +194,13 @@ export async function syncGranola(): Promise<SyncSourceResult> {
     await logRun(r);
     return r;
   } catch (e) {
-    const r = { key: "granola" as const, ok: false, count: 0, scope, message: (e as Error).message };
+    const r = {
+      key: "granola" as const,
+      ok: false,
+      count: 0,
+      scope,
+      message: (e as Error).message,
+    };
     await logRun(r);
     return r;
   }
@@ -161,7 +208,9 @@ export async function syncGranola(): Promise<SyncSourceResult> {
 
 function notionTitle(block: Record<string, unknown>): string {
   const type = block.type as string;
-  const inner = block[type] as { title?: string; rich_text?: Array<{ plain_text?: string }> } | undefined;
+  const inner = block[type] as
+    | { title?: string; rich_text?: Array<{ plain_text?: string }> }
+    | undefined;
   if (inner?.title) return inner.title;
   if (inner?.rich_text?.length) return inner.rich_text.map((t) => t.plain_text ?? "").join("");
   return "(untitled)";

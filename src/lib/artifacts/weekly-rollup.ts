@@ -14,6 +14,7 @@
 //     writes the story.
 
 import type { GateReadiness, ProgramModel, WorkItemRecord } from "../program-model";
+import { bySeverityThenState } from "../risk-register";
 import { HEALTH_LABEL } from "../workstream-updates";
 
 export interface RollupOptions {
@@ -40,7 +41,7 @@ export function renderWeeklyRollup(model: ProgramModel, opts: RollupOptions): st
   L.push("");
   L.push(`**Reporting period:** ${windowStart} to ${opts.asOf} (${windowDays} days)`);
   L.push(`**Client:** ${model.program.client}`);
-  L.push(`**Contract:** ${model.program.contractNumber}`);
+  if (model.program.contractNumber) L.push(`**Contract:** ${model.program.contractNumber}`);
   L.push(
     `**Launch:** ${model.program.launchDate} ` +
       `(${daysBetween(opts.asOf, model.program.launchDate)} days out)`,
@@ -145,7 +146,22 @@ export function renderWeeklyRollup(model: ProgramModel, opts: RollupOptions): st
           `${items.filter((i) => i.bucket !== "done" && i.bucket !== "canceled").length} |`,
       );
     }
-    L.push("");
+    // Attribution honesty. Measured on the live DEP board, only 7 of 50 issues
+    // carry an explicit workstream, so the per-workstream split above is mostly
+    // inference. Saying so is the difference between a reading and a guess.
+    const inferred = model.workItems.filter(
+      (w) => w.attribution === "keyword" || w.attribution === "fallback",
+    ).length;
+    if (inferred) {
+      const pct = Math.round((inferred / model.workItems.length) * 100);
+      L.push(
+        `_Workstream attribution: ${model.workItems.length - inferred} of ` +
+          `${model.workItems.length} come from the issue itself; ${inferred} (${pct}%) are ` +
+          "inferred from the title. Treat the per-workstream split as indicative, " +
+          "not authoritative — tag issues with a workstream at source to fix this._",
+      );
+      L.push("");
+    }
   } else {
     L.push(GAP + " No delivery data synced — Linear has not been read.");
     L.push("");
@@ -155,16 +171,35 @@ export function renderWeeklyRollup(model: ProgramModel, opts: RollupOptions): st
   L.push("## Risks and blockers");
   L.push("");
   if (model.risks.length) {
-    const open = model.risks.filter((r) => r.state !== "resolved");
-    L.push("| ID | Severity | Risk | Owner | Next action | Due |");
-    L.push("| --- | --- | --- | --- | --- | --- |");
+    const open = [...model.risks].filter((r) => r.state !== "resolved").sort(bySeverityThenState);
+    const high = open.filter((r) => r.severity === "high");
+    L.push(
+      `${open.length} open of ${model.risks.length} tracked — ` + `${high.length} high severity.`,
+    );
+    L.push("");
+    L.push("| ID | Severity | Risk | Area | Owner | Next action | Tickets |");
+    L.push("| --- | --- | --- | --- | --- | --- | --- |");
     for (const r of open) {
+      const sev =
+        r.likelihood && r.impact
+          ? `${r.severity} (${r.likelihood}×${r.impact})`
+          : r.severityNote
+            ? `${r.severity} (${r.severityNote})`
+            : r.severity;
       L.push(
-        `| ${r.id} | ${r.severity} | ${r.description} | ${r.owner ?? "—"} | ` +
-          `${r.mitigation ?? "—"} | ${r.dueAt ?? "—"} |`,
+        `| ${r.id} | ${sev} | ${cell(r.description)} | ${r.area ?? "—"} | ${r.owner ?? "—"} | ` +
+          `${cell(r.mitigation)} | ${r.linkedWorkItems.join(", ") || "—"} |`,
       );
     }
     L.push("");
+    const noDue = open.filter((r) => r.dueAt === null).length;
+    if (noDue) {
+      L.push(
+        `_${noDue} of ${open.length} open risks carry no scheduled completion date. ` +
+          "A POA&M requires one per row — enrich at source._",
+      );
+      L.push("");
+    }
   } else {
     L.push(GAP + " The risk register is not connected yet.");
     L.push("");
@@ -195,6 +230,12 @@ export function renderWeeklyRollup(model: ProgramModel, opts: RollupOptions): st
 }
 
 // ---------------------------------------------------------------- helpers
+
+/** Escape a value for a Markdown table cell. A stray pipe in prose would split
+ *  the row and silently corrupt every column after it. */
+function cell(v: string | null): string {
+  return (v ?? "—").replace(/\|/g, "\\|").replace(/\n+/g, " ");
+}
 
 function pressureLabel(p: number): string {
   const pct = Math.round(p * 100);

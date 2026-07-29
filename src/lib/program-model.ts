@@ -14,7 +14,12 @@
 // SourceRef is a record nobody can stand behind, so `origin: "config"` is a
 // distinct, explicit state rather than an empty refs array.
 
-import { PROGRAM, type Workstream } from "./program.config";
+import {
+  PROGRAM,
+  type AttributionBasis,
+  type ProgramConfig,
+  type Workstream,
+} from "./program.config";
 import type { Health } from "./workstream-updates";
 
 // ---------------------------------------------------------------- provenance
@@ -50,7 +55,9 @@ export interface ProgramFacts {
   id: string;
   name: string;
   client: string;
-  contractNumber: string;
+  /** Null when the engagement has no contract number. Renderers must mark the
+   *  gap rather than print an empty string that reads like a missing value. */
+  contractNumber: string | null;
   periodLabel: string;
   launchDate: string; // YYYY-MM-DD
 }
@@ -101,11 +108,25 @@ export interface WorkItemRecord {
   workstream: string;
   priority: number | null;
   labels: string[];
+  /**
+   * How the workstream was arrived at. Only "stored" and "explicit" are facts;
+   * "keyword" and "fallback" are inference. Carried per record so a renderer can
+   * report the split instead of presenting a guess as a reading.
+   */
+  attribution: AttributionBasis;
+  /** Real values from Linear. Both nullable — most issues have neither. */
+  dueDate: string | null;
+  createdAt: string | null;
   origin: Origin;
 }
 
-export type RiskSeverity = "low" | "medium" | "high" | "critical";
-export type RiskState = "open" | "mitigating" | "resolved";
+/** Matches the register's own three-level key. Deliberately not extended with a
+ *  "critical" level the source does not distinguish. */
+export type RiskSeverity = "low" | "medium" | "high";
+/** Mirrors the states the register actually uses. "monitoring" is kept distinct
+ *  from "mitigating": watching a risk is not the same as acting on it. */
+export type RiskState = "open" | "mitigating" | "monitoring" | "resolved";
+export type Likelihood = "H" | "M" | "L";
 
 /**
  * Shaped for the FedRAMP POA&M columns, since that is the strictest consumer.
@@ -118,7 +139,16 @@ export interface RiskRecord {
   /** POA&M: Weakness Description. */
   description: string;
   severity: RiskSeverity;
+  /** Likelihood x impact, when the register states it. Preserved separately
+   *  because the register's three severity labels lose this granularity — R1
+   *  (HxH) and R3 (MxH) are both "high". */
+  likelihood: Likelihood | null;
+  impact: Likelihood | null;
+  /** Qualifier the register attaches to severity, e.g. "accepted", "mitigated". */
+  severityNote: string | null;
   state: RiskState;
+  /** Free-text area from the register, e.g. "WS1 / infra", "delivery / capacity". */
+  area: string | null;
   workstream: string | null;
   /** POA&M: Point of Contact. */
   owner: string | null;
@@ -132,8 +162,8 @@ export interface RiskRecord {
   control: string | null;
   /** POA&M: Asset Identifier. */
   assetId: string | null;
-  /** Linked delivery ticket, when the risk has one. */
-  linkedWorkItem: string | null;
+  /** Linked delivery tickets. Plural — register rows cite up to three. */
+  linkedWorkItems: string[];
   origin: Origin;
 }
 
@@ -177,14 +207,16 @@ export interface ProgramModel {
 
 // ------------------------------------------------------------------ assembly
 
-export function programFactsFromConfig(): ProgramFacts {
+export function programFactsFromConfig(program: ProgramConfig = PROGRAM): ProgramFacts {
   return {
-    id: PROGRAM.id,
-    name: PROGRAM.name,
-    client: PROGRAM.contract.customer,
-    contractNumber: PROGRAM.contract.fullNumber,
-    periodLabel: PROGRAM.contract.period,
-    launchDate: PROGRAM.keyDates.launch,
+    id: program.id,
+    name: program.name,
+    client: program.contract.customer,
+    // Null for a commercial engagement with no contract vehicle. Kept null so a
+    // renderer prints a gap rather than the string "null".
+    contractNumber: program.contract.fullNumber,
+    periodLabel: program.contract.period,
+    launchDate: program.keyDates.launch,
   };
 }
 
@@ -195,8 +227,8 @@ export function programFactsFromConfig(): ProgramFacts {
  * problem this design is meant to avoid. A caller with a dated source can
  * attach health via withHealth().
  */
-export function workstreamsFromConfig(): WorkstreamRecord[] {
-  return PROGRAM.workstreams.map((w: Workstream) => ({
+export function workstreamsFromConfig(program: ProgramConfig = PROGRAM): WorkstreamRecord[] {
+  return program.workstreams.map((w: Workstream) => ({
     key: w.key,
     label: w.label,
     owner: w.owner,
@@ -225,10 +257,13 @@ export function workItemFromLinear(
     assignee: string | null;
     labels: string[] | null;
     url: string | null;
+    due_date?: string | null;
+    source_created_at?: string | null;
     synced_at: string;
   },
   bucket: string,
   workstream: string,
+  attribution: AttributionBasis = "keyword",
 ): WorkItemRecord {
   return {
     id: row.source_id,
@@ -240,6 +275,9 @@ export function workItemFromLinear(
     workstream,
     priority: row.priority,
     labels: row.labels ?? [],
+    attribution,
+    dueDate: row.due_date ?? null,
+    createdAt: row.source_created_at ? row.source_created_at.slice(0, 10) : null,
     origin: {
       kind: "sourced",
       refs: [

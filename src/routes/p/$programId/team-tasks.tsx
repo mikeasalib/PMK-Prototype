@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
 import { useStoredData, bucketOf, priorityLabel, type StoredLinearIssue, type LinearBucket } from "@/hooks/use-stored-data";
 
-export const Route = createFileRoute("/team-tasks")({
+export const Route = createFileRoute("/p/$programId/team-tasks")({
   head: () => ({
     meta: [
       { title: "Team tasks — Sprint 4" },

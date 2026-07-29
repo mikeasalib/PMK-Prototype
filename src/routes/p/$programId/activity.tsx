@@ -4,13 +4,17 @@ import { AppLayout, PageHeader } from "@/components/AppLayout";
 import type { WorkstreamKey } from "@/lib/va-data";
 import { useStoredData, inferWorkstream } from "@/hooks/use-stored-data";
 import { relativeTime } from "@/hooks/use-program-data";
-import { pageTitle, workstreamOf } from "@/lib/program.config";
+import { PROGRAMS, pageTitle, workstreamOf } from "@/lib/program.config";
+import { useProgram } from "./route";
 
-export const Route = createFileRoute("/activity")({
-  head: () => ({
+export const Route = createFileRoute("/p/$programId/activity")({
+  head: ({ params }) => ({
     meta: [
-      { title: pageTitle("Activity feed") },
-      { name: "description", content: "Reverse-chronological program event stream from Linear, Notion and Granola." },
+      { title: pageTitle("Activity feed", PROGRAMS[params.programId]) },
+      {
+        name: "description",
+        content: "Reverse-chronological program event stream from Linear, Notion and Granola.",
+      },
     ],
   }),
   component: ActivityFeed,
@@ -34,6 +38,7 @@ type Event = {
 };
 
 function ActivityFeed() {
+  const program = useProgram();
   const { linear, notion, granola, isLoading } = useStoredData();
   const [kind, setKind] = useState<Kind | "all">("all");
 
@@ -47,7 +52,7 @@ function ActivityFeed() {
         title: `${i.identifier} · ${i.title}`,
         detail: `${i.state_name ?? "—"} · ${i.assignee ?? "unassigned"}`,
         url: i.url,
-        ws: inferWorkstream(i) as WorkstreamKey,
+        ws: inferWorkstream(i, program) as WorkstreamKey,
       });
     }
     for (const n of notion) {
@@ -95,7 +100,9 @@ function ActivityFeed() {
         className="flex flex-wrap items-center gap-3 px-6 py-3"
         style={{ borderBottom: "1px solid #e5e5e2" }}
       >
-        <span className="text-[11px] uppercase tracking-wide" style={{ color: "#666" }}>Source</span>
+        <span className="text-[11px] uppercase tracking-wide" style={{ color: "#666" }}>
+          Source
+        </span>
         {(["all", "linear", "notion", "granola"] as const).map((k) => {
           const active = kind === k;
           const c = k === "all" ? "#3a5a40" : KIND_META[k].color;
@@ -120,12 +127,17 @@ function ActivityFeed() {
       </div>
 
       {isLoading ? (
-        <div className="p-6 text-[13px]" style={{ color: "#565c65" }}>Loading live data…</div>
+        <div className="p-6 text-[13px]" style={{ color: "#565c65" }}>
+          Loading live data…
+        </div>
       ) : (
         <div className="p-6 space-y-4">
           {grouped.map(([date, items]) => (
             <section key={date}>
-              <div className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-wide" style={{ color: "#3a5a40" }}>
+              <div
+                className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-wide"
+                style={{ color: "#3a5a40" }}
+              >
                 {date}
               </div>
               <ul className="rounded-md bg-white" style={{ border: "1px solid #e5e5e2" }}>
@@ -152,7 +164,7 @@ function ActivityFeed() {
                       {e.ws ? (
                         <span
                           className="mt-1 inline-block h-2 w-2 shrink-0 rounded-full"
-                          style={{ backgroundColor: workstreamOf(e.ws).color }}
+                          style={{ backgroundColor: workstreamOf(e.ws, program).color }}
                           title={e.ws}
                         />
                       ) : (
@@ -161,7 +173,13 @@ function ActivityFeed() {
                       <div className="min-w-0 flex-1">
                         <div className="font-medium">
                           {e.url ? (
-                            <a href={e.url} target="_blank" rel="noreferrer" className="underline" style={{ color: "#005ea2" }}>
+                            <a
+                              href={e.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="underline"
+                              style={{ color: "#005ea2" }}
+                            >
                               {e.title}
                             </a>
                           ) : (

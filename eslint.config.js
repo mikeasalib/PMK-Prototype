@@ -6,7 +6,20 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", ".output", ".vinxi"] },
+  {
+    ignores: [
+      "dist",
+      ".output",
+      ".vinxi",
+      // Generated files. Both carry a "do not edit" header, both are rewritten
+      // by their generators, and prettier disagrees with the style those
+      // generators emit — so linting them produced ~230 permanent errors that
+      // nobody could fix without the next regeneration undoing it. Excluding
+      // them is what makes the lint count mean something.
+      "src/integrations/supabase/types.ts",
+      "src/routeTree.gen.ts",
+    ],
+  },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
