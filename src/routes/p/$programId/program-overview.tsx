@@ -29,7 +29,7 @@ const daysFromNow = daysUntilLocal;
 function Overview() {
   const program = useProgram();
   const seed = seedFor(program.id);
-  const { linear, isLoading } = useStoredData();
+  const { linear, isLoading, origin } = useStoredData(program.id);
   // Per-program, from the URL. Was a module-level constant.
   const SPRINT_MILESTONES = program.sprintStrip;
 
@@ -62,7 +62,15 @@ function Overview() {
     <AppLayout>
       <PageHeader
         title="Program overview"
-        subtitle={`${program.domainLabel} · Contract ${program.contract.displayNumber} · live from Linear`}
+        subtitle={[
+          program.domainLabel,
+          // Ventura has no contract number; printing "Contract null" was the
+          // other half of this line being wrong.
+          program.contract.displayNumber ? `Contract ${program.contract.displayNumber}` : null,
+          origin === "snapshot" ? "captured snapshot" : "live from Linear",
+        ]
+          .filter(Boolean)
+          .join(" · ")}
       />
 
       {/* Milestone strip */}
@@ -161,7 +169,7 @@ function Overview() {
             </h2>
             <div className="grid grid-cols-4 gap-3">
               <Milestone
-                label="Sprint 4 end"
+                label={`${program.sprintStrip[0]?.label ?? "First milestone"} end`}
                 date={activeSprint.end}
                 days={daysFromNow(activeSprint.end)}
               />

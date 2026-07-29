@@ -10,11 +10,13 @@ import {
 
 export type { StoredLinearIssue, StoredNotionPage, StoredGranolaNote };
 
-export function useStoredData() {
+export function useStoredData(programId: string) {
   const fn = useServerFn(getStoredData);
   const { data, isLoading } = useQuery({
-    queryKey: ["stored-data"],
-    queryFn: () => fn(),
+    // Keyed by program: without this, switching engagements served the previous
+    // program's cached rows until the query went stale.
+    queryKey: ["stored-data", programId],
+    queryFn: () => fn({ data: programId }),
     staleTime: 30_000,
   });
   return {
@@ -22,6 +24,9 @@ export function useStoredData() {
     linear: data?.linear ?? [],
     notion: data?.notion ?? [],
     granola: data?.granola ?? [],
+    origin: data?.origin ?? "empty",
+    capturedAt: data?.capturedAt ?? null,
+    capturedFrom: data?.capturedFrom ?? null,
   };
 }
 

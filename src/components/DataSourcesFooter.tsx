@@ -1,4 +1,5 @@
 import { useProgramData, relativeTime, absoluteTime } from "@/hooks/use-program-data";
+import { useStoredData } from "@/hooks/use-stored-data";
 import { useProgram } from "@/routes/p/$programId/route";
 
 const SOURCES = [
@@ -10,6 +11,9 @@ const SOURCES = [
 export function DataSourcesFooter() {
   const program = useProgram();
   const { lastSyncedAt, sources, counts } = useProgramData();
+  // The origin of the rows the pages are actually rendering. Without this the
+  // footer said "Linear · not synced" on a page full of Linear issues.
+  const { origin, capturedAt, capturedFrom, linear } = useStoredData(program.id);
   const statusFor = (k: string) => sources.find((s) => s.key === k);
 
   return (
@@ -23,9 +27,22 @@ export function DataSourcesFooter() {
       <ul className="space-y-1">
         {SOURCES.map(({ key, label }) => {
           const s = statusFor(key);
-          const color = !s ? "#8a9099" : s.ok ? "#2e8540" : "#e52207";
+          // A snapshot is neither synced nor absent, and must not be shown as
+          // either. Amber, and it says which it is.
+          const isSnapshotSource = origin === "snapshot" && key === "linear";
+          const color = isSnapshotSource
+            ? "#8a5a00"
+            : !s
+              ? "#8a9099"
+              : s.ok
+                ? "#2e8540"
+                : "#e52207";
           const count = counts[key];
-          const text = !s ? "not synced" : `${count} in DB`;
+          const text = isSnapshotSource
+            ? `${linear.length} snapshot`
+            : !s
+              ? "not synced"
+              : `${count} in DB`;
           return (
             <li key={key} className="flex items-center gap-2" title={s?.scope ?? text}>
               <span
@@ -48,6 +65,17 @@ export function DataSourcesFooter() {
       >
         Last refresh · {relativeTime(lastSyncedAt)}
       </div>
+      {origin === "snapshot" ? (
+        <div
+          className="mt-2 rounded px-2 py-1.5 text-[10px] leading-snug"
+          style={{ backgroundColor: "rgba(138,90,0,0.22)", color: "#f2d9a8" }}
+          title={capturedFrom ?? undefined}
+        >
+          <strong>Captured snapshot, not a live read.</strong> Taken{" "}
+          {capturedAt ? relativeTime(capturedAt) : "unknown"}. Connect Supabase and run a sync for
+          live data.
+        </div>
+      ) : null}
       <div className="mt-2" style={{ color: "#8a9099" }}>
         {[
           program.contract.displayNumber ? `Contract ${program.contract.displayNumber}` : null,

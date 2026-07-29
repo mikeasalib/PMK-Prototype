@@ -115,27 +115,81 @@ export type StoredGranolaNote = {
   synced_at: string;
 };
 
-export const getStoredData = createServerFn({ method: "GET" }).handler(async () => {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const [linear, notion, granola] = await Promise.all([
-    supabaseAdmin
-      .from("linear_issues")
-      .select(
-        "id, source_id, identifier, title, state_name, state_type, priority, assignee, workstream, labels, url, source_updated_at, synced_at",
-      )
-      .order("source_updated_at", { ascending: false }),
-    supabaseAdmin
-      .from("notion_pages")
-      .select("id, source_id, title, url, parent_type, source_updated_at, synced_at")
-      .order("source_updated_at", { ascending: false }),
-    supabaseAdmin
-      .from("granola_notes")
-      .select("id, source_id, title, url, source_updated_at, synced_at")
-      .order("source_updated_at", { ascending: false }),
-  ]);
-  return {
-    linear: (linear.data ?? []) as StoredLinearIssue[],
-    notion: (notion.data ?? []) as StoredNotionPage[],
-    granola: (granola.data ?? []) as StoredGranolaNote[],
-  };
-});
+export type StoredDataOrigin = "live" | "snapshot" | "empty";
+
+export interface StoredData {
+  linear: StoredLinearIssue[];
+  notion: StoredNotionPage[];
+  granola: StoredGranolaNote[];
+  /** Where these rows came from. The UI must not present a snapshot as live. */
+  origin: StoredDataOrigin;
+  /** For a snapshot, when it was captured. Null when live or empty. */
+  capturedAt: string | null;
+  /** Human-readable provenance for a snapshot. */
+  capturedFrom: string | null;
+}
+
+export const getStoredData = createServerFn({ method: "GET" })
+  .inputValidator((programId: string) => programId)
+  .handler(async ({ data: programId }): Promise<StoredData> => {
+    const live = await readLive();
+    if (live) return { ...live, origin: "live", capturedAt: null, capturedFrom: null };
+
+    // Supabase unreachable or empty. Fall back to a captured snapshot so the app is
+    // developable without the service-role key — but never in preference to live
+    // data, and never silently: the origin travels with the rows.
+    const { snapshotFor, snapshotFallbackAllowed } = await import("./snapshots");
+    const snap = snapshotFallbackAllowed() ? snapshotFor(programId) : null;
+    if (!snap) {
+      return {
+        linear: [],
+        notion: [],
+        granola: [],
+        origin: "empty",
+        capturedAt: null,
+        capturedFrom: null,
+      };
+    }
+    return {
+      linear: snap.linear_issues as unknown as StoredLinearIssue[],
+      notion: [],
+      granola: [],
+      origin: "snapshot",
+      capturedAt: snap.fetchedAt,
+      capturedFrom: snap.source,
+    };
+  });
+
+/** Live read. Returns null when Supabase cannot be reached or holds nothing. */
+async function readLive() {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [linear, notion, granola] = await Promise.all([
+      supabaseAdmin
+        .from("linear_issues")
+        .select(
+          "id, source_id, identifier, title, state_name, state_type, priority, assignee, workstream, labels, url, source_updated_at, synced_at",
+        )
+        .order("source_updated_at", { ascending: false }),
+      supabaseAdmin
+        .from("notion_pages")
+        .select("id, source_id, title, url, parent_type, source_updated_at, synced_at")
+        .order("source_updated_at", { ascending: false }),
+      supabaseAdmin
+        .from("granola_notes")
+        .select("id, source_id, title, url, source_updated_at, synced_at")
+        .order("source_updated_at", { ascending: false }),
+    ]);
+    const rows = {
+      linear: (linear.data ?? []) as StoredLinearIssue[],
+      notion: (notion.data ?? []) as StoredNotionPage[],
+      granola: (granola.data ?? []) as StoredGranolaNote[],
+    };
+    // Nothing synced yet counts as "no live data", so the caller can fall back
+    // rather than render a confidently empty board.
+    const total = rows.linear.length + rows.notion.length + rows.granola.length;
+    return total > 0 ? rows : null;
+  } catch {
+    return null;
+  }
+}

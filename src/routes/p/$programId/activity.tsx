@@ -39,7 +39,7 @@ type Event = {
 
 function ActivityFeed() {
   const program = useProgram();
-  const { linear, notion, granola, isLoading } = useStoredData();
+  const { linear, notion, granola, isLoading, origin } = useStoredData(program.id);
   const [kind, setKind] = useState<Kind | "all">("all");
 
   const events: Event[] = useMemo(() => {
@@ -94,7 +94,11 @@ function ActivityFeed() {
     <AppLayout>
       <PageHeader
         title="Activity feed"
-        subtitle="Everything that changed, newest first — live from all three sources."
+        subtitle={
+          origin === "snapshot"
+            ? "Everything that changed, newest first — from a captured snapshot."
+            : "Everything that changed, newest first — live from all three sources."
+        }
       />
       <div
         className="flex flex-wrap items-center gap-3 px-6 py-3"

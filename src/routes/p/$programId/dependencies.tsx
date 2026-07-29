@@ -36,7 +36,7 @@ function Dependencies() {
   // module happened to import — the third instance of that bug in these files.
   const WS_ORDER: WorkstreamKey[] = workstreamKeys(program);
   const seed = seedFor(program.id);
-  const { linear, isLoading } = useStoredData();
+  const { linear, isLoading } = useStoredData(program.id);
   const [ws, setWs] = useState<WorkstreamKey | "all">("all");
   const [owner, setOwner] = useState<string>("all");
 

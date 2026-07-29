@@ -32,7 +32,7 @@ const daysUntil = daysUntilLocal;
 
 function WhatsImportant() {
   const program = useProgram();
-  const { linear, isLoading } = useStoredData();
+  const { linear, isLoading, origin } = useStoredData(program.id);
 
   const active = linear.filter((i) => bucketOf(i) === "in_progress");
   const blocked = linear.filter((i) => {
@@ -58,7 +58,13 @@ function WhatsImportant() {
     <AppLayout>
       <PageHeader
         title="What's important"
-        subtitle="The top hits of ongoing work — live from Linear, Notion, and Granola."
+        subtitle={
+          // Do not claim "live" when the rows came from a capture. The origin is
+          // known, so say which.
+          origin === "snapshot"
+            ? "The top hits of ongoing work — from a captured snapshot, not a live read."
+            : "The top hits of ongoing work — live from Linear, Notion, and Granola."
+        }
       />
 
       {/* Headline KPIs */}

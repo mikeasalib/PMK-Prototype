@@ -36,7 +36,7 @@ function SprintBoard() {
   // Per-program. Was module-level.
   const WS_KEYS: (WorkstreamKey | "all")[] = ["all", ...workstreamKeys(program)];
   const seed = seedFor(program.id);
-  const { linear, isLoading } = useStoredData();
+  const { linear, isLoading } = useStoredData(program.id);
   const [ws, setWs] = useState<WorkstreamKey | "all">("all");
 
   const filtered = useMemo(
