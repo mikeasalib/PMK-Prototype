@@ -8,6 +8,7 @@ import { HEALTH_COLOR, HEALTH_LABEL } from "@/lib/workstream-updates";
 import {
   PROGRAMS,
   pageTitle,
+  upcomingMilestones,
   workstreamKeys,
   workstreamOf,
   type ProgramConfig,
@@ -175,28 +176,19 @@ function Overview() {
             >
               Next milestones
             </h2>
+            {/* Program-driven, from the same helper as the What's Important
+                panel. Was four fixed slots labelled "Sprint 5 start" / "Code
+                freeze" — VA wording that read wrong on a rec deployment. */}
             <div className="grid grid-cols-4 gap-3">
-              <Milestone
-                label={`${program.sprintStrip[0]?.label ?? "First milestone"} end`}
-                date={activeSprint.end}
-                days={daysFromNow(activeSprint.end)}
-              />
-              <Milestone
-                label="Sprint 5 start"
-                date={program.keyDates.nextSprintStart}
-                days={daysFromNow(program.keyDates.nextSprintStart)}
-              />
-              <Milestone
-                label="Code freeze"
-                date={program.keyDates.codeFreeze}
-                days={daysFromNow(program.keyDates.codeFreeze)}
-              />
-              <Milestone
-                label="Public launch"
-                date={program.keyDates.launch}
-                days={daysFromNow(program.keyDates.launch)}
-                danger
-              />
+              {upcomingMilestones(program, now.slice(0, 10)).map((m) => (
+                <Milestone
+                  key={`${m.label}-${m.date}`}
+                  label={m.label}
+                  date={m.date}
+                  days={daysFromNow(m.date)}
+                  danger={m.date === program.keyDates.launch}
+                />
+              ))}
             </div>
           </section>
 

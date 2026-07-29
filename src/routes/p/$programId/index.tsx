@@ -9,7 +9,7 @@ import {
   type StoredLinearIssue,
 } from "@/hooks/use-stored-data";
 import { relativeTime } from "@/hooks/use-program-data";
-import { PROGRAMS, pageTitle, workstreamOf } from "@/lib/program.config";
+import { PROGRAMS, pageTitle, upcomingMilestones, workstreamOf } from "@/lib/program.config";
 import { daysUntilLocal, shortDate } from "@/lib/local-date";
 import { useProgram } from "./route";
 
@@ -136,36 +136,16 @@ function WhatsImportant() {
           {/* Next milestones */}
           <Panel title="Next milestones" accent="#3a5a40">
             <ul className="space-y-2 text-[12px]">
-              {/* Was four hardcoded rows with a literal 2026-07-31 and VA
-                  wording ("Sprint 5 start", "Code freeze"), which rendered VA's
-                  schedule on every program. Now the program's own strip plus its
-                  own named dates, nearest first. */}
-              {[
-                ...program.sprintStrip.map((s) => ({
-                  label: s.start === s.end ? s.label : `${s.label} end`,
-                  date: s.end,
-                })),
-                ...program.namedMilestones.map((m) => ({ label: m.label, date: m.date })),
-              ]
-                .sort((a, b) => a.date.localeCompare(b.date))
-                // "Next" means upcoming. Taking the earliest four showed Ventura
-                // its July gates, both already passed, while hiding the Dec 1
-                // launch. Pad from the past only if there is nothing ahead, so
-                // the panel is never empty on a finished program.
-                .reduce<Array<{ label: string; date: string }>>((acc, m, _i, all) => {
-                  if (acc.length) return acc;
-                  const todayIso = new Date().toISOString().slice(0, 10);
-                  const ahead = all.filter((x) => x.date >= todayIso).slice(0, 4);
-                  return ahead.length ? ahead : all.slice(-4);
-                }, [])
-                .map((m) => (
-                  <MilestoneRow
-                    key={`${m.label}-${m.date}`}
-                    label={m.label}
-                    date={m.date}
-                    danger={m.date === program.keyDates.launch}
-                  />
-                ))}
+              {/* Shared helper — same upcoming-milestone logic as the Program
+                  Overview, from the program's own strip and named dates. */}
+              {upcomingMilestones(program, new Date().toISOString().slice(0, 10)).map((m) => (
+                <MilestoneRow
+                  key={`${m.label}-${m.date}`}
+                  label={m.label}
+                  date={m.date}
+                  danger={m.date === program.keyDates.launch}
+                />
+              ))}
             </ul>
           </Panel>
         </div>

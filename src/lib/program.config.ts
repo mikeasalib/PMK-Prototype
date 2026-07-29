@@ -556,3 +556,30 @@ export function classifyWorkstreamDetailed(
 export function pageTitle(page: string, program: ProgramConfig): string {
   return `${page} — ${program.appName}`;
 }
+
+/**
+ * The program's own upcoming milestones — the sprint strip plus named key dates,
+ * soonest first. Single source for both the What's Important panel and the
+ * Program Overview "Next milestones", so neither hardcodes labels like "Sprint 5
+ * start" or "Code freeze" that only make sense for VA.
+ *
+ * Dedupes by date with the named milestone winning, because a launch date that
+ * is also the last sprint's end should read as "Public launch", not twice. Falls
+ * back to the most recent past milestones if nothing is ahead, so a finished
+ * program never shows an empty schedule.
+ */
+export function upcomingMilestones(
+  program: ProgramConfig,
+  todayIso: string,
+  limit = 4,
+): Array<{ label: string; date: string }> {
+  const byDate = new Map<string, { label: string; date: string }>();
+  for (const s of program.sprintStrip) {
+    byDate.set(s.end, { label: s.start === s.end ? s.label : `${s.label} end`, date: s.end });
+  }
+  for (const m of program.namedMilestones) byDate.set(m.date, { label: m.label, date: m.date });
+
+  const all = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+  const ahead = all.filter((m) => m.date >= todayIso);
+  return (ahead.length ? ahead : all.slice(-limit)).slice(0, limit);
+}
