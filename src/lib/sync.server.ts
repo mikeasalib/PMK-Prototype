@@ -57,7 +57,7 @@ export async function syncLinear(): Promise<SyncSourceResult> {
             url
             issues(first: 250) {
               nodes {
-                id identifier title url priority updatedAt
+                id identifier title url priority updatedAt createdAt dueDate
                 state { name type }
                 assignee { name }
                 cycle { number name }
@@ -106,6 +106,10 @@ export async function syncLinear(): Promise<SyncSourceResult> {
         cycle_name: cycle?.name ?? null,
         labels: labels.map((l) => l.name),
         url: (n.url as string) ?? null,
+        // Nullable and left that way: most issues carry no due date, and a NULL
+        // means "no commitment made", not "due today".
+        due_date: (n.dueDate as string) ?? null,
+        source_created_at: (n.createdAt as string) ?? null,
         source_updated_at: (n.updatedAt as string) ?? null,
         synced_at: new Date().toISOString(),
       };

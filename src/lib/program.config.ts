@@ -5,8 +5,10 @@
 // The two differ in ways that matter to the design, not just in labels:
 //   - VA is federal, fixed-price, with a contract number and a POA&M obligation.
 //     Ventura is a recreation deployment with neither.
-//   - VA's delivery work lives in a Linear project. Ventura's does not, so its
-//     work-item sections have no source and must say so.
+//   - Both have a Linear project, but they look nothing alike: VA's carries a
+//     rich description and 8 dated milestones; Ventura's is empty, status
+//     "Backlog", with zero milestones and a target date two weeks before the
+//     real launch. Which is why milestone fallback is explicit, not theoretical.
 //   - Granola scoping differs: VA is a folder, Ventura is a participant domain.
 //   - "Workstreams" for VA are WS1-WS5. For Ventura the equivalent axis is
 //     functional area (facilities, finance, call centre...). Same concept, and
@@ -75,6 +77,14 @@ export interface ProgramConfig {
   };
   /** The milestone strip on the program overview page. */
   sprintStrip: SprintWindow[];
+  /**
+   * Extra dated milestones that are not strip entries, in the program's own
+   * wording. Previously hardcoded as "Code freeze / UAT start" and "Public
+   * launch", which is VA vocabulary — a parks deployment has neither, and the
+   * schedule rendered "Code freeze / UAT start" over its campground launch.
+   * A date already present in sprintStrip is displaced by the named entry.
+   */
+  namedMilestones: Array<{ id: string; label: string; date: string }>;
   /** Ordered — this is the display order in every legend, column, and dropdown. */
   workstreams: Workstream[];
   /** Colour for a workstream key that is not in the roster above. */
@@ -83,16 +93,28 @@ export interface ProgramConfig {
   classifier: WorkstreamClassifier;
 }
 
+/**
+ * How a program's own source data states the workstream, when it does.
+ *
+ * Two real conventions, hence two shapes. VA writes "WS3" in the title and the
+ * digit is appended to a prefix. Ventura writes an area prefix — "Fees:",
+ * "Reporting:", "Memberships:" — which has to be looked up, because the words
+ * used are not the workstream keys.
+ *
+ * Never give these patterns the `g` flag. A module-level RegExp with /g keeps
+ * `lastIndex` between calls, so it would match on odd calls and miss on even
+ * ones — invisible to a typecheck and painful to find.
+ */
+export type ExplicitRule =
+  /** Capture group 1 is appended to `prefix`. "WS3" -> prefix "WS" -> "WS3". */
+  | { kind: "prefixedCapture"; pattern: RegExp; prefix: string }
+  /** Capture group 1 is looked up in `map`, case-insensitively. */
+  | { kind: "mappedCapture"; pattern: RegExp; map: Record<string, string> };
+
 export interface WorkstreamClassifier {
-  /**
-   * Pattern the source itself uses, e.g. "WS3" in an issue title. Capture group
-   * 1 is appended to `prefix`.
-   *
-   * Never give these patterns the `g` flag. A module-level RegExp with /g keeps
-   * `lastIndex` between calls, so it would match on odd calls and miss on even
-   * ones — invisible to a typecheck and painful to find.
-   */
-  explicit: { pattern: RegExp; prefix: string } | null;
+  /** How the source states the workstream itself, when it does. Null when the
+   *  program has no such convention — see ExplicitRule. */
+  explicit: ExplicitRule | null;
   /** Ordered fallbacks, first match wins. Tested against the UPPERCASED title. */
   keywords: Array<{ pattern: RegExp; workstream: string }>;
   /** Used when nothing matches. Must be a key in `workstreams`. */
@@ -130,6 +152,10 @@ const VA: ProgramConfig = {
     { key: "S7", label: "Sprint 7", start: "2026-08-31", end: "2026-09-11" },
     { key: "S8", label: "Sprint 8 · UAT/PRR", start: "2026-09-14", end: "2026-10-23" },
     { key: "S9", label: "ORR · Launch", start: "2026-10-26", end: "2026-11-11" },
+  ],
+  namedMilestones: [
+    { id: "code-freeze", label: "Code freeze / UAT start", date: "2026-09-28" },
+    { id: "launch", label: "Public launch", date: "2026-11-11" },
   ],
   // NOTE: workstream-updates.ts carries a second, differing set of names for
   // these same keys and calls itself the "corrected v2" taxonomy. Owners below
@@ -182,7 +208,7 @@ const VA: ProgramConfig = {
   ],
   unknownWorkstreamColor: "#565c65",
   classifier: {
-    explicit: { pattern: /\bWS([1-5])\b/, prefix: "WS" },
+    explicit: { kind: "prefixedCapture", pattern: /\bWS([1-5])\b/, prefix: "WS" },
     // Short keywords carry \b. Measured against 50 real DEP titles, the
     // unanchored forms misfired: SEARCH matched inside RESEARCH, sending two
     // accessibility-research tickets to WS2 (identity/login). AUTH inside
@@ -256,6 +282,9 @@ const VENTURA: ProgramConfig = {
     { key: "GATE", label: "Gate fees fully Kaizen", start: "2027-01-01", end: "2027-01-01" },
     { key: "LIMIT", label: "Hard res. date limit", start: "2027-01-09", end: "2027-01-09" },
   ],
+  // Empty on purpose: every dated gate for this program is already a strip
+  // entry with its own wording, so there is nothing to overlay.
+  namedMilestones: [],
   // The equivalent axis for a rec deployment is functional area, not WS1-WS5.
   // Owners are the real named leads; titles corrected against the account
   // handoff and memory dump (Jeri is Parks Manager, not Interim Director;
@@ -306,10 +335,26 @@ const VENTURA: ProgramConfig = {
   ],
   unknownWorkstreamColor: "#565c65",
   classifier: {
-    // No WSn convention on this program, so there is no explicit pattern to
-    // read — everything is keyword inference or fallback, and the rollup says so
-    // rather than implying the split is authoritative.
-    explicit: null,
+    // This program does have an explicit convention, just a different one: the
+    // board writes an area prefix before the colon. Taken from the live project
+    // — every prefix here appears on a real issue. This moves most of the board
+    // from inference to fact, which is why it is worth reading rather than
+    // keyword-guessing over it.
+    explicit: {
+      kind: "mappedCapture",
+      pattern: /^([A-Za-z][A-Za-z /&]*?):/,
+      map: {
+        reservations: "FAC",
+        "facility reservations": "FAC",
+        facilities: "FAC",
+        "gate fees": "FAC",
+        fees: "FIN",
+        reporting: "FIN",
+        memberships: "MEM",
+        admin: "Admin",
+        documentation: "Admin",
+      },
+    },
     // Vocabulary taken from the real account record: Itineo, Zion, Sherpa, ACO,
     // gate fees, DV passes, accrual. Short keywords carry \b — this program
     // already produced two substring bugs (VENUE inside "revenue", PARK inside
@@ -349,6 +394,17 @@ export const PROGRAMS: Record<string, ProgramConfig> = {
   va: VA,
   ventura: VENTURA,
 };
+
+/**
+ * Look up a program, failing loudly on an unknown id. Deliberately not falling
+ * back to the active program: silently rendering VA's data under a Ventura URL
+ * is the exact failure this registry exists to prevent.
+ */
+export function programById(programId: string): ProgramConfig {
+  const hit = PROGRAMS[programId];
+  if (!hit) throw new Error(`no program configured with id "${programId}"`);
+  return hit;
+}
 
 export const DEFAULT_PROGRAM_ID = "va";
 
@@ -417,14 +473,27 @@ export function workstreamKeys(program: ProgramConfig = PROGRAM): string[] {
  * the source said", and a later change to the keyword rules could no longer
  * re-derive old rows.
  */
+/**
+ * Resolve an explicit rule against a title. Returns null when the rule does not
+ * apply, including the mapped case where a prefix exists but is not one we know
+ * — arbitrary text before a colon is not a workstream.
+ */
+function resolveExplicit(upperTitle: string, rule: ExplicitRule): string | null {
+  const m = upperTitle.match(rule.pattern);
+  if (!m) return null;
+  if (rule.kind === "prefixedCapture") return rule.prefix + m[1];
+  return rule.map[m[1].trim().toLowerCase()] ?? null;
+}
+
 export function parseSourceWorkstream(
   title: string,
   program: ProgramConfig = PROGRAM,
 ): string | null {
-  const c = program.classifier.explicit;
-  if (!c) return null;
-  const m = title.toUpperCase().match(c.pattern);
-  return m ? c.prefix + m[1] : null;
+  const rule = program.classifier.explicit;
+  if (!rule) return null;
+  // Both shapes are legitimate on the write path: a prefix the board actually
+  // writes is what the source said, not a guess, so it is safe to persist.
+  return resolveExplicit(title.toUpperCase(), rule);
 }
 
 /**
@@ -460,8 +529,8 @@ export function classifyWorkstreamDetailed(
   const t = title.toUpperCase();
   const c = program.classifier;
   if (c.explicit) {
-    const m = t.match(c.explicit.pattern);
-    if (m) return { workstream: c.explicit.prefix + m[1], basis: "explicit" };
+    const hit = resolveExplicit(t, c.explicit);
+    if (hit) return { workstream: hit, basis: "explicit" };
   }
   for (const r of c.keywords) {
     if (r.pattern.test(t)) return { workstream: r.workstream, basis: "keyword" };

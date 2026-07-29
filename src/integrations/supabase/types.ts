@@ -104,10 +104,12 @@ export type Database = {
           created_at: string
           cycle_name: string | null
           cycle_number: number | null
+          due_date: string | null
           id: string
           identifier: string
           labels: string[] | null
           priority: number | null
+          source_created_at: string | null
           source_id: string
           source_updated_at: string | null
           state_name: string | null
@@ -123,10 +125,12 @@ export type Database = {
           created_at?: string
           cycle_name?: string | null
           cycle_number?: number | null
+          due_date?: string | null
           id?: string
           identifier: string
           labels?: string[] | null
           priority?: number | null
+          source_created_at: string | null
           source_id: string
           source_updated_at?: string | null
           state_name?: string | null
@@ -142,10 +146,12 @@ export type Database = {
           created_at?: string
           cycle_name?: string | null
           cycle_number?: number | null
+          due_date?: string | null
           id?: string
           identifier?: string
           labels?: string[] | null
           priority?: number | null
+          source_created_at?: string | null
           source_id?: string
           source_updated_at?: string | null
           state_name?: string | null

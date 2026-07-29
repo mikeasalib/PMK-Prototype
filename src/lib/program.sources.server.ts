@@ -7,10 +7,13 @@
 //
 // Two things the second program forced into the open:
 //
-//  1. Not every program has every source. Ventura County has no Linear project —
-//     its delivery work is not tracked there — so `linear` is null rather than
-//     pointing at something wrong. A null source is honest; a wrong id produces
-//     confident garbage.
+//  1. Not every program has every source, and `null` beats a wrong id — a null
+//     source is honest, a wrong one produces confident garbage. Ventura was
+//     briefly configured with `linear: null` on my assumption that a rec
+//     deployment tracked no delivery work there. That was wrong: the project
+//     exists, spans two teams (REC and DEP), and is the team's actual issue
+//     register. Corrected below. The lesson kept: verify a source is absent
+//     rather than inferring absence from the program type.
 //  2. Granola is not scoped the same way twice. The VA program is a folder.
 //     Ventura is identified by participant email domain, because that is how the
 //     meetings actually cohere — six Ventura calls in the last 30 days all carry
@@ -36,11 +39,38 @@ export interface NotionSource {
   riskRegisterMatch: RegExp | null;
 }
 
+/**
+ * Where a program's risk/issue register actually lives.
+ *
+ * The two programs disagree, which is the point. VA keeps a hand-authored Notion
+ * table with likelihood x impact. Ventura keeps no written register at all — the
+ * team holds it mentally and the Linear board is the working record — so its
+ * risks are derived from labelled Linear issues.
+ *
+ * Linear-derived risks are better on two POA&M columns and worse on one: Linear
+ * carries a real createdAt and dueDate (detection date and scheduled completion,
+ * both of which VA's table lacks entirely) but models no likelihood or impact,
+ * so severity has to come from priority.
+ */
+export type RiskSource =
+  | { kind: "notionTable" }
+  | {
+      kind: "linearIssues";
+      /** Only issues carrying one of these labels count as register entries.
+       *  Empty means every issue on the project counts. */
+      labels: string[];
+      /** Treat an overdue issue as a register entry regardless of label. */
+      includeOverdue: boolean;
+    }
+  | { kind: "none" };
+
 export interface ProgramSources {
   /** Null when the program's delivery work does not live in Linear. */
   linear: LinearSource | null;
   granola: GranolaSource | null;
   notion: NotionSource | null;
+  /** Where risks come from. Not every program keeps one the same way. */
+  risks: RiskSource;
 }
 
 export const GATEWAY_URL =
@@ -63,14 +93,17 @@ const VA_SOURCES: ProgramSources = {
     hubLabel: process.env.NOTION_HUB_LABEL ?? "VA",
     riskRegisterMatch: /risk register/i,
   },
+  risks: { kind: "notionTable" },
 };
 
 const VENTURA_SOURCES: ProgramSources = {
-  // No Linear project. Recreation deployments are run out of Notion, and the
-  // "Implementation" Linear project referenced in Customer Operations is not
-  // per-customer. Left null so work-item sections report an absent source
-  // instead of silently showing another program's board.
-  linear: null,
+  linear: {
+    // Spans two teams, Recreation (REC) and Deployment (DEP), so issue
+    // identifiers are a mix of REC- and DEP-. Lead is nico@kaizenlabs.co.
+    projectId: process.env.VENTURA_LINEAR_PROJECT_ID ?? "b7d98661-7d8a-47d7-addf-096bc73a7752",
+    scopeLabel: "project venturacounty (REC + DEP)",
+    itemNoun: "Ventura issues",
+  },
   granola: {
     kind: "participantDomains",
     domains: ["venturacounty.gov", "ventura.org"],
@@ -81,10 +114,15 @@ const VENTURA_SOURCES: ProgramSources = {
     // "Ventura County, CA" under Recreation Customer Deployment & Health.
     rootPageId: process.env.VENTURA_NOTION_ROOT_PAGE_ID ?? "31768467f30f81d29342cac96e9ea6bc",
     hubLabel: "Ventura County, CA",
-    // This program keeps outstanding questions and decisions rather than a risk
-    // register table, so there is nothing to look for. Null, not a guess.
+    // Confirmed by the account owner: there is no written register page. The
+    // team holds it mentally. Null because nothing exists to find, not because
+    // it was not looked for.
     riskRegisterMatch: null,
   },
+  // Risks come off the Linear board instead. "Bug" is the register-worthy
+  // label, and anything past its due date counts regardless of label — an
+  // overdue commitment is a risk whether or not someone tagged it one.
+  risks: { kind: "linearIssues", labels: ["Bug"], includeOverdue: true },
 };
 
 export const SOURCES_BY_PROGRAM: Record<string, ProgramSources> = {

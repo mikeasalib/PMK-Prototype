@@ -8,11 +8,11 @@
 // Parsing lives in risk-register.ts as a pure function so it can be verified
 // against captured content without a network call. This file only fetches.
 
-import { SOURCES } from "./program.sources.server";
+import { GATEWAY_URL, sourcesFor } from "./program.sources.server";
 import { parseRiskRegister, type ParseResult } from "./risk-register";
 import type { SourceRef } from "./program-model";
 
-const GATEWAY = SOURCES.gatewayUrl;
+const GATEWAY = GATEWAY_URL;
 
 function headers(connKey: string) {
   return {
@@ -72,15 +72,23 @@ export interface RegisterFetch extends ParseResult {
  * the page can be renamed without a code change as long as it still says what
  * it is.
  */
-export async function fetchRiskRegister(pageTitleMatch = /risk register/i): Promise<RegisterFetch> {
+export async function fetchRiskRegister(programId: string): Promise<RegisterFetch> {
   const empty = { risks: [], skipped: [], pageId: null };
+  const src = sourcesFor(programId);
+  if (!src.notion) {
+    return { ...empty, ok: false, message: "no Notion source for this program" };
+  }
+  const pageTitleMatch = src.notion.riskRegisterMatch;
+  if (!pageTitleMatch) {
+    return { ...empty, ok: false, message: "this program keeps no Notion register page" };
+  }
   const key = process.env.NOTION_API_KEY;
   if (!key) return { ...empty, ok: false, message: "not connected" };
 
   try {
     // 1. Find the register page among the hub's children. syncNotion already
     //    enumerates these, so this is a path we know works.
-    const hubChildren = await children(SOURCES.notion.rootPageId, key);
+    const hubChildren = await children(src.notion.rootPageId, key);
     const page = hubChildren.find((b) => {
       if (b.type !== "child_page") return false;
       const t = (b.child_page as { title?: string } | undefined)?.title ?? "";

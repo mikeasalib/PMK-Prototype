@@ -90,6 +90,8 @@ export type StoredLinearIssue = {
   workstream: string | null;
   labels: string[] | null;
   url: string | null;
+  due_date: string | null;
+  source_created_at: string | null;
   source_updated_at: string | null;
   synced_at: string;
 };

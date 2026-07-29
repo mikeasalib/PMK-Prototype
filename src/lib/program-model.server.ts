@@ -5,7 +5,7 @@
 // failing the whole assembly — a report with a marked gap is useful; a report
 // that failed to generate is not.
 
-import { PROGRAM } from "./program.config";
+import { PROGRAM, programById, type ProgramConfig } from "./program.config";
 import {
   freshestSourceAt,
   programFactsFromConfig,
@@ -58,34 +58,47 @@ function bucketOf(stateType: string | null): string {
   }
 }
 
-export async function assembleProgramModel(asOf = today()): Promise<AssembleResult> {
+export async function assembleProgramModel(
+  programId: string = PROGRAM.id,
+  asOf = today(),
+): Promise<AssembleResult> {
   const sources: AssembleResult["sources"] = [];
+  const program: ProgramConfig = programById(programId);
+  const { sourcesFor } = await import("./program.sources.server");
+  const src = sourcesFor(program.id);
 
   // ---- Linear work items, from the synced cache
   let workItems: WorkItemRecord[] = [];
-  try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin
-      .from("linear_issues")
-      .select(
-        "source_id, identifier, title, state_name, state_type, priority, assignee, workstream, labels, url, synced_at",
-      )
-      .order("source_updated_at", { ascending: false });
-    if (error) throw new Error(error.message);
-
-    const { classifyWorkstreamDetailed } = await import("./program.config");
-    workItems = (data ?? []).map((r) => {
-      const a = classifyWorkstreamDetailed(r.title, r.workstream);
-      return workItemFromLinear(r, bucketOf(r.state_type), a.workstream, a.basis);
+  if (!src.linear) {
+    sources.push({
+      key: "linear",
+      ok: false,
+      message: "no Linear project configured for this program",
     });
-    sources.push({ key: "linear", ok: true, message: `${workItems.length} issues` });
-  } catch (e) {
-    sources.push({ key: "linear", ok: false, message: (e as Error).message });
-  }
+  } else
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data, error } = await supabaseAdmin
+        .from("linear_issues")
+        .select(
+          "source_id, identifier, title, state_name, state_type, priority, assignee, workstream, labels, url, due_date, source_created_at, synced_at",
+        )
+        .order("source_updated_at", { ascending: false });
+      if (error) throw new Error(error.message);
+
+      const { classifyWorkstreamDetailed } = await import("./program.config");
+      workItems = (data ?? []).map((r) => {
+        const a = classifyWorkstreamDetailed(r.title, r.workstream, program);
+        return workItemFromLinear(r, bucketOf(r.state_type), a.workstream, a.basis);
+      });
+      sources.push({ key: "linear", ok: true, message: `${workItems.length} issues` });
+    } catch (e) {
+      sources.push({ key: "linear", ok: false, message: (e as Error).message });
+    }
 
   // ---- Linear project milestones. The real dated backbone; falls back to
   //      config only if Linear has none, and says which was used.
-  let milestones = milestonesFromConfig(asOf);
+  let milestones = milestonesFromConfig(program, asOf);
   let milestoneOrigin = "config";
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -123,23 +136,67 @@ export async function assembleProgramModel(asOf = today()): Promise<AssembleResu
     });
   }
 
-  // ---- Risk register, read live from Notion
+  // ---- Risks. Where the register lives differs per program, so branch on the
+  //      configured source rather than assuming Notion.
   let risks: ProgramModel["risks"] = [];
-  try {
-    const { fetchRiskRegister } = await import("./risk-register.server");
-    const reg = await fetchRiskRegister();
-    risks = reg.risks;
-    sources.push({ key: "notion:risk-register", ok: reg.ok, message: reg.message });
-  } catch (e) {
-    sources.push({ key: "notion:risk-register", ok: false, message: (e as Error).message });
+  if (src.risks.kind === "notionTable") {
+    try {
+      const { fetchRiskRegister } = await import("./risk-register.server");
+      const reg = await fetchRiskRegister(program.id);
+      risks = reg.risks;
+      sources.push({ key: "notion:risk-register", ok: reg.ok, message: reg.message });
+    } catch (e) {
+      sources.push({ key: "notion:risk-register", ok: false, message: (e as Error).message });
+    }
+  } else if (src.risks.kind === "linearIssues") {
+    // Derived from the board, because this program keeps no written register.
+    const rule = src.risks;
+    try {
+      const { risksFromLinearIssues } = await import("./risk-register.linear");
+      const out = risksFromLinearIssues(
+        workItems.map((w) => ({
+          identifier: w.identifier,
+          title: w.title,
+          description: null,
+          statusType: w.bucket === "in_progress" ? "started" : w.bucket,
+          priority: w.priority,
+          assignee: w.assignee,
+          labels: w.labels,
+          url: w.origin.kind === "sourced" ? (w.origin.refs[0]?.url ?? null) : null,
+          dueDate: w.dueDate,
+          createdAt: w.createdAt,
+          syncedAt:
+            w.origin.kind === "sourced" ? w.origin.refs[0].fetchedAt : new Date().toISOString(),
+        })),
+        { labels: rule.labels, includeOverdue: rule.includeOverdue, asOf },
+      );
+      risks = out.risks;
+      const why = rule.labels.length ? `label ${rule.labels.join("/")}` : "all open issues";
+      sources.push({
+        key: "linear:risks",
+        ok: true,
+        // linear_issues does not persist due_date or created_at yet, so the
+        // overdue half of the rule cannot fire from cached rows. Say so instead
+        // of quietly returning a label-only register.
+        message: `${out.risks.length} from ${why}` + (rule.includeOverdue ? " or past due" : ""),
+      });
+    } catch (e) {
+      sources.push({ key: "linear:risks", ok: false, message: (e as Error).message });
+    }
+  } else {
+    sources.push({
+      key: "risks",
+      ok: false,
+      message: "this program keeps no risk register",
+    });
   }
 
-  const phases = phasesFromLifecycle(asOf);
+  const phases = phasesFromLifecycle(program, asOf);
   const partial = {
-    program: programFactsFromConfig(),
+    program: programFactsFromConfig(program),
     // Health has no source yet, so it stays null rather than reusing the dated
     // hand-transcribed values — see workstreamsFromConfig.
-    workstreams: PROGRAM.workstreams.map((w) => ({
+    workstreams: program.workstreams.map((w) => ({
       key: w.key,
       label: w.label,
       owner: w.owner,
@@ -165,7 +222,7 @@ export async function assembleProgramModel(asOf = today()): Promise<AssembleResu
 
   return {
     model,
-    gates: upcomingGateReadiness(phases, workItems, { asOf }),
+    gates: upcomingGateReadiness(phases, workItems, { asOf, program }),
     sources,
     milestoneOrigin,
   };

@@ -14,7 +14,12 @@
 // SourceRef is a record nobody can stand behind, so `origin: "config"` is a
 // distinct, explicit state rather than an empty refs array.
 
-import { PROGRAM, type AttributionBasis, type Workstream } from "./program.config";
+import {
+  PROGRAM,
+  type AttributionBasis,
+  type ProgramConfig,
+  type Workstream,
+} from "./program.config";
 import type { Health } from "./workstream-updates";
 
 // ---------------------------------------------------------------- provenance
@@ -109,6 +114,9 @@ export interface WorkItemRecord {
    * report the split instead of presenting a guess as a reading.
    */
   attribution: AttributionBasis;
+  /** Real values from Linear. Both nullable — most issues have neither. */
+  dueDate: string | null;
+  createdAt: string | null;
   origin: Origin;
 }
 
@@ -199,14 +207,16 @@ export interface ProgramModel {
 
 // ------------------------------------------------------------------ assembly
 
-export function programFactsFromConfig(): ProgramFacts {
+export function programFactsFromConfig(program: ProgramConfig = PROGRAM): ProgramFacts {
   return {
-    id: PROGRAM.id,
-    name: PROGRAM.name,
-    client: PROGRAM.contract.customer,
-    contractNumber: PROGRAM.contract.fullNumber,
-    periodLabel: PROGRAM.contract.period,
-    launchDate: PROGRAM.keyDates.launch,
+    id: program.id,
+    name: program.name,
+    client: program.contract.customer,
+    // Null for a commercial engagement with no contract vehicle. Kept null so a
+    // renderer prints a gap rather than the string "null".
+    contractNumber: program.contract.fullNumber,
+    periodLabel: program.contract.period,
+    launchDate: program.keyDates.launch,
   };
 }
 
@@ -217,8 +227,8 @@ export function programFactsFromConfig(): ProgramFacts {
  * problem this design is meant to avoid. A caller with a dated source can
  * attach health via withHealth().
  */
-export function workstreamsFromConfig(): WorkstreamRecord[] {
-  return PROGRAM.workstreams.map((w: Workstream) => ({
+export function workstreamsFromConfig(program: ProgramConfig = PROGRAM): WorkstreamRecord[] {
+  return program.workstreams.map((w: Workstream) => ({
     key: w.key,
     label: w.label,
     owner: w.owner,
@@ -247,6 +257,8 @@ export function workItemFromLinear(
     assignee: string | null;
     labels: string[] | null;
     url: string | null;
+    due_date?: string | null;
+    source_created_at?: string | null;
     synced_at: string;
   },
   bucket: string,
@@ -264,6 +276,8 @@ export function workItemFromLinear(
     priority: row.priority,
     labels: row.labels ?? [],
     attribution,
+    dueDate: row.due_date ?? null,
+    createdAt: row.source_created_at ? row.source_created_at.slice(0, 10) : null,
     origin: {
       kind: "sourced",
       refs: [

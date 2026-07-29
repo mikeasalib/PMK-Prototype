@@ -5,7 +5,7 @@
 // says so, so a rendered artifact can distinguish a fact we pulled from a fact
 // we typed.
 
-import { PROGRAM } from "./program.config";
+import { PROGRAM, type ProgramConfig } from "./program.config";
 import { LIFECYCLE, type LifecyclePhase } from "./va-data";
 import {
   derivedFrom,
@@ -42,8 +42,24 @@ export function derivePhaseState(
   return "in_progress";
 }
 
-export function phasesFromLifecycle(asOf: string = today()): PhaseRecord[] {
-  return LIFECYCLE.map((p: LifecyclePhase) => ({
+/**
+ * Lifecycle phases per program.
+ *
+ * This registry exists specifically to stop VA's seed content leaking into other
+ * programs. Before it, phasesFromLifecycle returned LIFECYCLE unconditionally,
+ * so Ventura would have rendered the VA program's six phases — with VA exit
+ * criteria and VA gates — as if they were its own. A program with no lifecycle
+ * seed gets an empty list, and the renderers already mark that as unsourced.
+ */
+const PHASES_BY_PROGRAM: Record<string, LifecyclePhase[]> = {
+  va: LIFECYCLE,
+};
+
+export function phasesFromLifecycle(
+  program: ProgramConfig = PROGRAM,
+  asOf: string = today(),
+): PhaseRecord[] {
+  return (PHASES_BY_PROGRAM[program.id] ?? []).map((p: LifecyclePhase) => ({
     id: p.id,
     name: p.name,
     window: p.window,
@@ -62,10 +78,15 @@ export function phasesFromLifecycle(asOf: string = today()): PhaseRecord[] {
  * project milestones are not synced yet; when they are, they merge in here and
  * arrive with real SourceRefs.
  */
-export function milestonesFromConfig(asOf: string = today()): MilestoneRecord[] {
-  const out: MilestoneRecord[] = PROGRAM.sprintStrip.map((s) => ({
+export function milestonesFromConfig(
+  program: ProgramConfig = PROGRAM,
+  asOf: string = today(),
+): MilestoneRecord[] {
+  const out: MilestoneRecord[] = program.sprintStrip.map((s) => ({
     id: s.key,
-    label: `${s.label} ends`,
+    // A window "ends"; a point-in-time gate does not. Appending unconditionally
+    // produced "Itineo sunset ends" and "Gate fees fully Kaizen ends".
+    label: s.start === s.end ? s.label : `${s.label} ends`,
     date: s.end,
     state: asOf > s.end ? "complete" : asOf < s.start ? "upcoming" : "in_progress",
     owner: null,
@@ -74,11 +95,7 @@ export function milestonesFromConfig(asOf: string = today()): MilestoneRecord[] 
     origin: fromConfig,
   }));
 
-  const named: Array<[string, string, string]> = [
-    ["code-freeze", "Code freeze / UAT start", PROGRAM.keyDates.codeFreeze],
-    ["launch", "Public launch", PROGRAM.keyDates.launch],
-  ];
-  for (const [id, label, date] of named) {
+  for (const { id, label, date } of program.namedMilestones) {
     // A named key date and a sprint boundary can land on the same day — the
     // launch date is also the last sprint's end. The named one is the one worth
     // reporting, so it displaces the sprint boundary rather than sitting
@@ -165,8 +182,13 @@ export function looksBlocking(item: Pick<WorkItemRecord, "title" | "labels">): b
 export function upcomingGateReadiness(
   phases: PhaseRecord[],
   workItems: WorkItemRecord[],
-  opts: { asOf?: string; exitCriteriaMet?: Record<string, number> } = {},
+  opts: {
+    asOf?: string;
+    exitCriteriaMet?: Record<string, number>;
+    program?: ProgramConfig;
+  } = {},
 ): GateReadiness[] {
+  const prog = opts.program ?? PROGRAM;
   const asOf = opts.asOf ?? today();
   const met = opts.exitCriteriaMet ?? {};
 
@@ -177,7 +199,8 @@ export function upcomingGateReadiness(
   return phases
     .filter((p) => p.state !== "complete")
     .map((p) => {
-      const phaseEnd = LIFECYCLE.find((l) => l.id === p.id)?.endsOn ?? asOf;
+      const phaseEnd =
+        (PHASES_BY_PROGRAM[prog.id] ?? []).find((l) => l.id === p.id)?.endsOn ?? asOf;
       return gateReadiness(p, {
         daysRemaining: daysBetween(asOf, phaseEnd),
         // Unknown until exit criteria are individually trackable — counts as
