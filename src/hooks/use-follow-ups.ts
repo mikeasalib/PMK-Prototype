@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   bucketFollowUps,
   emptyCuration,
@@ -56,59 +56,65 @@ export function useFollowUps(programId: string) {
   const [curation, setCuration] = useState<CurationState>(emptyCuration());
   const [hydrated, setHydrated] = useState(false);
 
-  // Hydrate after mount so server and first client render agree.
+  // Hydrate after mount so server and first client render agree. Keyed on
+  // programId, which also re-hydrates when the user switches engagements.
+  const skipPersist = useRef(true);
   useEffect(() => {
+    skipPersist.current = true;
     setCuration(loadCuration(programId));
     setHydrated(true);
   }, [programId]);
 
-  const persist = useCallback(
-    (next: CurationState) => {
-      setCuration(next);
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(storageKey(programId), JSON.stringify(next));
-      }
-    },
-    [programId],
-  );
+  // Persist on change rather than inside each mutator, so the mutators can use
+  // the functional updater form — two actions in one tick both see the freshest
+  // state and neither is lost. Skips the render right after a (re)hydration so a
+  // load never immediately writes back.
+  useEffect(() => {
+    if (!hydrated) return;
+    if (skipPersist.current) {
+      skipPersist.current = false;
+      return;
+    }
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(storageKey(programId), JSON.stringify(curation));
+    }
+  }, [curation, hydrated, programId]);
 
   const now = () => new Date().toISOString();
 
-  const setStatus = useCallback(
-    (id: string, status: FollowUpStatus) => {
-      persist({
-        ...curation,
-        decisions: { ...curation.decisions, [id]: { status, updatedAt: now() } },
-      });
-    },
-    [curation, persist],
-  );
+  const setStatus = useCallback((id: string, status: FollowUpStatus) => {
+    setCuration((prev) => ({
+      ...prev,
+      decisions: { ...prev.decisions, [id]: { status, updatedAt: now() } },
+    }));
+  }, []);
 
   const addManual = useCallback(
     (input: { title: string; detail?: string; owner?: string; direction: FollowUpDirection }) => {
       const title = input.title.trim();
       if (!title) return;
-      // Next in sequence from the highest existing suffix, so ids stay unique
-      // even after items are removed, without Date.now()/random.
-      const seq =
-        curation.manual.reduce((n, m) => Math.max(n, Number(m.id.split("-").at(-1)) || 0), 0) + 1;
-      const id = `${programId}-manual-${seq}`;
-      persist({
-        ...curation,
-        manual: [
-          ...curation.manual,
-          {
-            id,
-            title,
-            detail: input.detail?.trim() || undefined,
-            owner: input.owner?.trim() || undefined,
-            direction: input.direction,
-            createdAt: now(),
-          },
-        ],
+      setCuration((prev) => {
+        // Next in sequence from the highest existing suffix, so ids stay unique
+        // even after items are removed, without Date.now()/random.
+        const seq =
+          prev.manual.reduce((n, m) => Math.max(n, Number(m.id.split("-").at(-1)) || 0), 0) + 1;
+        return {
+          ...prev,
+          manual: [
+            ...prev.manual,
+            {
+              id: `${programId}-manual-${seq}`,
+              title,
+              detail: input.detail?.trim() || undefined,
+              owner: input.owner?.trim() || undefined,
+              direction: input.direction,
+              createdAt: now(),
+            },
+          ],
+        };
       });
     },
-    [curation, persist, programId],
+    [programId],
   );
 
   const items = useMemo(() => mergeFollowUps(candidates, curation), [candidates, curation]);

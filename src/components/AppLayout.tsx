@@ -13,12 +13,18 @@ import {
   FileOutput,
   ListTodo,
   HelpCircle,
+  Eye,
+  EyeOff,
+  SlidersHorizontal,
+  Check,
 } from "lucide-react";
+import { useState } from "react";
 import { DataSourcesFooter } from "./DataSourcesFooter";
 import { ProgramSwitcher } from "./ProgramSwitcher";
 import { RefreshButton } from "./RefreshButton";
 import { PROGRAMS } from "@/lib/program.config";
 import { useProgram } from "@/routes/p/$programId/route";
+import { useNavPrefs } from "@/hooks/use-nav-prefs";
 
 // Every destination is program-scoped. The leading "/p/$programId" is a literal
 // route id, not a template string — TanStack fills the param from `params`.
@@ -86,13 +92,52 @@ function renderNavLink(n: NavLeaf, indented: boolean, programId: string, pathnam
   );
 }
 
+/** One nav item in customize mode: not a link, but a toggle that shows or hides
+ *  it. Hidden items stay listed here (dimmed) so they can always be brought
+ *  back — hiding is never deletion. */
+function renderEditRow(n: NavLeaf, indented: boolean, hidden: boolean, onToggle: () => void) {
+  const Icon = n.icon;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={!hidden}
+      aria-label={`${hidden ? "Show" : "Hide"} ${n.label}`}
+      className="flex w-full items-center gap-3 rounded-lg py-2 text-left text-[13px] transition-colors"
+      style={{
+        paddingLeft: indented ? 34 : 12,
+        paddingRight: 12,
+        backgroundColor: "transparent",
+        color: hidden ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.82)",
+        fontWeight: 500,
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = NAV_HOVER)}
+      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+    >
+      <Icon size={indented ? 15 : 18} strokeWidth={2} />
+      <span className="flex-1" style={{ textDecoration: hidden ? "line-through" : "none" }}>
+        {n.label}
+      </span>
+      {hidden ? <EyeOff size={15} /> : <Eye size={15} />}
+    </button>
+  );
+}
+
 export function AppLayout({ children }: { children?: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const program = useProgram();
+  const { hydrated, isHidden, toggle, hidden } = useNavPrefs();
+  const [editing, setEditing] = useState(false);
   // Green nav chrome — mirrors Cedar's admin shell, kept green so the internal
   // tool reads as clearly distinct from the external-facing product. Per-program
   // so a second engagement can be visually distinguishable.
   const NAV_BG = program.navColor || NAV_BG_FALLBACK;
+
+  // Before hydration, show everything — a server render cannot know the user's
+  // hidden set, and hiding on the server then revealing on the client would
+  // flash. Once hydrated, honour the preference unless the user is editing, in
+  // which case every item is shown so it can be toggled.
+  const showItem = (key: string) => !hydrated || editing || !isHidden(key);
 
   return (
     <div className="flex min-h-screen" style={{ color: "#1b1b1b" }}>
@@ -116,18 +161,58 @@ export function AppLayout({ children }: { children?: ReactNode }) {
           </div>
         </div>
 
-        <nav className="flex-1 space-y-0.5 px-2 py-1">
-          {NAV.map((n) => {
-            const children = "children" in n ? n.children : undefined;
-            return (
-              <div key={n.to}>
-                {renderNavLink(n, false, program.id, pathname)}
-                {children?.map((c) => (
-                  <div key={c.to}>{renderNavLink(c, true, program.id, pathname)}</div>
-                ))}
-              </div>
-            );
-          })}
+        <nav className="flex-1 overflow-y-auto px-2 py-1">
+          <div className="space-y-0.5">
+            {NAV.map((n) => {
+              const children = "children" in n ? n.children : undefined;
+              // In view mode a parent hidden by the user drops out entirely,
+              // taking its children with it. In edit mode everything shows.
+              if (!editing && !showItem(n.to)) return null;
+              return (
+                <div key={n.to}>
+                  {editing
+                    ? renderEditRow(n, false, isHidden(n.to), () => toggle(n.to))
+                    : renderNavLink(n, false, program.id, pathname)}
+                  {children?.map((c) =>
+                    !editing && !showItem(c.to) ? null : (
+                      <div key={c.to}>
+                        {editing
+                          ? renderEditRow(c, true, isHidden(c.to), () => toggle(c.to))
+                          : renderNavLink(c, true, program.id, pathname)}
+                      </div>
+                    ),
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Customize control. Always present so a hidden item is never a dead
+              end, and a plain button rather than a nav item so it cannot itself
+              be hidden. */}
+          <button
+            type="button"
+            onClick={() => setEditing((v) => !v)}
+            className="mt-2 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[12px] transition-colors"
+            style={{
+              color: editing ? "#ffffff" : "rgba(255,255,255,0.55)",
+              backgroundColor: editing ? NAV_ACTIVE : "transparent",
+            }}
+            onMouseEnter={(e) => {
+              if (!editing) e.currentTarget.style.backgroundColor = NAV_HOVER;
+            }}
+            onMouseLeave={(e) => {
+              if (!editing) e.currentTarget.style.backgroundColor = "transparent";
+            }}
+          >
+            {editing ? <Check size={15} /> : <SlidersHorizontal size={15} />}
+            <span>{editing ? "Done customizing" : "Customize sidebar"}</span>
+            {!editing && hidden.length ? (
+              <span className="ml-auto text-[11px]" style={{ color: "rgba(255,255,255,0.4)" }}>
+                {hidden.length} hidden
+              </span>
+            ) : null}
+          </button>
         </nav>
 
         <DataSourcesFooter />
