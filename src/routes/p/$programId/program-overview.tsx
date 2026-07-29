@@ -21,7 +21,7 @@ import {
   upcomingGateReadiness,
   deriveHealth,
 } from "@/lib/program-model.adapters";
-import type { GateReadiness } from "@/lib/program-model";
+import type { GateReadiness, PhaseRecord } from "@/lib/program-model";
 import { useFollowUps } from "@/hooks/use-follow-ups";
 import { useProgram } from "./route";
 
@@ -101,14 +101,20 @@ function Overview() {
     };
   });
 
-  // Gate readiness — the "what's about to hurt" signal, already computed for the
-  // rollup and now surfaced here. Empty for a program with no lifecycle phases
-  // (Ventura), which the panel states rather than showing a blank box.
+  // Lifecycle phases and gate readiness. Both empty on a program with no phase
+  // config; the panels below handle that by hiding themselves.
+  const phases = phasesFromLifecycle(program, todayIso);
+  const currentPhase = phases.find((p) => p.state === "in_progress") ?? null;
   const gates = upcomingGateReadiness(
-    phasesFromLifecycle(program, todayIso),
+    phases,
     linear.map((i) => ({ bucket: bucketOf(i), title: i.title, labels: i.labels ?? [] })),
     { asOf: todayIso, program },
   );
+
+  // What the top-left "current" panel means depends on how the program keeps
+  // time. Declared per-program in program.timeAxis so the choice is explicit
+  // instead of inferred from another field.
+  const usesPhases = program.timeAxis === "phase";
 
   return (
     <AppLayout>
@@ -174,7 +180,9 @@ function Overview() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 p-6 lg:grid-cols-2">
-          {/* Sprint status (real Linear data) */}
+          {/* Current sprint / current phase — same slot, different concept per
+              program.timeAxis. VA keeps its sprint framing; a rec deployment
+              shows the current lifecycle phase from the playbook instead. */}
           <section
             className="rounded-md p-4"
             style={{ backgroundColor: "#f7f7f5", border: "1px solid #e5e5e2" }}
@@ -184,37 +192,56 @@ function Overview() {
                 className="text-sm font-semibold"
                 style={{ color: "#3a5a40", fontFamily: "Public Sans, system-ui, sans-serif" }}
               >
-                Current sprint — {activeSprint.label}
+                {usesPhases
+                  ? `Current phase — ${currentPhase?.name ?? "post-launch"}`
+                  : `Current sprint — ${activeSprint.label}`}
               </h2>
               <span className="text-[11px]" style={{ color: "#565c65" }}>
-                {activeSprint.start.slice(5)} – {activeSprint.end.slice(5)}
+                {usesPhases
+                  ? currentPhase
+                    ? currentPhase.window
+                    : "Live customer handoff"
+                  : `${activeSprint.start.slice(5)} – ${activeSprint.end.slice(5)}`}
               </span>
             </div>
-            <div className="flex items-center gap-4">
-              <Ring pct={pctDone} />
-              <div className="text-[13px]">
-                <div>
-                  <b>{done}</b> done · <b>{inProgress}</b> in progress · <b>{todo}</b> todo ·{" "}
-                  <b>{backlog}</b> backlog
+            {usesPhases ? (
+              <PhaseProgress phases={phases} currentPhase={currentPhase} />
+            ) : (
+              <>
+                <div className="flex items-center gap-4">
+                  <Ring pct={pctDone} />
+                  <div className="text-[13px]">
+                    <div>
+                      <b>{done}</b> done · <b>{inProgress}</b> in progress · <b>{todo}</b> todo ·{" "}
+                      <b>{backlog}</b> backlog
+                    </div>
+                    <div style={{ color: "#565c65" }}>{total} issues in Linear (DEP)</div>
+                  </div>
                 </div>
-                <div style={{ color: "#565c65" }}>{total} issues in Linear (DEP)</div>
-              </div>
-            </div>
-            <div
-              className="mt-4 h-2 w-full overflow-hidden rounded-full"
-              style={{ backgroundColor: "#eee" }}
-            >
-              <div className="flex h-2">
-                <span style={{ width: `${(done / total) * 100}%`, backgroundColor: "#2e8540" }} />
-                <span
-                  style={{ width: `${(inProgress / total) * 100}%`, backgroundColor: "#ffbe2e" }}
-                />
-                <span style={{ width: `${(todo / total) * 100}%`, backgroundColor: "#a3b8cc" }} />
-                <span
-                  style={{ width: `${(backlog / total) * 100}%`, backgroundColor: "#dfe1e2" }}
-                />
-              </div>
-            </div>
+                <div
+                  className="mt-4 h-2 w-full overflow-hidden rounded-full"
+                  style={{ backgroundColor: "#eee" }}
+                >
+                  <div className="flex h-2">
+                    <span
+                      style={{ width: `${(done / total) * 100}%`, backgroundColor: "#2e8540" }}
+                    />
+                    <span
+                      style={{
+                        width: `${(inProgress / total) * 100}%`,
+                        backgroundColor: "#ffbe2e",
+                      }}
+                    />
+                    <span
+                      style={{ width: `${(todo / total) * 100}%`, backgroundColor: "#a3b8cc" }}
+                    />
+                    <span
+                      style={{ width: `${(backlog / total) * 100}%`, backgroundColor: "#dfe1e2" }}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
           </section>
 
           {/* Next milestones */}
@@ -399,6 +426,60 @@ function Overview() {
  * cleared without leaving the overview), and a link to the full page. Reads the
  * same per-program curation as the Follow-ups route, so a done here shows there.
  */
+/**
+ * Phase progress for a rec deployment: how far through the lifecycle the
+ * program is (phases-complete-of-total), plus how much of the current phase's
+ * window has elapsed. Not issue-completion — a rec board holds open commitments
+ * that don't map to "sprint velocity", so borrowing the sprint ring for phases
+ * would double-count things it shouldn't. A finished deployment (post-Launch,
+ * in Live Customer Handoff) shows steady-state rather than a % done.
+ */
+function PhaseProgress({
+  phases,
+  currentPhase,
+}: {
+  phases: PhaseRecord[];
+  currentPhase: PhaseRecord | null;
+}) {
+  const done = phases.filter((p) => p.state === "complete").length;
+  const pct = phases.length ? Math.round((done / phases.length) * 100) : 0;
+
+  return (
+    <>
+      <div className="flex items-center gap-4">
+        <Ring pct={pct} />
+        <div className="text-[13px]">
+          <div>
+            <b>{done}</b> of <b>{phases.length}</b> phases complete
+          </div>
+          <div style={{ color: "#565c65" }}>
+            {currentPhase
+              ? `Now in ${currentPhase.name.toLowerCase()} — ${currentPhase.goal}`
+              : "Post-launch — steady operations, handoff to Customer Success"}
+          </div>
+        </div>
+      </div>
+      {currentPhase ? (
+        <ul className="mt-4 space-y-1 text-[12px]">
+          {currentPhase.exitCriteria.slice(0, 4).map((c) => (
+            <li key={c} className="flex items-start gap-2" style={{ color: "#3d3d3d" }}>
+              <span aria-hidden style={{ color: "#a0a099" }}>
+                ▢
+              </span>
+              <span>{c}</span>
+            </li>
+          ))}
+          {currentPhase.exitCriteria.length > 4 ? (
+            <li className="text-[11px]" style={{ color: "#8a8a80" }}>
+              +{currentPhase.exitCriteria.length - 4} more exit criteria
+            </li>
+          ) : null}
+        </ul>
+      ) : null}
+    </>
+  );
+}
+
 /** How the pressure score reads at a glance. Same thresholds as the rollup. */
 function pressureBand(p: number): { label: string; color: string } {
   const pct = Math.round(p * 100);

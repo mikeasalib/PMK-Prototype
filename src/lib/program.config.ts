@@ -65,6 +65,13 @@ export interface ProgramConfig {
    *  deliverable — offering one for a parks deployment would be nonsense, so
    *  applicability is per-program rather than global. */
   artifacts: Array<"rollup" | "project-plan" | "poam">;
+  /**
+   * How the program organises time on its overview. VA-style engagements run on
+   * fixed sprints against a launch date; rec deployments run on canonical phases
+   * (Discovery → Configuration → Launch → …) per the Rec Deployment Playbook.
+   * Same visual slot, different concept and data source.
+   */
+  timeAxis: "sprint" | "phase";
   contract: {
     /** Null when the engagement has no contract number (commercial SOW). */
     displayNumber: string | null;
@@ -140,6 +147,7 @@ const VA: ProgramConfig = {
   navColor: "#1f3d2b",
   seal: { src: "/seal-va.png", alt: "Department of Veterans Affairs seal" },
   artifacts: ["rollup", "project-plan", "poam"],
+  timeAxis: "sprint",
   contract: {
     displayNumber: "36C10G24D0048",
     fullNumber: "36C10G24D0048 / CLIN 0001",
@@ -258,6 +266,7 @@ const VENTURA: ProgramConfig = {
   // No POA&M. It is a federal compliance artifact and has no meaning for a
   // county parks reservation system.
   artifacts: ["rollup", "project-plan"],
+  timeAxis: "phase",
   contract: {
     // Commercial SOW rather than a federal contract vehicle. AE Will Harrison,
     // closed December 2025, kickoff Jan 6 2026.

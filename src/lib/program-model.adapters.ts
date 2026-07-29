@@ -7,6 +7,7 @@
 
 import { PROGRAM, type ProgramConfig } from "./program.config";
 import { LIFECYCLE, type LifecyclePhase } from "./va-data";
+import { recDeploymentPhases } from "./rec-deployment-lifecycle";
 import {
   derivedFrom,
   fromConfig,
@@ -51,8 +52,12 @@ export function derivePhaseState(
  * criteria and VA gates — as if they were its own. A program with no lifecycle
  * seed gets an empty list, and the renderers already mark that as unsourced.
  */
+// Ventura's phases are back-calculated from its Jul 13 go-live using the
+// playbook's target durations, so the pre-launch dates are approximate — actual
+// deployments always run longer. Launch onwards is anchored to the real date.
 const PHASES_BY_PROGRAM: Record<string, LifecyclePhase[]> = {
   va: LIFECYCLE,
+  ventura: recDeploymentPhases("2026-07-13"),
 };
 
 export function phasesFromLifecycle(
