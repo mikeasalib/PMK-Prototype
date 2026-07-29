@@ -90,7 +90,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:title", content: ROOT_TITLE },
       {
         property: "og:description",
-        content: `Sprint tracking, dependencies, blockers, and stakeholders for the ${PROGRAM.domainLabel} program.`,
+        // The root renders above /p/$programId, so no program is resolved here.
+        // Previously interpolated the default program's domain label, which
+        // described VA on every page of every engagement.
+        content: "Delivery tracking, dependencies, blockers, and stakeholders per program.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

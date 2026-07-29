@@ -52,6 +52,15 @@ export interface ProgramConfig {
   domainLabel: string;
   /** Sidebar chrome. Green mirrors Cedar's admin shell — see AppLayout. */
   navColor: string;
+  /**
+   * The program's seal or badge, shown in the program switcher.
+   *
+   * `src` is a path under /public. Null means no asset yet, and the switcher
+   * falls back to an initials chip rather than shipping a stand-in that looks
+   * like a real seal. Official insignia — the VA seal in particular — is not
+   * something to approximate by hand.
+   */
+  seal: { src: string | null; alt: string };
   /** Which artifacts this program can produce. A POA&M is a federal compliance
    *  deliverable — offering one for a parks deployment would be nonsense, so
    *  applicability is per-program rather than global. */
@@ -129,6 +138,7 @@ const VA: ProgramConfig = {
   appName: "VA Program Intel",
   domainLabel: "VA.gov modernization",
   navColor: "#1f3d2b",
+  seal: { src: null, alt: "Department of Veterans Affairs seal" },
   artifacts: ["rollup", "project-plan", "poam"],
   contract: {
     displayNumber: "36C10G24D0048",
@@ -244,6 +254,7 @@ const VENTURA: ProgramConfig = {
   appName: "Program Intel",
   domainLabel: "Ventura County Parks recreation deployment",
   navColor: "#1f3d2b",
+  seal: { src: null, alt: "County of Ventura Parks logo" },
   // No POA&M. It is a federal compliance artifact and has no meaning for a
   // county parks reservation system.
   artifacts: ["rollup", "project-plan"],
@@ -445,7 +456,10 @@ function workstreamIndex(program: ProgramConfig): Record<string, Workstream> {
  */
 export function workstreamOf(
   key: string | null | undefined,
-  program: ProgramConfig = PROGRAM,
+  // Required, not defaulted. A default here silently returned VA's roster for
+  // every caller that forgot to pass a program, which is exactly how WS1-WS5
+  // appeared in Ventura's risk filters.
+  program: ProgramConfig,
 ): Workstream {
   const hit = key ? workstreamIndex(program)[key] : undefined;
   if (hit) return hit;
@@ -460,7 +474,7 @@ export function workstreamOf(
 }
 
 /** Workstream keys in display order. */
-export function workstreamKeys(program: ProgramConfig = PROGRAM): string[] {
+export function workstreamKeys(program: ProgramConfig): string[] {
   return program.workstreams.map((w) => w.key);
 }
 
@@ -503,8 +517,8 @@ export function parseSourceWorkstream(
  */
 export function classifyWorkstream(
   title: string,
-  explicit?: string | null,
-  program: ProgramConfig = PROGRAM,
+  explicit: string | null,
+  program: ProgramConfig,
 ): string {
   return classifyWorkstreamDetailed(title, explicit, program).workstream;
 }
@@ -522,8 +536,8 @@ export type AttributionBasis = "stored" | "explicit" | "keyword" | "fallback";
  */
 export function classifyWorkstreamDetailed(
   title: string,
-  explicit?: string | null,
-  program: ProgramConfig = PROGRAM,
+  explicit: string | null,
+  program: ProgramConfig,
 ): { workstream: string; basis: AttributionBasis } {
   if (explicit) return { workstream: explicit, basis: "stored" };
   const t = title.toUpperCase();
@@ -539,6 +553,6 @@ export function classifyWorkstreamDetailed(
 }
 
 /** Page title for a route: "Sprint board — VA Program Intel". */
-export function pageTitle(page: string): string {
-  return `${page} — ${PROGRAM.appName}`;
+export function pageTitle(page: string, program: ProgramConfig): string {
+  return `${page} — ${program.appName}`;
 }

@@ -1,5 +1,5 @@
 import { useProgramData, relativeTime, absoluteTime } from "@/hooks/use-program-data";
-import { PROGRAM } from "@/lib/program.config";
+import { useProgram } from "@/routes/p/$programId/route";
 
 const SOURCES = [
   { key: "granola", label: "Granola" },
@@ -8,6 +8,7 @@ const SOURCES = [
 ] as const;
 
 export function DataSourcesFooter() {
+  const program = useProgram();
   const { lastSyncedAt, sources, counts } = useProgramData();
   const statusFor = (k: string) => sources.find((s) => s.key === k);
 
@@ -48,7 +49,12 @@ export function DataSourcesFooter() {
         Last refresh · {relativeTime(lastSyncedAt)}
       </div>
       <div className="mt-2" style={{ color: "#8a9099" }}>
-        {`Contract ${PROGRAM.contract.displayNumber} · ${PROGRAM.keyDates.launchLabel}`}
+        {[
+          program.contract.displayNumber ? `Contract ${program.contract.displayNumber}` : null,
+          program.keyDates.launchLabel,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
       </div>
     </div>
   );

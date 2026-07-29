@@ -4,7 +4,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { FileText, FileSpreadsheet, FileType, Download, Loader2 } from "lucide-react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
-import { pageTitle, PROGRAM } from "@/lib/program.config";
+import { PROGRAMS, pageTitle } from "@/lib/program.config";
+import { useProgram } from "./route";
 import {
   ARTIFACTS,
   generateArtifact,
@@ -12,10 +13,10 @@ import {
   type GeneratedArtifact,
 } from "@/lib/artifacts.functions";
 
-export const Route = createFileRoute("/artifacts")({
-  head: () => ({
+export const Route = createFileRoute("/p/$programId/artifacts")({
+  head: ({ params }) => ({
     meta: [
-      { title: pageTitle("Artifacts") },
+      { title: pageTitle("Artifacts", PROGRAMS[params.programId]) },
       {
         name: "description",
         content:
@@ -46,6 +47,7 @@ function download(a: GeneratedArtifact) {
 }
 
 function Artifacts() {
+  const program = useProgram();
   const run = useServerFn(generateArtifact);
   const [busy, setBusy] = useState<ArtifactKind | null>(null);
   const [last, setLast] = useState<Record<string, GeneratedArtifact>>({});
@@ -68,7 +70,7 @@ function Artifacts() {
     <AppLayout>
       <PageHeader
         title="Artifacts"
-        subtitle={`Formal documents generated from the ${PROGRAM.domainLabel} program model. Every one is a draft to review, not a finished deliverable.`}
+        subtitle={`Formal documents generated from the ${program.domainLabel} program model. Every one is a draft to review, not a finished deliverable.`}
       />
 
       <div className="px-6 pb-10 pt-2">
@@ -99,7 +101,7 @@ function Artifacts() {
                   <div className="flex min-w-0 items-start gap-3">
                     <div
                       className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded"
-                      style={{ backgroundColor: "#1f3d2b14", color: PROGRAM.navColor }}
+                      style={{ backgroundColor: "#1f3d2b14", color: program.navColor }}
                     >
                       <Icon size={18} strokeWidth={2} />
                     </div>
@@ -115,7 +117,7 @@ function Artifacts() {
                     onClick={() => generate(a.kind)}
                     disabled={isBusy}
                     className="flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-[13px] font-medium text-white transition-opacity disabled:opacity-60"
-                    style={{ backgroundColor: PROGRAM.navColor }}
+                    style={{ backgroundColor: program.navColor }}
                   >
                     {isBusy ? (
                       <Loader2 size={15} className="animate-spin" />

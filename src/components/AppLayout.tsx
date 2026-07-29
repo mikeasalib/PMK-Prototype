@@ -14,30 +14,37 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { DataSourcesFooter } from "./DataSourcesFooter";
+import { ProgramSwitcher } from "./ProgramSwitcher";
 import { RefreshButton } from "./RefreshButton";
-import { PROGRAM } from "@/lib/program.config";
+import { PROGRAMS } from "@/lib/program.config";
+import { useProgram } from "@/routes/p/$programId/route";
 
+// Every destination is program-scoped. The leading "/p/$programId" is a literal
+// route id, not a template string — TanStack fills the param from `params`.
 const NAV = [
-  { to: "/", label: "What's important", icon: Star },
-  { to: "/team-tasks", label: "Team tasks", icon: ListChecks },
-  { to: "/program-overview", label: "Program overview", icon: LayoutDashboard },
-  { to: "/sprint-board", label: "Sprint board", icon: LayoutGrid },
-  { to: "/dependencies", label: "Dependency map", icon: Share2 },
-  { to: "/activity", label: "Activity feed", icon: Activity },
-  { to: "/lifecycle", label: "Lifecycle plan", icon: GitBranch },
-  { to: "/risks", label: "Risks & blockers", icon: AlertTriangle },
-  { to: "/stakeholders", label: "Stakeholders & Glossary", icon: Users },
-  { to: "/artifacts", label: "Artifacts", icon: FileOutput },
+  { to: "/p/$programId", label: "What's important", icon: Star },
+  { to: "/p/$programId/team-tasks", label: "Team tasks", icon: ListChecks },
+  { to: "/p/$programId/program-overview", label: "Program overview", icon: LayoutDashboard },
+  { to: "/p/$programId/sprint-board", label: "Sprint board", icon: LayoutGrid },
+  { to: "/p/$programId/dependencies", label: "Dependency map", icon: Share2 },
+  { to: "/p/$programId/activity", label: "Activity feed", icon: Activity },
+  { to: "/p/$programId/lifecycle", label: "Lifecycle plan", icon: GitBranch },
+  { to: "/p/$programId/risks", label: "Risks & blockers", icon: AlertTriangle },
+  { to: "/p/$programId/stakeholders", label: "Stakeholders & Glossary", icon: Users },
+  { to: "/p/$programId/artifacts", label: "Artifacts", icon: FileOutput },
 ] as const;
 
-// Green nav chrome — mirrors Cedar's admin shell, kept green so the internal
-// tool reads as clearly distinct from the external-facing product.
-const NAV_BG = PROGRAM.navColor;
+const NAV_BG_FALLBACK = "#1f3d2b";
 const NAV_ACTIVE = "rgba(255,255,255,0.13)";
 const NAV_HOVER = "rgba(255,255,255,0.07)";
 
 export function AppLayout({ children }: { children?: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const program = useProgram();
+  // Green nav chrome — mirrors Cedar's admin shell, kept green so the internal
+  // tool reads as clearly distinct from the external-facing product. Per-program
+  // so a second engagement can be visually distinguishable.
+  const NAV_BG = program.navColor || NAV_BG_FALLBACK;
 
   return (
     <div className="flex min-h-screen" style={{ color: "#1b1b1b" }}>
@@ -54,21 +61,25 @@ export function AppLayout({ children }: { children?: ReactNode }) {
               lineHeight: 1.2,
             }}
           >
-            {PROGRAM.name}
+            {program.name}
           </div>
           <div className="mt-1 text-[11px]" style={{ color: "rgba(255,255,255,0.6)" }}>
-            {PROGRAM.org}
+            {program.org}
           </div>
         </div>
 
         <nav className="flex-1 space-y-0.5 px-2 py-1">
           {NAV.map((n) => {
             const Icon = n.icon;
-            const active = n.to === "/" ? pathname === "/" : pathname.startsWith(n.to);
+            // The index route is a prefix of every sibling, so it can only be
+            // "active" on an exact match — otherwise it highlights everywhere.
+            const href = n.to.replace("$programId", program.id);
+            const active = n.to === "/p/$programId" ? pathname === href : pathname.startsWith(href);
             return (
               <Link
                 key={n.to}
                 to={n.to}
+                params={{ programId: program.id }}
                 className="flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] transition-colors"
                 style={{
                   backgroundColor: active ? NAV_ACTIVE : "transparent",
@@ -148,6 +159,7 @@ export function PageHeader({
         </div>
         <div className="flex shrink-0 items-center gap-3 pt-1">
           {actions}
+          <ProgramSwitcher />
           <RefreshButton />
         </div>
       </div>

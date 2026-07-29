@@ -1,18 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
-import { ORGS } from "@/lib/va-data";
-import {
-  GLOSSARY,
-  GLOSSARY_CATEGORIES,
-  GLOSSARY_SOURCE,
-  type GlossaryCategory,
-} from "@/lib/va-glossary";
-import { pageTitle } from "@/lib/program.config";
 
-export const Route = createFileRoute("/stakeholders")({
-  head: () => ({
-    meta: [{ title: pageTitle("Stakeholders & glossary") }],
+import { PROGRAMS, pageTitle } from "@/lib/program.config";
+import type { GlossaryCategory } from "@/lib/va-glossary";
+import { seedFor } from "@/lib/program-seed";
+import { useProgram } from "./route";
+
+export const Route = createFileRoute("/p/$programId/stakeholders")({
+  head: ({ params }) => ({
+    meta: [{ title: pageTitle("Stakeholders & glossary", PROGRAMS[params.programId]) }],
   }),
   component: Stakeholders,
 });
@@ -20,6 +17,8 @@ export const Route = createFileRoute("/stakeholders")({
 type Tab = "people" | "glossary";
 
 function Stakeholders() {
+  const program = useProgram();
+  const seed = seedFor(program.id);
   const [tab, setTab] = useState<Tab>("people");
 
   return (
@@ -66,9 +65,11 @@ function Stakeholders() {
 }
 
 function PeoplePanel() {
+  const program = useProgram();
+  const seed = seedFor(program.id);
   return (
     <div className="grid grid-cols-1 gap-4 p-6 xl:grid-cols-2 2xl:grid-cols-4">
-      {ORGS.map((org) => (
+      {seed.orgs.map((org) => (
         <section
           key={org.name}
           className="rounded-md"
@@ -85,10 +86,7 @@ function PeoplePanel() {
               className="inline-block h-2.5 w-2.5 rounded-full"
               style={{ backgroundColor: org.color }}
             />
-            <h2
-              className="text-[13px] font-semibold"
-              style={{ color: org.color }}
-            >
+            <h2 className="text-[13px] font-semibold" style={{ color: org.color }}>
               {org.name}
             </h2>
             <span className="ml-auto text-[11px]" style={{ color: "#666" }}>
@@ -97,10 +95,7 @@ function PeoplePanel() {
           </div>
           <ul className="divide-y" style={{ borderColor: "#eee" }}>
             {org.contacts.map((c) => (
-              <li
-                key={c.name}
-                className="flex items-start justify-between gap-2 px-3 py-2"
-              >
+              <li key={c.name} className="flex items-start justify-between gap-2 px-3 py-2">
                 <div>
                   <div className="text-[13px] font-medium">{c.name}</div>
                   <div className="text-[11px]" style={{ color: "#666" }}>
@@ -129,12 +124,14 @@ function PeoplePanel() {
 }
 
 function GlossaryPanel() {
+  const program = useProgram();
+  const seed = seedFor(program.id);
   const [q, setQ] = useState("");
   const [activeCat, setActiveCat] = useState<GlossaryCategory | "all">("all");
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return GLOSSARY.filter((e) => {
+    return seed.glossary.filter((e) => {
       if (activeCat !== "all" && e.category !== activeCat) return false;
       if (!needle) return true;
       return (
@@ -146,7 +143,7 @@ function GlossaryPanel() {
   }, [q, activeCat]);
 
   const grouped = useMemo(() => {
-    const map = new Map<GlossaryCategory, typeof GLOSSARY>();
+    const map = new Map<GlossaryCategory, typeof seed.glossary>();
     for (const e of filtered) {
       const arr = map.get(e.category) ?? [];
       arr.push(e);
@@ -179,10 +176,10 @@ function GlossaryPanel() {
             color: activeCat === "all" ? "#fff" : "#333",
           }}
         >
-          All ({GLOSSARY.length})
+          All ({seed.glossary.length})
         </button>
-        {GLOSSARY_CATEGORIES.map((c) => {
-          const count = GLOSSARY.filter((e) => e.category === c.key).length;
+        {seed.glossaryCategories.map((c) => {
+          const count = seed.glossary.filter((e) => e.category === c.key).length;
           const active = activeCat === c.key;
           return (
             <button
@@ -200,19 +197,24 @@ function GlossaryPanel() {
             </button>
           );
         })}
-        <span className="ml-auto text-[11px]" style={{ color: "#666" }}>
-          Source:{" "}
-          <a
-            href={GLOSSARY_SOURCE.url}
-            target="_blank"
-            rel="noreferrer"
-            className="underline"
-            style={{ color: "#2e5d3a" }}
-          >
-            {GLOSSARY_SOURCE.title}
-          </a>{" "}
-          · {GLOSSARY_SOURCE.updated}
-        </span>
+        {/* A program without a glossary has no source to cite. Rendering the
+            attribution unconditionally would credit VA's Notion page for an
+            empty glossary. */}
+        {seed.glossarySource ? (
+          <span className="ml-auto text-[11px]" style={{ color: "#666" }}>
+            Source:{" "}
+            <a
+              href={seed.glossarySource.url}
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+              style={{ color: "#2e5d3a" }}
+            >
+              {seed.glossarySource.title}
+            </a>{" "}
+            · {seed.glossarySource.updated}
+          </span>
+        ) : null}
       </div>
 
       {filtered.length === 0 ? (
@@ -228,95 +230,81 @@ function GlossaryPanel() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-          {GLOSSARY_CATEGORIES.filter((c) => grouped.has(c.key)).map((c) => {
-            const entries = grouped.get(c.key)!;
-            return (
-              <section
-                key={c.key}
-                className="rounded-md"
-                style={{
-                  border: "1px solid #e5e5e2",
-                  backgroundColor: "#fff",
-                }}
-              >
-                <div
-                  className="flex items-center gap-2 px-3 py-2"
+          {seed.glossaryCategories
+            .filter((c) => grouped.has(c.key))
+            .map((c) => {
+              const entries = grouped.get(c.key)!;
+              return (
+                <section
+                  key={c.key}
+                  className="rounded-md"
                   style={{
-                    backgroundColor: `${c.color}14`,
-                    borderBottom: `1px solid ${c.color}44`,
+                    border: "1px solid #e5e5e2",
+                    backgroundColor: "#fff",
                   }}
                 >
-                  <span
-                    className="inline-block h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: c.color }}
-                  />
-                  <h2
-                    className="text-[13px] font-semibold"
-                    style={{ color: c.color }}
+                  <div
+                    className="flex items-center gap-2 px-3 py-2"
+                    style={{
+                      backgroundColor: `${c.color}14`,
+                      borderBottom: `1px solid ${c.color}44`,
+                    }}
                   >
-                    {c.key}
-                  </h2>
-                  <span
-                    className="ml-auto text-[11px]"
-                    style={{ color: "#666" }}
-                  >
-                    {entries.length}
-                  </span>
-                </div>
-                <p
-                  className="px-3 pb-1.5 pt-1.5 text-[11px]"
-                  style={{ color: "#666" }}
-                >
-                  {c.blurb}
-                </p>
-                <ul className="divide-y" style={{ borderColor: "#eee" }}>
-                  {entries.map((e) => (
-                    <li key={`${e.category}-${e.term}`} className="px-3 py-2">
-                      <div className="flex flex-wrap items-baseline gap-2">
-                        <span
-                          className="rounded px-1.5 py-0.5 font-mono text-[11px] font-semibold"
-                          style={{
-                            backgroundColor: `${c.color}14`,
-                            color: c.color,
-                            border: `1px solid ${c.color}33`,
-                          }}
-                        >
-                          {e.term}
-                        </span>
-                        {e.lead ? (
+                    <span
+                      className="inline-block h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: c.color }}
+                    />
+                    <h2 className="text-[13px] font-semibold" style={{ color: c.color }}>
+                      {c.key}
+                    </h2>
+                    <span className="ml-auto text-[11px]" style={{ color: "#666" }}>
+                      {entries.length}
+                    </span>
+                  </div>
+                  <p className="px-3 pb-1.5 pt-1.5 text-[11px]" style={{ color: "#666" }}>
+                    {c.blurb}
+                  </p>
+                  <ul className="divide-y" style={{ borderColor: "#eee" }}>
+                    {entries.map((e) => (
+                      <li key={`${e.category}-${e.term}`} className="px-3 py-2">
+                        <div className="flex flex-wrap items-baseline gap-2">
                           <span
-                            className="text-[11px]"
-                            style={{ color: "#333" }}
-                          >
-                            Lead:{" "}
-                            <span style={{ fontWeight: 600 }}>{e.lead}</span>
-                          </span>
-                        ) : null}
-                        {e.unconfirmed ? (
-                          <span
-                            className="rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide"
+                            className="rounded px-1.5 py-0.5 font-mono text-[11px] font-semibold"
                             style={{
-                              backgroundColor: "#fff4e0",
-                              color: "#8a5a00",
-                              border: "1px solid #8a5a0044",
+                              backgroundColor: `${c.color}14`,
+                              color: c.color,
+                              border: `1px solid ${c.color}33`,
                             }}
                           >
-                            unconfirmed
+                            {e.term}
                           </span>
-                        ) : null}
-                      </div>
-                      <div
-                        className="mt-1 text-[12px] leading-snug"
-                        style={{ color: "#333" }}
-                      >
-                        {e.meaning.replace(/\s*\(unconfirmed\)\s*/i, " ").trim()}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            );
-          })}
+                          {e.lead ? (
+                            <span className="text-[11px]" style={{ color: "#333" }}>
+                              Lead: <span style={{ fontWeight: 600 }}>{e.lead}</span>
+                            </span>
+                          ) : null}
+                          {e.unconfirmed ? (
+                            <span
+                              className="rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide"
+                              style={{
+                                backgroundColor: "#fff4e0",
+                                color: "#8a5a00",
+                                border: "1px solid #8a5a0044",
+                              }}
+                            >
+                              unconfirmed
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="mt-1 text-[12px] leading-snug" style={{ color: "#333" }}>
+                          {e.meaning.replace(/\s*\(unconfirmed\)\s*/i, " ").trim()}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              );
+            })}
         </div>
       )}
     </div>

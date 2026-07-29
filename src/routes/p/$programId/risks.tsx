@@ -2,19 +2,19 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
 import { WsTag } from "@/components/va-ui";
-import {
-  RISKS,
-  type RiskSeverity,
-  type RiskStatus,
-  type WorkstreamKey,
-} from "@/lib/va-data";
-import { PROGRAM, pageTitle, workstreamKeys } from "@/lib/program.config";
+import { type RiskSeverity, type RiskStatus, type WorkstreamKey } from "@/lib/va-data";
+import { PROGRAMS, pageTitle, workstreamKeys } from "@/lib/program.config";
+import { seedFor } from "@/lib/program-seed";
+import { useProgram } from "./route";
 
-export const Route = createFileRoute("/risks")({
-  head: () => ({
+export const Route = createFileRoute("/p/$programId/risks")({
+  head: ({ params }) => ({
     meta: [
-      { title: pageTitle("Risks & blockers") },
-      { name: "description", content: `Active risk and blocker register for the ${PROGRAM.domainLabel} program.` },
+      { title: pageTitle("Risks & blockers", PROGRAMS[params.programId]) },
+      {
+        name: "description",
+        content: `Active risk and blocker register for the ${PROGRAMS[params.programId].domainLabel} program.`,
+      },
     ],
   }),
   component: RisksPage,
@@ -38,20 +38,19 @@ function daysBetween(a: string, b: string) {
 }
 
 function RisksPage() {
+  const program = useProgram();
+  const seed = seedFor(program.id);
   const today = "2026-07-07";
   const [ws, setWs] = useState<WorkstreamKey | "all">("all");
   const [owner, setOwner] = useState<string>("all");
   const [sev, setSev] = useState<RiskSeverity | "all">("all");
   const [status, setStatus] = useState<RiskStatus | "all">("all");
 
-  const owners = useMemo(
-    () => Array.from(new Set(RISKS.map((r) => r.owner))).sort(),
-    [],
-  );
+  const owners = useMemo(() => Array.from(new Set(seed.risks.map((r) => r.owner))).sort(), []);
 
   const rows = useMemo(
     () =>
-      RISKS.filter(
+      seed.risks.filter(
         (r) =>
           (ws === "all" || r.ws === ws) &&
           (owner === "all" || r.owner === owner) &&
@@ -61,11 +60,11 @@ function RisksPage() {
     [ws, owner, sev, status],
   );
 
-  const openedThisWeek = RISKS.filter((r) => daysBetween(r.opened, today) <= 7).length;
-  const closedThisWeek = RISKS.filter(
+  const openedThisWeek = seed.risks.filter((r) => daysBetween(r.opened, today) <= 7).length;
+  const closedThisWeek = seed.risks.filter(
     (r) => r.closed && daysBetween(r.closed, today) <= 7,
   ).length;
-  const openTotal = RISKS.filter((r) => r.status !== "resolved").length;
+  const openTotal = seed.risks.filter((r) => r.status !== "resolved").length;
 
   return (
     <AppLayout>
@@ -81,11 +80,7 @@ function RisksPage() {
         <Kpi label="Open" value={openTotal} color="#b3261e" />
         <Kpi label="Opened this week" value={openedThisWeek} color="#8a5a00" />
         <Kpi label="Closed this week" value={closedThisWeek} color="#3b7a2e" />
-        <Kpi
-          label="Net this week"
-          value={openedThisWeek - closedThisWeek}
-          color="#3a5a40"
-        />
+        <Kpi label="Net this week" value={openedThisWeek - closedThisWeek} color="#3a5a40" />
       </div>
 
       <div
@@ -100,8 +95,10 @@ function RisksPage() {
             style={{ borderColor: "#d5d5d0" }}
           >
             <option value="all">All</option>
-            {workstreamKeys().map((k) => (
-              <option key={k} value={k}>{k}</option>
+            {workstreamKeys(program).map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
             ))}
           </select>
         </Filter>
@@ -114,7 +111,9 @@ function RisksPage() {
           >
             <option value="all">All</option>
             {owners.map((o) => (
-              <option key={o} value={o}>{o}</option>
+              <option key={o} value={o}>
+                {o}
+              </option>
             ))}
           </select>
         </Filter>
@@ -127,7 +126,9 @@ function RisksPage() {
           >
             <option value="all">All</option>
             {(["critical", "high", "medium", "low"] as RiskSeverity[]).map((s) => (
-              <option key={s} value={s}>{s}</option>
+              <option key={s} value={s}>
+                {s}
+              </option>
             ))}
           </select>
         </Filter>
@@ -140,12 +141,14 @@ function RisksPage() {
           >
             <option value="all">All</option>
             {(["open", "mitigating", "resolved"] as RiskStatus[]).map((s) => (
-              <option key={s} value={s}>{s}</option>
+              <option key={s} value={s}>
+                {s}
+              </option>
             ))}
           </select>
         </Filter>
         <span className="ml-auto text-[11px]" style={{ color: "#666" }}>
-          {rows.length} of {RISKS.length}
+          {rows.length} of {seed.risks.length}
         </span>
       </div>
 
@@ -176,9 +179,13 @@ function RisksPage() {
                 <tr key={r.id} style={{ borderTop: "1px solid #eee" }}>
                   <td className="px-3 py-2 font-mono">{r.id}</td>
                   <td className="px-3 py-2 font-medium">{r.title}</td>
-                  <td className="px-3 py-2"><WsTag ws={r.ws} /></td>
+                  <td className="px-3 py-2">
+                    <WsTag ws={r.ws} />
+                  </td>
                   <td className="px-3 py-2">{r.owner}</td>
-                  <td className="px-3 py-2 font-mono" style={{ color: "#666" }}>{r.opened}</td>
+                  <td className="px-3 py-2 font-mono" style={{ color: "#666" }}>
+                    {r.opened}
+                  </td>
                   <td
                     className="px-3 py-2 font-mono"
                     style={{ color: aging ? "#b3261e" : "#666", fontWeight: aging ? 700 : 400 }}
@@ -195,7 +202,9 @@ function RisksPage() {
                   <td className="px-3 py-2 font-mono" style={{ color: "#005ea2" }}>
                     {r.linkedTicket ?? "—"}
                   </td>
-                  <td className="px-3 py-2" style={{ color: "#333" }}>{r.nextAction}</td>
+                  <td className="px-3 py-2" style={{ color: "#333" }}>
+                    {r.nextAction}
+                  </td>
                 </tr>
               );
             })}
@@ -215,7 +224,10 @@ function Kpi({ label, value, color }: { label: string; value: number; color: str
       <div className="text-[10px] uppercase tracking-wide" style={{ color: "#666" }}>
         {label}
       </div>
-      <div className="text-xl font-bold" style={{ color, fontFamily: 'Public Sans, system-ui, sans-serif' }}>
+      <div
+        className="text-xl font-bold"
+        style={{ color, fontFamily: "Public Sans, system-ui, sans-serif" }}
+      >
         {value}
       </div>
     </div>

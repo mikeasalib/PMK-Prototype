@@ -1,18 +1,19 @@
 import { workstreamOf } from "@/lib/program.config";
+import { useProgram } from "@/routes/p/$programId/route";
 import type { WorkstreamKey } from "@/lib/va-data";
 
 export function WsPip({ ws }: { ws: WorkstreamKey }) {
   return (
     <span
       className="inline-block h-2 w-2 rounded-full"
-      style={{ backgroundColor: workstreamOf(ws).color }}
-      title={workstreamOf(ws).label}
+      style={{ backgroundColor: workstreamOf(ws, useProgram()).color }}
+      title={workstreamOf(ws, useProgram()).label}
     />
   );
 }
 
 export function WsTag({ ws }: { ws: WorkstreamKey }) {
-  const w = workstreamOf(ws);
+  const w = workstreamOf(ws, useProgram());
   return (
     <span
       className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide"
