@@ -41,7 +41,7 @@ export function renderWeeklyRollup(model: ProgramModel, opts: RollupOptions): st
   L.push("");
   L.push(`**Reporting period:** ${windowStart} to ${opts.asOf} (${windowDays} days)`);
   L.push(`**Client:** ${model.program.client}`);
-  L.push(`**Contract:** ${model.program.contractNumber}`);
+  if (model.program.contractNumber) L.push(`**Contract:** ${model.program.contractNumber}`);
   L.push(
     `**Launch:** ${model.program.launchDate} ` +
       `(${daysBetween(opts.asOf, model.program.launchDate)} days out)`,

@@ -24,7 +24,13 @@ export function renderProjectPlan(model: ProgramModel, opts: ProjectPlanOptions)
   // ---- title block
   B.push({ kind: "heading", level: 1, text: `${model.program.name} — Project Plan` });
   B.push({ kind: "kv", label: "Client", value: model.program.client });
-  B.push({ kind: "kv", label: "Contract", value: model.program.contractNumber });
+  // A program with no contract number says so, rather than showing a blank
+  // line that reads like the value was lost.
+  B.push({
+    kind: "kv",
+    label: "Contract",
+    value: model.program.contractNumber ?? "not applicable to this engagement",
+  });
   B.push({ kind: "kv", label: "Period of performance", value: model.program.periodLabel });
   B.push({
     kind: "kv",

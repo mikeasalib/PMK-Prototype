@@ -50,7 +50,9 @@ export interface ProgramFacts {
   id: string;
   name: string;
   client: string;
-  contractNumber: string;
+  /** Null when the engagement has no contract number. Renderers must mark the
+   *  gap rather than print an empty string that reads like a missing value. */
+  contractNumber: string | null;
   periodLabel: string;
   launchDate: string; // YYYY-MM-DD
 }

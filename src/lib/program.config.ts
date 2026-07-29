@@ -1,6 +1,16 @@
-// The single active program. VA is the first program running on this shell, not
-// the shell itself — everything here is per-engagement and should be the only
-// place a program's identity, contract facts, and key dates are written down.
+// The program registry. Each entry is one engagement; the shell is the thing
+// they share. VA was the first program on it, Ventura County is the second, and
+// having two is what actually proves the shell is not the VA program.
+//
+// The two differ in ways that matter to the design, not just in labels:
+//   - VA is federal, fixed-price, with a contract number and a POA&M obligation.
+//     Ventura is a recreation deployment with neither.
+//   - VA's delivery work lives in a Linear project. Ventura's does not, so its
+//     work-item sections have no source and must say so.
+//   - Granola scoping differs: VA is a folder, Ventura is a participant domain.
+//   - "Workstreams" for VA are WS1-WS5. For Ventura the equivalent axis is
+//     functional area (facilities, finance, call centre...). Same concept, and
+//     the reason the taxonomy is data rather than a type.
 //
 // Client-safe: no process.env, no Supabase, no secrets. The "which external
 // project do we pull from" selectors live in program.sources.server.ts so they
@@ -40,12 +50,17 @@ export interface ProgramConfig {
   domainLabel: string;
   /** Sidebar chrome. Green mirrors Cedar's admin shell — see AppLayout. */
   navColor: string;
+  /** Which artifacts this program can produce. A POA&M is a federal compliance
+   *  deliverable — offering one for a parks deployment would be nonsense, so
+   *  applicability is per-program rather than global. */
+  artifacts: Array<"rollup" | "project-plan" | "poam">;
   contract: {
-    /** Bare contract number, as shown in the UI. */
-    displayNumber: string;
-    /** Contract number with CLIN, for reference. */
-    fullNumber: string;
-    prime: string;
+    /** Null when the engagement has no contract number (commercial SOW). */
+    displayNumber: string | null;
+    /** Contract number with CLIN, for reference. Null if not applicable. */
+    fullNumber: string | null;
+    /** Null when Kaizen contracts directly with the customer, i.e. no prime. */
+    prime: string | null;
     customer: string;
     period: string;
     value: string;
@@ -84,7 +99,7 @@ export interface WorkstreamClassifier {
   fallback: string;
 }
 
-export const PROGRAM: ProgramConfig = {
+const VA: ProgramConfig = {
   id: "va",
   name: "VA Website Redesign",
   org: "Kaizen Laboratories Inc.",
@@ -92,6 +107,7 @@ export const PROGRAM: ProgramConfig = {
   appName: "VA Program Intel",
   domainLabel: "VA.gov modernization",
   navColor: "#1f3d2b",
+  artifacts: ["rollup", "project-plan", "poam"],
   contract: {
     displayNumber: "36C10G24D0048",
     fullNumber: "36C10G24D0048 / CLIN 0001",
@@ -184,17 +200,178 @@ export const PROGRAM: ProgramConfig = {
   },
 };
 
-const WORKSTREAM_BY_KEY: Record<string, Workstream> = Object.fromEntries(
-  PROGRAM.workstreams.map((w) => [w.key, w]),
-);
+/**
+ * Ventura County Parks — a recreation deployment, and the second program on this
+ * shell. Sourced from the Notion "Ventura County Implementation Plan", read
+ * 2026-07-28.
+ *
+ * Deliberately different from VA in every way the shell has to tolerate: no
+ * contract number, no prime, no Linear project, no POA&M, and an entirely
+ * different "workstream" axis. If the shell renders this correctly it is a
+ * framework; if it only renders VA it is still the VA program.
+ */
+const VENTURA: ProgramConfig = {
+  id: "ventura",
+  name: "Ventura County Parks",
+  org: "Kaizen Laboratories Inc.",
+  orgShort: "Kaizen Laboratories",
+  appName: "Program Intel",
+  domainLabel: "Ventura County Parks recreation deployment",
+  navColor: "#1f3d2b",
+  // No POA&M. It is a federal compliance artifact and has no meaning for a
+  // county parks reservation system.
+  artifacts: ["rollup", "project-plan"],
+  contract: {
+    // Commercial SOW rather than a federal contract vehicle.
+    displayNumber: null,
+    fullNumber: null,
+    // Kaizen contracts directly; there is no prime above it.
+    prime: null,
+    customer: "County of Ventura — Parks Department",
+    period: "January 2026 – January 1, 2027 (full cutover)",
+    value: "not recorded in Notion",
+    invoiceEmail: "Brandon.Nakamoto@venturacounty.gov",
+  },
+  keyDates: {
+    // Go-live already happened; the remaining hard date is full cutover from
+    // the legacy system, so that is what "launch" means for this program.
+    launch: "2027-01-01",
+    launchLabel: "Jan 1, 2027",
+    // Reservations opened 7/13 for Dec 1 bookings; nothing freezes here.
+    codeFreeze: "2026-07-10",
+    nextSprintStart: "2026-08-03",
+  },
+  // Recreation deployments run to monthly implementation stages, not sprints.
+  sprintStrip: [
+    { key: "GO", label: "Go-Live", start: "2026-07-10", end: "2026-07-10" },
+    { key: "RES", label: "Reservations open", start: "2026-07-13", end: "2026-07-13" },
+    { key: "DEC", label: "Dec 1 inventory", start: "2026-12-01", end: "2026-12-01" },
+    { key: "CUT", label: "Full cutover", start: "2027-01-01", end: "2027-01-01" },
+  ],
+  // The equivalent axis for a rec deployment is functional area, not WS1-WS5.
+  // Owners are the real Ventura points of contact from the implementation plan.
+  workstreams: [
+    {
+      key: "FAC",
+      short: "FAC",
+      label: "Facilities & Venues",
+      owner: "Chad Bowie (Chief Ranger) / Will Seelos",
+      color: "#2e8540",
+    },
+    {
+      key: "FIN",
+      short: "FIN",
+      label: "Finance & Reporting",
+      owner: "Brandon Nakamoto (lead) / Tina Arellano",
+      color: "#005ea2",
+    },
+    {
+      key: "CC",
+      short: "CC",
+      label: "Call Center (Zion)",
+      owner: "Zion / Kaizen deployment",
+      color: "#54278f",
+    },
+    {
+      key: "MEM",
+      short: "MEM",
+      label: "Memberships & Passes",
+      owner: "Jeri Cooper (Interim Parks Director)",
+      color: "#008480",
+    },
+    {
+      key: "IT",
+      short: "IT",
+      label: "IT & Integration",
+      owner: "Joseph Sound (CEO ITSD)",
+      color: "#936f38",
+    },
+    {
+      key: "Admin",
+      short: "Admin",
+      label: "Admin · Deployment",
+      owner: "Kaizen deployment team",
+      color: "#565c65",
+    },
+  ],
+  unknownWorkstreamColor: "#565c65",
+  classifier: {
+    // No WSn convention on this program, so there is no explicit pattern to
+    // read — everything is keyword inference or fallback, and the rollup will
+    // say so rather than implying the split is authoritative.
+    explicit: null,
+    keywords: [
+      // VENUE and PARK both need boundaries: "revenue" contains VENUE and
+      // "parking" contains PARK, which sent finance and pass work to FAC.
+      {
+        pattern: /CAMPGROUND|\bVENUES?\b|FACILIT|\bPARKS?\b|PICNIC|SITE MAP|\bMAPS?\b/,
+        workstream: "FAC",
+      },
+      { pattern: /GL\b|RECONCIL|REVENUE|ACCRUAL|INVOICE|STRIPE|REPORT|FINANC/, workstream: "FIN" },
+      { pattern: /CALL CENTER|CALL CENTRE|ZION|PHONE|VOICEMAIL/, workstream: "CC" },
+      {
+        pattern: /MEMBERSHIP|ANNUAL PASS|PARKING PASS|\bDV\b|VETERAN|DISCOUNT|PERMIT/,
+        workstream: "MEM",
+      },
+      // \bAUTH\b, not AUTH — bare AUTH matches "author", "authoring" and
+      // "authority". VA's equivalent rule was already anchored; this one was not.
+      { pattern: /\bSSO\b|\bAUTH\b|INTEGRAT|MIGRAT|ITINEO|SHAREPOINT/, workstream: "IT" },
+    ],
+    fallback: "Admin",
+  },
+};
+
+/**
+ * Every program the shell knows about. Adding an engagement is a new entry here
+ * plus its source ids in program.sources.server.ts — not a code change.
+ */
+export const PROGRAMS: Record<string, ProgramConfig> = {
+  va: VA,
+  ventura: VENTURA,
+};
+
+export const DEFAULT_PROGRAM_ID = "va";
+
+/**
+ * The active program. Kept as a plain const so the ~10 existing call sites are
+ * untouched; when the project switcher lands this becomes a lookup on the route
+ * param and PROGRAMS is already the registry it needs.
+ */
+export const PROGRAM: ProgramConfig = PROGRAMS[DEFAULT_PROGRAM_ID];
+
+/** Is this artifact offered for this program? */
+export function artifactApplies(
+  kind: "rollup" | "project-plan" | "poam",
+  program: ProgramConfig = PROGRAM,
+): boolean {
+  return program.artifacts.includes(kind);
+}
+
+// Per-program lookup, memoised by program id. This was a single module-level map
+// built from the active program, which meant workstreamOf and the classifier
+// could only ever answer for one program — the exact way a "program-agnostic"
+// config stays secretly single-program. Adding Ventura is what surfaced it.
+const BY_KEY_CACHE = new Map<string, Record<string, Workstream>>();
+
+function workstreamIndex(program: ProgramConfig): Record<string, Workstream> {
+  let hit = BY_KEY_CACHE.get(program.id);
+  if (!hit) {
+    hit = Object.fromEntries(program.workstreams.map((w) => [w.key, w]));
+    BY_KEY_CACHE.set(program.id, hit);
+  }
+  return hit;
+}
 
 /**
  * Total function — never returns undefined, so no call site has to handle a
  * miss. linear_issues.workstream is free text with no constraint, so an
  * unrecognised key is reachable; before this existed those lookups threw.
  */
-export function workstreamOf(key: string | null | undefined): Workstream {
-  const hit = key ? WORKSTREAM_BY_KEY[key] : undefined;
+export function workstreamOf(
+  key: string | null | undefined,
+  program: ProgramConfig = PROGRAM,
+): Workstream {
+  const hit = key ? workstreamIndex(program)[key] : undefined;
   if (hit) return hit;
   const shown = key ?? "—";
   return {
@@ -202,13 +379,13 @@ export function workstreamOf(key: string | null | undefined): Workstream {
     short: shown,
     label: shown,
     owner: "",
-    color: PROGRAM.unknownWorkstreamColor,
+    color: program.unknownWorkstreamColor,
   };
 }
 
 /** Workstream keys in display order. */
-export function workstreamKeys(): string[] {
-  return PROGRAM.workstreams.map((w) => w.key);
+export function workstreamKeys(program: ProgramConfig = PROGRAM): string[] {
+  return program.workstreams.map((w) => w.key);
 }
 
 /**
@@ -217,11 +394,14 @@ export function workstreamKeys(): string[] {
  *
  * Deliberately narrower than classifyWorkstream and NOT to be merged with it: if
  * sync stored keyword guesses, linear_issues.workstream would stop being "what
- * Linear said", and a later change to the keyword rules could no longer
+ * the source said", and a later change to the keyword rules could no longer
  * re-derive old rows.
  */
-export function parseSourceWorkstream(title: string): string | null {
-  const c = PROGRAM.classifier.explicit;
+export function parseSourceWorkstream(
+  title: string,
+  program: ProgramConfig = PROGRAM,
+): string | null {
+  const c = program.classifier.explicit;
   if (!c) return null;
   const m = title.toUpperCase().match(c.pattern);
   return m ? c.prefix + m[1] : null;
@@ -232,8 +412,12 @@ export function parseSourceWorkstream(title: string): string | null {
  * one, then the source's own pattern, then keyword heuristics, then the
  * fallback. Used on the READ path, so a rule change re-derives everything.
  */
-export function classifyWorkstream(title: string, explicit?: string | null): string {
-  return classifyWorkstreamDetailed(title, explicit).workstream;
+export function classifyWorkstream(
+  title: string,
+  explicit?: string | null,
+  program: ProgramConfig = PROGRAM,
+): string {
+  return classifyWorkstreamDetailed(title, explicit, program).workstream;
 }
 
 /** How an attribution was arrived at. Only "stored" and "explicit" are facts. */
@@ -250,10 +434,11 @@ export type AttributionBasis = "stored" | "explicit" | "keyword" | "fallback";
 export function classifyWorkstreamDetailed(
   title: string,
   explicit?: string | null,
+  program: ProgramConfig = PROGRAM,
 ): { workstream: string; basis: AttributionBasis } {
   if (explicit) return { workstream: explicit, basis: "stored" };
   const t = title.toUpperCase();
-  const c = PROGRAM.classifier;
+  const c = program.classifier;
   if (c.explicit) {
     const m = t.match(c.explicit.pattern);
     if (m) return { workstream: c.explicit.prefix + m[1], basis: "explicit" };
