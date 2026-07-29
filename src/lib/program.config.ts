@@ -222,100 +222,120 @@ const VENTURA: ProgramConfig = {
   // county parks reservation system.
   artifacts: ["rollup", "project-plan"],
   contract: {
-    // Commercial SOW rather than a federal contract vehicle.
+    // Commercial SOW rather than a federal contract vehicle. AE Will Harrison,
+    // closed December 2025, kickoff Jan 6 2026.
     displayNumber: null,
     fullNumber: null,
-    // Kaizen contracts directly; there is no prime above it.
+    // Kaizen contracts directly with the county; there is no prime above it.
     prime: null,
-    customer: "County of Ventura — Parks Department",
+    // Enterprise Fund — the department takes no resident tax funding, which is
+    // why fiscal scrutiny (ACO itemisation) is heavy.
+    customer: "County of Ventura — Parks, General Services Agency",
     period: "January 2026 – January 1, 2027 (full cutover)",
     value: "not recorded in Notion",
     invoiceEmail: "Brandon.Nakamoto@venturacounty.gov",
   },
   keyDates: {
-    // Go-live already happened; the remaining hard date is full cutover from
-    // the legacy system, so that is what "launch" means for this program.
-    launch: "2027-01-01",
-    launchLabel: "Jan 1, 2027",
-    // Reservations opened 7/13 for Dec 1 bookings; nothing freezes here.
-    codeFreeze: "2026-07-10",
+    // The pivotal gate is December 1, not the January cutover: live campsite
+    // reservations open, day use and community centres go live, annual passes
+    // become Kaizen-only as Itineo is disabled, and the gate-fee system starts
+    // transitioning. Everything unresolved has a December 1 runway.
+    launch: "2026-12-01",
+    launchLabel: "Dec 1, 2026",
+    // Nothing freezes on a rec deployment. The nearest equivalent is the day
+    // public booking opened and the system became load-bearing.
+    codeFreeze: "2026-07-13",
     nextSprintStart: "2026-08-03",
   },
-  // Recreation deployments run to monthly implementation stages, not sprints.
+  // Recreation deployments run to dated operational gates, not sprints.
   sprintStrip: [
-    { key: "GO", label: "Go-Live", start: "2026-07-10", end: "2026-07-10" },
-    { key: "RES", label: "Reservations open", start: "2026-07-13", end: "2026-07-13" },
-    { key: "DEC", label: "Dec 1 inventory", start: "2026-12-01", end: "2026-12-01" },
-    { key: "CUT", label: "Full cutover", start: "2027-01-01", end: "2027-01-01" },
+    { key: "CAMP", label: "Campground res. live", start: "2026-07-13", end: "2026-07-13" },
+    { key: "DAY", label: "Day use live", start: "2026-07-15", end: "2026-07-15" },
+    { key: "DEC1", label: "Campsites + gate fees", start: "2026-12-01", end: "2026-12-01" },
+    { key: "SUNSET", label: "Itineo sunset", start: "2026-12-31", end: "2026-12-31" },
+    { key: "GATE", label: "Gate fees fully Kaizen", start: "2027-01-01", end: "2027-01-01" },
+    { key: "LIMIT", label: "Hard res. date limit", start: "2027-01-09", end: "2027-01-09" },
   ],
   // The equivalent axis for a rec deployment is functional area, not WS1-WS5.
-  // Owners are the real Ventura points of contact from the implementation plan.
+  // Owners are the real named leads; titles corrected against the account
+  // handoff and memory dump (Jeri is Parks Manager, not Interim Director;
+  // Brandon is Accountant I; Tina is Senior Accounting Assistant).
   workstreams: [
     {
       key: "FAC",
       short: "FAC",
       label: "Facilities & Venues",
-      owner: "Chad Bowie (Chief Ranger) / Will Seelos",
+      owner: "Chad Bowie (Chief Ranger) / William Seelos",
       color: "#2e8540",
     },
     {
       key: "FIN",
       short: "FIN",
       label: "Finance & Reporting",
-      owner: "Brandon Nakamoto (lead) / Tina Arellano",
+      owner: "Brandon Nakamoto / Tina Arellano (Dana Vodantis approves)",
       color: "#005ea2",
     },
     {
       key: "CC",
       short: "CC",
       label: "Call Center (Zion)",
-      owner: "Zion / Kaizen deployment",
+      owner: "Abbey Clove (Zion Dir. Ops) / Mia Clove (lead agent)",
       color: "#54278f",
     },
     {
       key: "MEM",
       short: "MEM",
       label: "Memberships & Passes",
-      owner: "Jeri Cooper (Interim Parks Director)",
+      owner: "William Seelos (approves DV + annual passes)",
       color: "#008480",
     },
     {
-      key: "IT",
-      short: "IT",
-      label: "IT & Integration",
-      owner: "Joseph Sound (CEO ITSD)",
+      key: "PLAT",
+      short: "PLAT",
+      label: "Platform & Integrations",
+      owner: "Nico Turk (Kaizen DS lead)",
       color: "#936f38",
     },
     {
       key: "Admin",
       short: "Admin",
       label: "Admin · Deployment",
-      owner: "Kaizen deployment team",
+      owner: "Nico Turk (lead) / Michael Salib (secondary)",
       color: "#565c65",
     },
   ],
   unknownWorkstreamColor: "#565c65",
   classifier: {
     // No WSn convention on this program, so there is no explicit pattern to
-    // read — everything is keyword inference or fallback, and the rollup will
-    // say so rather than implying the split is authoritative.
+    // read — everything is keyword inference or fallback, and the rollup says so
+    // rather than implying the split is authoritative.
     explicit: null,
+    // Vocabulary taken from the real account record: Itineo, Zion, Sherpa, ACO,
+    // gate fees, DV passes, accrual. Short keywords carry \b — this program
+    // already produced two substring bugs (VENUE inside "revenue", PARK inside
+    // "parking"), so the guard in the harness checks every pattern.
     keywords: [
-      // VENUE and PARK both need boundaries: "revenue" contains VENUE and
-      // "parking" contains PARK, which sent finance and pass work to FAC.
       {
-        pattern: /CAMPGROUND|\bVENUES?\b|FACILIT|\bPARKS?\b|PICNIC|SITE MAP|\bMAPS?\b/,
+        pattern:
+          /CAMPGROUND|CAMPING|CAMPSITE|\bVENUES?\b|FACILIT|\bPARKS?\b|PICNIC|\bSITES?\b|\bMAPS?\b|GATE FEE|DAY USE|COMMUNITY CENTER|BALLFIELD/,
         workstream: "FAC",
       },
-      { pattern: /GL\b|RECONCIL|REVENUE|ACCRUAL|INVOICE|STRIPE|REPORT|FINANC/, workstream: "FIN" },
-      { pattern: /CALL CENTER|CALL CENTRE|ZION|PHONE|VOICEMAIL/, workstream: "CC" },
       {
-        pattern: /MEMBERSHIP|ANNUAL PASS|PARKING PASS|\bDV\b|VETERAN|DISCOUNT|PERMIT/,
+        pattern:
+          /\bGLS?\b|GL CODE|RECONCIL|\bREVENUES?\b|ACCRUAL|INVOICE|PAYOUT|SETTLEMENT|SHERPA|\bACO\b|DEPOSIT|CHARGEBACK|\bCHARGES?\b|\bFEES?\b|RECEIPT|REFUND|REPORT|FINANC|\bBSA\b|ACCOUNTING|ACCOUNTANT/,
+        workstream: "FIN",
+      },
+      { pattern: /CALL CENTER|CALL CENTRE|\bZION\b|PHONE|VOICEMAIL|ESCALATION/, workstream: "CC" },
+      {
+        pattern:
+          /MEMBERSHIP|ANNUAL PASS|PARKING PASS|\bDV\b|VETERAN|DISCOUNT|PERMIT|NONPROFIT|NON-PROFIT/,
         workstream: "MEM",
       },
-      // \bAUTH\b, not AUTH — bare AUTH matches "author", "authoring" and
-      // "authority". VA's equivalent rule was already anchored; this one was not.
-      { pattern: /\bSSO\b|\bAUTH\b|INTEGRAT|MIGRAT|ITINEO|SHAREPOINT/, workstream: "IT" },
+      {
+        pattern:
+          /\bSSO\b|\bAUTH\b|INTEGRAT|MIGRAT|ITINEO|SHAREPOINT|STRIPE|\bACH\b|RESIDENCY|LOGIN|\bACCOUNTS?\b/,
+        workstream: "PLAT",
+      },
     ],
     fallback: "Admin",
   },
