@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { CircleUserRound } from "lucide-react";
 import { PROGRAMS, type ProgramConfig } from "@/lib/program.config";
+import { useProgram } from "@/routes/p/$programId/route";
 
 /**
  * Kaizen's dark green. Fixed rather than taken from program.navColor: the
@@ -9,7 +10,6 @@ import { PROGRAMS, type ProgramConfig } from "@/lib/program.config";
  * engagements. The sidebar is where per-program colour belongs.
  */
 const KAIZEN_GREEN = "#1f3d2b";
-import { useProgram } from "@/routes/p/$programId/route";
 
 /**
  * Account-style menu, top right — mirrors the pattern on the customer-facing
