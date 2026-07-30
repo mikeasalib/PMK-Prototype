@@ -29,6 +29,7 @@ import { useNavPrefs } from "@/hooks/use-nav-prefs";
 // Every destination is program-scoped. The leading "/p/$programId" is a literal
 // route id, not a template string — TanStack fills the param from `params`.
 const NAV = [
+  { to: "/p/$programId/program-overview", label: "Command centre", icon: LayoutDashboard },
   { to: "/p/$programId", label: "What's important", icon: Star },
   {
     to: "/p/$programId/team-tasks",
@@ -38,7 +39,6 @@ const NAV = [
     // caught between calls that never become a Linear issue, so they nest here.
     children: [{ to: "/p/$programId/follow-ups", label: "Follow-ups", icon: ListTodo }],
   },
-  { to: "/p/$programId/program-overview", label: "Program overview", icon: LayoutDashboard },
   { to: "/p/$programId/sprint-board", label: "Sprint board", icon: LayoutGrid },
   { to: "/p/$programId/dependencies", label: "Dependency map", icon: Share2 },
   { to: "/p/$programId/activity", label: "Activity feed", icon: Activity },

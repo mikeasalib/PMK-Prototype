@@ -28,7 +28,7 @@ import { useProgram } from "./route";
 export const Route = createFileRoute("/p/$programId/program-overview")({
   head: ({ params }) => ({
     meta: [
-      { title: pageTitle("Program overview", PROGRAMS[params.programId]) },
+      { title: pageTitle("Command centre", PROGRAMS[params.programId]) },
       {
         name: "description",
         content: `${PROGRAMS[params.programId].domainLabel} program status — milestones, sprint progress, workstream burn-down.`,
@@ -119,7 +119,7 @@ function Overview() {
   return (
     <AppLayout>
       <PageHeader
-        title="Program overview"
+        title="Command centre"
         subtitle={[
           program.domainLabel,
           // Ventura has no contract number; printing "Contract null" was the
