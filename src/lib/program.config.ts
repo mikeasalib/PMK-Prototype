@@ -254,9 +254,13 @@ const VA: ProgramConfig = {
     fallback: "Admin",
   },
   hex: {
-    // Null until VA's customer-health project is wired in. See customer-health
-    // route for the "not configured" state.
-    customerHealth: { embedUrl: null, projectLabel: null },
+    customerHealth: {
+      // Shared internal Kaizen dashboard — same project across programs. The
+      // "?embedded=true" query strips Hex's own chrome inside an iframe.
+      embedUrl:
+        "https://app.hex.tech/019a7b11-1a43-7884-a5ff-2ec695b681ce/app/Customer-Health-Dashboard-032cHK1fjszRp7QJIy2EGz/latest?embedded=true",
+      projectLabel: "Kaizen Customer Health Dashboard",
+    },
   },
 };
 
@@ -421,8 +425,12 @@ const VENTURA: ProgramConfig = {
     fallback: "Admin",
   },
   hex: {
-    // Null until Ventura's customer-health project is wired in.
-    customerHealth: { embedUrl: null, projectLabel: null },
+    customerHealth: {
+      // Shared internal Kaizen dashboard — same project across programs.
+      embedUrl:
+        "https://app.hex.tech/019a7b11-1a43-7884-a5ff-2ec695b681ce/app/Customer-Health-Dashboard-032cHK1fjszRp7QJIy2EGz/latest?embedded=true",
+      projectLabel: "Kaizen Customer Health Dashboard",
+    },
   },
 };
 
