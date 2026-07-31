@@ -12,6 +12,7 @@ import {
   Users,
   FileOutput,
   ListTodo,
+  HeartPulse,
   HelpCircle,
   Eye,
   EyeOff,
@@ -30,6 +31,7 @@ import { useNavPrefs } from "@/hooks/use-nav-prefs";
 // route id, not a template string — TanStack fills the param from `params`.
 const NAV = [
   { to: "/p/$programId/program-overview", label: "Command centre", icon: LayoutDashboard },
+  { to: "/p/$programId/customer-health", label: "Customer health", icon: HeartPulse },
   { to: "/p/$programId", label: "What's important", icon: Star },
   {
     to: "/p/$programId/team-tasks",

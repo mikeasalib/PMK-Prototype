@@ -107,6 +107,17 @@ export interface ProgramConfig {
   unknownWorkstreamColor: string;
   /** How to attribute an issue to a workstream when the source doesn't say. */
   classifier: WorkstreamClassifier;
+  /**
+   * Live dashboards this program embeds from Hex. The embed URL is authored per
+   * program because sentiment signal is per-engagement. Null means the program
+   * hasn't been wired to a Hex project yet; the page renders an honest
+   * "not configured" state rather than a blank iframe. Structured as an object
+   * so additional embeds (adoption, revenue, etc.) can be added without another
+   * top-level field.
+   */
+  hex: {
+    customerHealth: { embedUrl: string | null; projectLabel: string | null };
+  };
 }
 
 /**
@@ -241,6 +252,11 @@ const VA: ProgramConfig = {
       { pattern: /\bAPIS?\b|ARCHITECTURE|FEATURE FLAG|GITHUB|BRANCH/, workstream: "WS1" },
     ],
     fallback: "Admin",
+  },
+  hex: {
+    // Null until VA's customer-health project is wired in. See customer-health
+    // route for the "not configured" state.
+    customerHealth: { embedUrl: null, projectLabel: null },
   },
 };
 
@@ -403,6 +419,10 @@ const VENTURA: ProgramConfig = {
       },
     ],
     fallback: "Admin",
+  },
+  hex: {
+    // Null until Ventura's customer-health project is wired in.
+    customerHealth: { embedUrl: null, projectLabel: null },
   },
 };
 
