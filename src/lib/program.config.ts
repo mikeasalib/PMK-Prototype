@@ -116,7 +116,20 @@ export interface ProgramConfig {
    * top-level field.
    */
   hex: {
-    customerHealth: { embedUrl: string | null; projectLabel: string | null };
+    /**
+     * `embedUrl` is the plain-iframe fallback — Hex renders it using whatever
+     * Hex session the viewer's browser already has, and shows a Hex login
+     * screen if the viewer has none. `projectId` unlocks the signed-embed
+     * path, where the server mints a short-lived presigned URL with the
+     * workspace's HEX_API_KEY so viewers without their own Hex accounts can
+     * see the dashboard too. Either can be null — the page discloses which
+     * mode is active.
+     */
+    customerHealth: {
+      embedUrl: string | null;
+      projectLabel: string | null;
+      projectId: string | null;
+    };
   };
 }
 
@@ -256,10 +269,12 @@ const VA: ProgramConfig = {
   hex: {
     customerHealth: {
       // Shared internal Kaizen dashboard — same project across programs. The
-      // "?embedded=true" query strips Hex's own chrome inside an iframe.
+      // "?embedded=true" query strips Hex's own chrome inside the iframe.
       embedUrl:
         "https://app.hex.tech/019a7b11-1a43-7884-a5ff-2ec695b681ce/app/Customer-Health-Dashboard-032cHK1fjszRp7QJIy2EGz/latest?embedded=true",
       projectLabel: "Kaizen Customer Health Dashboard",
+      // Last URL segment of the app path; used by the signed-embed API.
+      projectId: "032cHK1fjszRp7QJIy2EGz",
     },
   },
 };
@@ -430,6 +445,7 @@ const VENTURA: ProgramConfig = {
       embedUrl:
         "https://app.hex.tech/019a7b11-1a43-7884-a5ff-2ec695b681ce/app/Customer-Health-Dashboard-032cHK1fjszRp7QJIy2EGz/latest?embedded=true",
       projectLabel: "Kaizen Customer Health Dashboard",
+      projectId: "032cHK1fjszRp7QJIy2EGz",
     },
   },
 };
