@@ -615,7 +615,7 @@ function SittingUntouchedPanel({
           className="text-sm font-semibold"
           style={{ color: "#3a5a40", fontFamily: "Public Sans, system-ui, sans-serif" }}
         >
-          Sitting untouched — {items.length} of {inProgressTotal} in progress
+          No recent updates — {items.length} of {inProgressTotal} in progress
         </h2>
         <Link
           to="/p/$programId/sprint-board"
@@ -628,8 +628,7 @@ function SittingUntouchedPanel({
       </div>
       {items.length === 0 ? (
         <div className="text-[12px]" style={{ color: "#565c65" }}>
-          Nothing stalled — every in-progress item has been touched in the last{" "}
-          {AGING_THRESHOLD_DAYS} days.
+          Every in-progress item has been updated in the last {AGING_THRESHOLD_DAYS} days.
         </div>
       ) : (
         <div className="space-y-1.5">
@@ -643,7 +642,7 @@ function SittingUntouchedPanel({
                 <div
                   className="w-16 shrink-0 rounded px-1.5 py-0.5 text-center text-[10px] font-semibold"
                   style={{ backgroundColor: band.bg, color: band.fg }}
-                  title={`${i.severity} — ${i.daysSinceUpdate} days since last Linear update`}
+                  title={`${i.daysSinceUpdate} days since Linear last saw a change on this issue (${i.severity})`}
                 >
                   {i.daysSinceUpdate}d
                 </div>
@@ -683,9 +682,9 @@ function SittingUntouchedPanel({
         </div>
       )}
       <div className="mt-2 text-[10px]" style={{ color: "#8a8a80" }}>
-        Days since Linear last updated the issue (any field, any comment). Not
-        started_at — an item nudged in the last week is not stalled, even if it
-        was opened long ago.
+        Days since Linear last saw a change on the issue — any field, any
+        comment. Not opened_at: an item created months ago but nudged this
+        week does not count as stale.
       </div>
     </section>
   );
