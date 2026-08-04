@@ -194,9 +194,12 @@ function Overview() {
         </div>
       ) : null}
 
-      {!isLoading && linear.length > 0 ? (
+      {/* Follow-ups sit above the fold because the sub-issue tasks caught
+          between calls are the most action-shaped signal on this page —
+          promoted above "No recent updates" per the strategist's own steer. */}
+      {!isLoading ? (
         <div className="px-6 pt-4">
-          <SittingUntouchedPanel program={program} items={stalled} inProgressTotal={inProgress} />
+          <FollowUpsSummary program={program} />
         </div>
       ) : null}
 
@@ -434,12 +437,19 @@ function Overview() {
             </div>
           </section>
 
-          {/* Follow-ups summary. Replaces the old "Workstream quick-dive" (hand-
-              authored VA narrative, empty for other programs) and "What's moving
-              right now" (a re-list of in-progress issues already covered by
-              What's Important and the sprint board). The command centre is more
-              useful surfacing the sub-issue follow-ups caught between calls. */}
-          <FollowUpsSummary program={program} />
+          {/* Sitting-in-place, at the bottom of the grid: still visible during
+              scan, but ranked below Follow-ups since those are the tasks a
+              strategist can act on directly, while "no recent updates" is a
+              symptom to investigate. */}
+          {linear.length > 0 ? (
+            <div className="lg:col-span-2">
+              <SittingUntouchedPanel
+                program={program}
+                items={stalled}
+                inProgressTotal={inProgress}
+              />
+            </div>
+          ) : null}
         </div>
       )}
     </AppLayout>
