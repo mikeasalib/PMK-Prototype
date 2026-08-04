@@ -21,8 +21,11 @@ import {
   upcomingGateReadiness,
   deriveHealth,
   sittingUntouched,
+  recentlyClosed,
   AGING_THRESHOLD_DAYS,
+  RECENTLY_CLOSED_WINDOW_DAYS,
   type StalledItem,
+  type ClosedItem,
 } from "@/lib/program-model.adapters";
 import type { GateReadiness, PhaseRecord } from "@/lib/program-model";
 import { useFollowUps } from "@/hooks/use-follow-ups";
@@ -114,22 +117,19 @@ function Overview() {
     { asOf: todayIso, program },
   );
 
-  // "Sitting untouched" — in-progress items with no source update in the
-  // aging window. Workstream classifier runs at read time; we do not persist
-  // guesses, so the panel prints the same attribution the burn-down uses.
-  const stalled: StalledItem[] = sittingUntouched(
-    linear.map((i) => ({
-      identifier: i.identifier,
-      title: i.title,
-      bucket: bucketOf(i),
-      updatedAt: i.source_updated_at,
-      assignee: i.assignee,
-      priority: i.priority,
-      workstream: classifyWorkstreamDetailed(i.title, i.workstream, program).workstream,
-      url: i.url,
-    })),
-    todayIso,
-  );
+  // Aging candidates share a shape between the two panels — build once.
+  const agingCandidates = linear.map((i) => ({
+    identifier: i.identifier,
+    title: i.title,
+    bucket: bucketOf(i),
+    updatedAt: i.source_updated_at,
+    assignee: i.assignee,
+    priority: i.priority,
+    workstream: classifyWorkstreamDetailed(i.title, i.workstream, program).workstream,
+    url: i.url,
+  }));
+  const stalled: StalledItem[] = sittingUntouched(agingCandidates, todayIso);
+  const closed: ClosedItem[] = recentlyClosed(agingCandidates, todayIso);
 
   // What the top-left "current" panel means depends on how the program keeps
   // time. Declared per-program in program.timeAxis so the choice is explicit
@@ -450,6 +450,16 @@ function Overview() {
               />
             </div>
           ) : null}
+
+          {/* Wins column, directly below No-recent-updates: the paired signal.
+              A page with only "what's stalled" reads as bad news; showing what
+              actually closed in the same window is honest and grounds the
+              stall count against the pace of real completion. */}
+          {linear.length > 0 ? (
+            <div className="lg:col-span-2">
+              <RecentlyClosedPanel program={program} items={closed} />
+            </div>
+          ) : null}
         </div>
       )}
     </AppLayout>
@@ -703,6 +713,118 @@ function SittingUntouchedPanel({
 /** Colour bands mirroring the severity labels sittingUntouched attaches. Kept
  *  local to the panel because they're one screen's presentation choice, not a
  *  cross-page palette. */
+/**
+ * "Recently closed" — the paired signal to "No recent updates". Same window
+ * as the aging function's threshold (14 days), so the two panels together
+ * describe one two-week slice: what left the board vs what stopped moving.
+ *
+ * Canceled items are shown with a "dropped" tag rather than a "shipped" tag,
+ * because a canceled ticket is a scope decision worth seeing but not a win.
+ * Empty state renders as a one-liner — the absence of closures in a fortnight
+ * is itself a signal, and hiding it would make quiet weeks indistinguishable
+ * from a wired-up feed with nothing to say.
+ */
+function RecentlyClosedPanel({
+  program,
+  items,
+}: {
+  program: ProgramConfig;
+  items: ClosedItem[];
+}) {
+  const top = items.slice(0, 10);
+  return (
+    <section
+      className="rounded-md p-4"
+      style={{ backgroundColor: "#fff", border: "1px solid #e5e5e2" }}
+    >
+      <div className="mb-3 flex items-baseline justify-between">
+        <h2
+          className="text-sm font-semibold"
+          style={{ color: "#3a5a40", fontFamily: "Public Sans, system-ui, sans-serif" }}
+        >
+          Recently closed — {items.length} in the last {RECENTLY_CLOSED_WINDOW_DAYS} days
+        </h2>
+        <Link
+          to="/p/$programId/activity"
+          params={{ programId: program.id }}
+          className="text-[11px] font-medium"
+          style={{ color: "#3a5a40" }}
+        >
+          Activity feed →
+        </Link>
+      </div>
+      {items.length === 0 ? (
+        <div className="text-[12px]" style={{ color: "#565c65" }}>
+          Nothing closed in the last {RECENTLY_CLOSED_WINDOW_DAYS} days.
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {top.map((i) => {
+            const dropped = i.bucket === "canceled";
+            return (
+              <div key={i.identifier} className="flex items-center gap-3 text-[12px]">
+                <div className="w-16 shrink-0 font-mono text-[11px]" style={{ color: "#565c65" }}>
+                  {i.identifier}
+                </div>
+                <div
+                  className="w-16 shrink-0 rounded px-1.5 py-0.5 text-center text-[10px] font-semibold"
+                  style={
+                    dropped
+                      ? { backgroundColor: "#eee", color: "#565c65" }
+                      : { backgroundColor: "#dcecdd", color: "#1f5c2f" }
+                  }
+                  title={
+                    dropped
+                      ? `Canceled ${i.daysSinceClosed}d ago`
+                      : `Closed ${i.daysSinceClosed}d ago`
+                  }
+                >
+                  {dropped ? "dropped" : `${i.daysSinceClosed}d`}
+                </div>
+                <div className="min-w-0 flex-1 truncate">
+                  {i.url ? (
+                    <a
+                      href={i.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:underline"
+                      style={{ color: "#1b1b1b" }}
+                    >
+                      {i.title}
+                    </a>
+                  ) : (
+                    i.title
+                  )}
+                </div>
+                <div className="w-16 shrink-0 text-right text-[10px]" style={{ color: "#565c65" }}>
+                  {i.workstream}
+                </div>
+                <div
+                  className="w-28 shrink-0 truncate text-right text-[10px]"
+                  style={{ color: "#565c65" }}
+                  title={i.assignee ?? "Unassigned"}
+                >
+                  {i.assignee ?? "—"}
+                </div>
+              </div>
+            );
+          })}
+          {items.length > top.length ? (
+            <div className="pt-1 text-[10px]" style={{ color: "#8a8a80" }}>
+              +{items.length - top.length} more — see activity feed.
+            </div>
+          ) : null}
+        </div>
+      )}
+      <div className="mt-2 text-[10px]" style={{ color: "#8a8a80" }}>
+        "Closed" is the Linear state change to done or canceled within the last{" "}
+        {RECENTLY_CLOSED_WINDOW_DAYS} days. Canceled items are shown as "dropped" —
+        a scope decision worth seeing, not a shipped win.
+      </div>
+    </section>
+  );
+}
+
 function agingBand(severity: StalledItem["severity"]): { bg: string; fg: string } {
   switch (severity) {
     case "cold":

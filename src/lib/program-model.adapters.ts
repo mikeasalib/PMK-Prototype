@@ -339,3 +339,44 @@ export function sittingUntouched(items: AgingCandidate[], asOf: string = today()
     return ap - bp;
   });
 }
+
+/**
+ * Complement to "No recent updates": items that closed in the last N days.
+ * Answers "what got done this stretch," which reads differently from the
+ * burn-down completed count because that number spans the whole engagement.
+ *
+ * "Closed" means bucket is "done" or "canceled". Canceled items are included
+ * because knowing something was dropped is as useful as knowing something
+ * shipped — the strategist's question is "what left the board," not "what
+ * shipped." The bucket travels through so the panel can label them apart.
+ *
+ * Signal is source_updated_at, same as the aging function. Linear stamps
+ * updatedAt when the state changes to closed, so recentness matches when the
+ * change actually happened rather than when the ticket was opened.
+ */
+export const RECENTLY_CLOSED_WINDOW_DAYS = 14;
+
+export interface ClosedItem extends AgingCandidate {
+  /** Days between updatedAt (closure time in Linear) and asOf. Non-negative. */
+  daysSinceClosed: number;
+}
+
+export function recentlyClosed(
+  items: AgingCandidate[],
+  asOf: string = today(),
+  windowDays: number = RECENTLY_CLOSED_WINDOW_DAYS,
+): ClosedItem[] {
+  const out: ClosedItem[] = [];
+  for (const item of items) {
+    if (item.bucket !== "done" && item.bucket !== "canceled") continue;
+    if (!item.updatedAt) continue;
+    const days = daysBetween(item.updatedAt.slice(0, 10), asOf);
+    // A negative days-since would mean a future timestamp — drop rather than
+    // display "-2d closed", which reads like a bug.
+    if (days < 0 || days > windowDays) continue;
+    out.push({ ...item, daysSinceClosed: days });
+  }
+  // Freshest closures first — the strategist's eye should land on "today"
+  // before "last week."
+  return out.sort((a, b) => a.daysSinceClosed - b.daysSinceClosed);
+}
