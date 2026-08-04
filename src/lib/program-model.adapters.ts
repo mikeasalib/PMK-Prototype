@@ -275,3 +275,67 @@ export function upcomingGateReadiness(
     })
     .sort((a, b) => b.pressure - a.pressure);
 }
+
+/**
+ * "Sitting untouched" — in-progress items whose last source update is older
+ * than the aging threshold. Answers the strategist's daily question of what
+ * is technically on the board but not actually moving.
+ *
+ * Signal is `source_updated_at` from Linear, not started_at — anyone editing
+ * the description, changing state, or leaving a comment resets the counter,
+ * which matches the intuition of "someone is still touching this." An issue
+ * with no updatedAt at all is excluded rather than counted as maximally
+ * stalled: absent metadata is not the same as absent activity.
+ *
+ * Buckets are chosen for a typical sprint cadence, not tuned per program.
+ * They are on-screen labels; a reader can compare across engagements.
+ */
+export type AgingSeverity = "aging" | "stalled" | "cold";
+export const AGING_THRESHOLD_DAYS = 7;
+
+export interface AgingCandidate {
+  identifier: string;
+  title: string;
+  /** Must be the normalised bucket, i.e. "in_progress" for a stalled item. */
+  bucket: string;
+  updatedAt: string | null;
+  assignee: string | null;
+  priority: number | null;
+  workstream: string;
+  url: string | null;
+}
+
+export interface StalledItem extends AgingCandidate {
+  daysSinceUpdate: number;
+  severity: AgingSeverity;
+}
+
+export function agingSeverity(days: number): AgingSeverity {
+  if (days >= 30) return "cold";
+  if (days >= 14) return "stalled";
+  return "aging";
+}
+
+/**
+ * Filter to in-progress items with an updatedAt older than the threshold,
+ * annotate with days-since and severity, sort oldest first. Ties break on
+ * higher priority (urgent/high) so a stale P1 outranks a stale P4.
+ */
+export function sittingUntouched(items: AgingCandidate[], asOf: string = today()): StalledItem[] {
+  const out: StalledItem[] = [];
+  for (const item of items) {
+    if (item.bucket !== "in_progress") continue;
+    if (!item.updatedAt) continue;
+    const days = daysBetween(item.updatedAt.slice(0, 10), asOf);
+    if (days < AGING_THRESHOLD_DAYS) continue;
+    out.push({ ...item, daysSinceUpdate: days, severity: agingSeverity(days) });
+  }
+  return out.sort((a, b) => {
+    if (b.daysSinceUpdate !== a.daysSinceUpdate) return b.daysSinceUpdate - a.daysSinceUpdate;
+    // Linear priority is 1 urgent, 2 high, 3 medium, 4 low, 0 none. A "0/none"
+    // sorts after 4 so unprioritised ties fall to the bottom.
+    const ap = a.priority && a.priority > 0 ? a.priority : 99;
+    const bp = b.priority && b.priority > 0 ? b.priority : 99;
+    return ap - bp;
+  });
+}

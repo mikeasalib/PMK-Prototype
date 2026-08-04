@@ -20,6 +20,9 @@ import {
   phasesFromLifecycle,
   upcomingGateReadiness,
   deriveHealth,
+  sittingUntouched,
+  AGING_THRESHOLD_DAYS,
+  type StalledItem,
 } from "@/lib/program-model.adapters";
 import type { GateReadiness, PhaseRecord } from "@/lib/program-model";
 import { useFollowUps } from "@/hooks/use-follow-ups";
@@ -111,6 +114,23 @@ function Overview() {
     { asOf: todayIso, program },
   );
 
+  // "Sitting untouched" — in-progress items with no source update in the
+  // aging window. Workstream classifier runs at read time; we do not persist
+  // guesses, so the panel prints the same attribution the burn-down uses.
+  const stalled: StalledItem[] = sittingUntouched(
+    linear.map((i) => ({
+      identifier: i.identifier,
+      title: i.title,
+      bucket: bucketOf(i),
+      updatedAt: i.source_updated_at,
+      assignee: i.assignee,
+      priority: i.priority,
+      workstream: classifyWorkstreamDetailed(i.title, i.workstream, program).workstream,
+      url: i.url,
+    })),
+    todayIso,
+  );
+
   // What the top-left "current" panel means depends on how the program keeps
   // time. Declared per-program in program.timeAxis so the choice is explicit
   // instead of inferred from another field.
@@ -171,6 +191,12 @@ function Overview() {
       {!isLoading && gates.length > 0 ? (
         <div className="px-6 pt-4">
           <GateReadinessPanel gates={gates} />
+        </div>
+      ) : null}
+
+      {!isLoading && linear.length > 0 ? (
+        <div className="px-6 pt-4">
+          <SittingUntouchedPanel program={program} items={stalled} inProgressTotal={inProgress} />
         </div>
       ) : null}
 
@@ -555,6 +581,129 @@ function GateReadinessPanel({ gates }: { gates: GateReadiness[] }) {
       </div>
     </section>
   );
+}
+
+/**
+ * "Sitting untouched" — in-progress items with no source_updated_at movement in
+ * the aging window. Present-tense, small, and lists items rather than
+ * summarising, so the eye lands on which cards are stalled, not on a number.
+ *
+ * When nothing is stalled the panel renders a one-line "Nothing stalled" state
+ * rather than hiding — the absence itself is worth reading, and hiding would
+ * make it indistinguishable from "the signal isn't wired up." When there are
+ * no in-progress items at all (a program that hasn't started work yet), the
+ * panel does hide, because there is nothing coherent to say.
+ */
+function SittingUntouchedPanel({
+  program,
+  items,
+  inProgressTotal,
+}: {
+  program: ProgramConfig;
+  items: StalledItem[];
+  inProgressTotal: number;
+}) {
+  if (inProgressTotal === 0) return null;
+  const top = items.slice(0, 8);
+  return (
+    <section
+      className="rounded-md p-4"
+      style={{ backgroundColor: "#fff", border: "1px solid #e5e5e2" }}
+    >
+      <div className="mb-3 flex items-baseline justify-between">
+        <h2
+          className="text-sm font-semibold"
+          style={{ color: "#3a5a40", fontFamily: "Public Sans, system-ui, sans-serif" }}
+        >
+          Sitting untouched — {items.length} of {inProgressTotal} in progress
+        </h2>
+        <Link
+          to="/p/$programId/sprint-board"
+          params={{ programId: program.id }}
+          className="text-[11px] font-medium"
+          style={{ color: "#3a5a40" }}
+        >
+          Sprint board →
+        </Link>
+      </div>
+      {items.length === 0 ? (
+        <div className="text-[12px]" style={{ color: "#565c65" }}>
+          Nothing stalled — every in-progress item has been touched in the last{" "}
+          {AGING_THRESHOLD_DAYS} days.
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {top.map((i) => {
+            const band = agingBand(i.severity);
+            return (
+              <div key={i.identifier} className="flex items-center gap-3 text-[12px]">
+                <div className="w-16 shrink-0 font-mono text-[11px]" style={{ color: "#565c65" }}>
+                  {i.identifier}
+                </div>
+                <div
+                  className="w-16 shrink-0 rounded px-1.5 py-0.5 text-center text-[10px] font-semibold"
+                  style={{ backgroundColor: band.bg, color: band.fg }}
+                  title={`${i.severity} — ${i.daysSinceUpdate} days since last Linear update`}
+                >
+                  {i.daysSinceUpdate}d
+                </div>
+                <div className="min-w-0 flex-1 truncate">
+                  {i.url ? (
+                    <a
+                      href={i.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:underline"
+                      style={{ color: "#1b1b1b" }}
+                    >
+                      {i.title}
+                    </a>
+                  ) : (
+                    i.title
+                  )}
+                </div>
+                <div className="w-16 shrink-0 text-right text-[10px]" style={{ color: "#565c65" }}>
+                  {i.workstream}
+                </div>
+                <div
+                  className="w-28 shrink-0 truncate text-right text-[10px]"
+                  style={{ color: "#565c65" }}
+                  title={i.assignee ?? "Unassigned"}
+                >
+                  {i.assignee ?? "—"}
+                </div>
+              </div>
+            );
+          })}
+          {items.length > top.length ? (
+            <div className="pt-1 text-[10px]" style={{ color: "#8a8a80" }}>
+              +{items.length - top.length} more — see sprint board.
+            </div>
+          ) : null}
+        </div>
+      )}
+      <div className="mt-2 text-[10px]" style={{ color: "#8a8a80" }}>
+        Days since Linear last updated the issue (any field, any comment). Not
+        started_at — an item nudged in the last week is not stalled, even if it
+        was opened long ago.
+      </div>
+    </section>
+  );
+}
+
+/** Colour bands mirroring the severity labels sittingUntouched attaches. Kept
+ *  local to the panel because they're one screen's presentation choice, not a
+ *  cross-page palette. */
+function agingBand(severity: StalledItem["severity"]): { bg: string; fg: string } {
+  switch (severity) {
+    case "cold":
+      return { bg: "#fce4e4", fg: "#8a1c1c" };
+    case "stalled":
+      return { bg: "#fbe6c8", fg: "#8a4a00" };
+    case "aging":
+    default:
+      return { bg: "#fff5c2", fg: "#5a4a00" };
+  }
 }
 
 function FollowUpsSummary({ program }: { program: ProgramConfig }) {
