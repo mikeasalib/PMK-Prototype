@@ -13,6 +13,7 @@ import {
   FileOutput,
   ListTodo,
   HeartPulse,
+  Search,
   HelpCircle,
   Eye,
   EyeOff,
@@ -32,6 +33,7 @@ import { useNavPrefs } from "@/hooks/use-nav-prefs";
 const NAV = [
   { to: "/p/$programId/program-overview", label: "Command centre", icon: LayoutDashboard },
   { to: "/p/$programId/customer-health", label: "Customer health", icon: HeartPulse },
+  { to: "/p/$programId/search", label: "Search", icon: Search },
   { to: "/p/$programId", label: "What's important", icon: Star },
   {
     to: "/p/$programId/team-tasks",

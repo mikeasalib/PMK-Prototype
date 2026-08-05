@@ -16,6 +16,7 @@ import { Route as PProgramIdIndexRouteImport } from './routes/p/$programId/index
 import { Route as PProgramIdTeamTasksRouteImport } from './routes/p/$programId/team-tasks'
 import { Route as PProgramIdStakeholdersRouteImport } from './routes/p/$programId/stakeholders'
 import { Route as PProgramIdSprintBoardRouteImport } from './routes/p/$programId/sprint-board'
+import { Route as PProgramIdSearchRouteImport } from './routes/p/$programId/search'
 import { Route as PProgramIdRisksRouteImport } from './routes/p/$programId/risks'
 import { Route as PProgramIdProgramOverviewRouteImport } from './routes/p/$programId/program-overview'
 import { Route as PProgramIdLifecycleRouteImport } from './routes/p/$programId/lifecycle'
@@ -58,6 +59,11 @@ const PProgramIdStakeholdersRoute = PProgramIdStakeholdersRouteImport.update({
 const PProgramIdSprintBoardRoute = PProgramIdSprintBoardRouteImport.update({
   id: '/sprint-board',
   path: '/sprint-board',
+  getParentRoute: () => PProgramIdRouteRoute,
+} as any)
+const PProgramIdSearchRoute = PProgramIdSearchRouteImport.update({
+  id: '/search',
+  path: '/search',
   getParentRoute: () => PProgramIdRouteRoute,
 } as any)
 const PProgramIdRisksRoute = PProgramIdRisksRouteImport.update({
@@ -115,6 +121,7 @@ export interface FileRoutesByFullPath {
   '/p/$programId/lifecycle': typeof PProgramIdLifecycleRoute
   '/p/$programId/program-overview': typeof PProgramIdProgramOverviewRoute
   '/p/$programId/risks': typeof PProgramIdRisksRoute
+  '/p/$programId/search': typeof PProgramIdSearchRoute
   '/p/$programId/sprint-board': typeof PProgramIdSprintBoardRoute
   '/p/$programId/stakeholders': typeof PProgramIdStakeholdersRoute
   '/p/$programId/team-tasks': typeof PProgramIdTeamTasksRoute
@@ -131,6 +138,7 @@ export interface FileRoutesByTo {
   '/p/$programId/lifecycle': typeof PProgramIdLifecycleRoute
   '/p/$programId/program-overview': typeof PProgramIdProgramOverviewRoute
   '/p/$programId/risks': typeof PProgramIdRisksRoute
+  '/p/$programId/search': typeof PProgramIdSearchRoute
   '/p/$programId/sprint-board': typeof PProgramIdSprintBoardRoute
   '/p/$programId/stakeholders': typeof PProgramIdStakeholdersRoute
   '/p/$programId/team-tasks': typeof PProgramIdTeamTasksRoute
@@ -149,6 +157,7 @@ export interface FileRoutesById {
   '/p/$programId/lifecycle': typeof PProgramIdLifecycleRoute
   '/p/$programId/program-overview': typeof PProgramIdProgramOverviewRoute
   '/p/$programId/risks': typeof PProgramIdRisksRoute
+  '/p/$programId/search': typeof PProgramIdSearchRoute
   '/p/$programId/sprint-board': typeof PProgramIdSprintBoardRoute
   '/p/$programId/stakeholders': typeof PProgramIdStakeholdersRoute
   '/p/$programId/team-tasks': typeof PProgramIdTeamTasksRoute
@@ -168,6 +177,7 @@ export interface FileRouteTypes {
     | '/p/$programId/lifecycle'
     | '/p/$programId/program-overview'
     | '/p/$programId/risks'
+    | '/p/$programId/search'
     | '/p/$programId/sprint-board'
     | '/p/$programId/stakeholders'
     | '/p/$programId/team-tasks'
@@ -184,6 +194,7 @@ export interface FileRouteTypes {
     | '/p/$programId/lifecycle'
     | '/p/$programId/program-overview'
     | '/p/$programId/risks'
+    | '/p/$programId/search'
     | '/p/$programId/sprint-board'
     | '/p/$programId/stakeholders'
     | '/p/$programId/team-tasks'
@@ -201,6 +212,7 @@ export interface FileRouteTypes {
     | '/p/$programId/lifecycle'
     | '/p/$programId/program-overview'
     | '/p/$programId/risks'
+    | '/p/$programId/search'
     | '/p/$programId/sprint-board'
     | '/p/$programId/stakeholders'
     | '/p/$programId/team-tasks'
@@ -262,6 +274,13 @@ declare module '@tanstack/react-router' {
       path: '/sprint-board'
       fullPath: '/p/$programId/sprint-board'
       preLoaderRoute: typeof PProgramIdSprintBoardRouteImport
+      parentRoute: typeof PProgramIdRouteRoute
+    }
+    '/p/$programId/search': {
+      id: '/p/$programId/search'
+      path: '/search'
+      fullPath: '/p/$programId/search'
+      preLoaderRoute: typeof PProgramIdSearchRouteImport
       parentRoute: typeof PProgramIdRouteRoute
     }
     '/p/$programId/risks': {
@@ -332,6 +351,7 @@ interface PProgramIdRouteRouteChildren {
   PProgramIdLifecycleRoute: typeof PProgramIdLifecycleRoute
   PProgramIdProgramOverviewRoute: typeof PProgramIdProgramOverviewRoute
   PProgramIdRisksRoute: typeof PProgramIdRisksRoute
+  PProgramIdSearchRoute: typeof PProgramIdSearchRoute
   PProgramIdSprintBoardRoute: typeof PProgramIdSprintBoardRoute
   PProgramIdStakeholdersRoute: typeof PProgramIdStakeholdersRoute
   PProgramIdTeamTasksRoute: typeof PProgramIdTeamTasksRoute
@@ -347,6 +367,7 @@ const PProgramIdRouteRouteChildren: PProgramIdRouteRouteChildren = {
   PProgramIdLifecycleRoute: PProgramIdLifecycleRoute,
   PProgramIdProgramOverviewRoute: PProgramIdProgramOverviewRoute,
   PProgramIdRisksRoute: PProgramIdRisksRoute,
+  PProgramIdSearchRoute: PProgramIdSearchRoute,
   PProgramIdSprintBoardRoute: PProgramIdSprintBoardRoute,
   PProgramIdStakeholdersRoute: PProgramIdStakeholdersRoute,
   PProgramIdTeamTasksRoute: PProgramIdTeamTasksRoute,
