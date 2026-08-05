@@ -60,6 +60,16 @@ const PHASES_BY_PROGRAM: Record<string, LifecyclePhase[]> = {
   ventura: recDeploymentPhases("2026-07-13"),
 };
 
+/**
+ * Raw lifecycle rows with startsOn/endsOn, for renderers that need to plot
+ * phases proportionally (Gantt / timeline views). Consumers wanting the
+ * derived-state / gate view should use phasesFromLifecycle instead — that one
+ * strips the raw dates and normalises to PhaseRecord.
+ */
+export function lifecyclePhasesFor(program: ProgramConfig): LifecyclePhase[] {
+  return PHASES_BY_PROGRAM[program.id] ?? [];
+}
+
 export function phasesFromLifecycle(
   program: ProgramConfig = PROGRAM,
   asOf: string = today(),
