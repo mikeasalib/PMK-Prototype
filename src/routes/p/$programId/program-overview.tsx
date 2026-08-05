@@ -14,7 +14,7 @@ import {
   workstreamOf,
   type ProgramConfig,
 } from "@/lib/program.config";
-import { daysUntilLocal, addDaysIso } from "@/lib/local-date";
+import { daysUntilLocal } from "@/lib/local-date";
 import { seedFor } from "@/lib/program-seed";
 import {
   phasesFromLifecycle,
@@ -22,13 +22,10 @@ import {
   deriveHealth,
   sittingUntouched,
   recentlyClosed,
-  computeVelocity,
   AGING_THRESHOLD_DAYS,
   RECENTLY_CLOSED_WINDOW_DAYS,
   type StalledItem,
   type ClosedItem,
-  type VelocityReading,
-  type VelocityWindow,
 } from "@/lib/program-model.adapters";
 import type { GateReadiness, PhaseRecord } from "@/lib/program-model";
 import { useFollowUps } from "@/hooks/use-follow-ups";
@@ -139,40 +136,6 @@ function Overview() {
   // instead of inferred from another field.
   const usesPhases = program.timeAxis === "phase";
 
-  // Velocity windows depend on the program's timekeeping. Sprint-based programs
-  // compare the active sprint to the one before it — the strategist's natural
-  // beat. Phase-based programs compare rolling 14-day windows because there's
-  // no discrete "sprint" to end. Both paths use computeVelocity; the shape
-  // travels through to the panel unchanged.
-  const velocity: VelocityReading = (() => {
-    if (usesPhases) {
-      const priorEnd = addDaysIso(todayIso, -RECENTLY_CLOSED_WINDOW_DAYS - 1);
-      const cur: VelocityWindow = {
-        start: addDaysIso(todayIso, -RECENTLY_CLOSED_WINDOW_DAYS),
-        end: todayIso,
-        label: `the last ${RECENTLY_CLOSED_WINDOW_DAYS} days`,
-      };
-      const prior: VelocityWindow = {
-        start: addDaysIso(priorEnd, -RECENTLY_CLOSED_WINDOW_DAYS + 1),
-        end: priorEnd,
-        label: `the prior ${RECENTLY_CLOSED_WINDOW_DAYS}`,
-      };
-      return computeVelocity(agingCandidates, cur, prior);
-    }
-    // Sprint window from the config strip; prior is the strip entry before it.
-    const activeIdx = SPRINT_MILESTONES.findIndex((s) => s.key === activeSprint.key);
-    const prevSprint = activeIdx > 0 ? SPRINT_MILESTONES[activeIdx - 1] : null;
-    const cur: VelocityWindow = {
-      start: activeSprint.start,
-      end: activeSprint.end,
-      label: activeSprint.label,
-    };
-    const prior: VelocityWindow | null = prevSprint
-      ? { start: prevSprint.start, end: prevSprint.end, label: prevSprint.label }
-      : null;
-    return computeVelocity(agingCandidates, cur, prior);
-  })();
-
   return (
     <AppLayout>
       <PageHeader
@@ -271,10 +234,7 @@ function Overview() {
               </span>
             </div>
             {usesPhases ? (
-              <>
-                <PhaseProgress phases={phases} currentPhase={currentPhase} />
-                <VelocityLine velocity={velocity} />
-              </>
+              <PhaseProgress phases={phases} currentPhase={currentPhase} />
             ) : (
               <>
                 <div className="flex items-center gap-4">
@@ -309,7 +269,6 @@ function Overview() {
                     />
                   </div>
                 </div>
-                <VelocityLine velocity={velocity} />
               </>
             )}
           </section>
@@ -863,39 +822,6 @@ function RecentlyClosedPanel({
         a scope decision worth seeing, not a shipped win.
       </div>
     </section>
-  );
-}
-
-/**
- * One-line velocity chip: closed-count for the current window and a signed
- * delta against the prior window. Renders next to the sprint/phase ring so
- * "how many did we ship" sits beside "how far are we in the cycle" — the
- * two questions a strategist answers together every morning.
- *
- * A null prior means there is no prior window yet (first sprint on the
- * strip); the delta is omitted rather than shown as "vs 0", which would read
- * like a slump against a phantom baseline.
- */
-function VelocityLine({ velocity }: { velocity: VelocityReading }) {
-  const { closed, priorClosed, delta, window: w, priorWindow } = velocity;
-  const deltaColor =
-    delta === null ? "#565c65" : delta > 0 ? "#1f5c2f" : delta < 0 ? "#8a1c1c" : "#565c65";
-  return (
-    <div className="mt-3 text-[12px]" style={{ color: "#565c65" }}>
-      <span style={{ color: "#1b1b1b" }}>
-        <b>{closed}</b> closed in {w.label}
-      </span>
-      {priorWindow && priorClosed !== null && delta !== null ? (
-        <>
-          {" · "}
-          <span style={{ color: deltaColor, fontWeight: 600 }}>
-            {delta > 0 ? "+" : ""}
-            {delta}
-          </span>{" "}
-          vs {priorWindow.label} ({priorClosed})
-        </>
-      ) : null}
-    </div>
   );
 }
 

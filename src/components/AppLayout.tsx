@@ -32,10 +32,10 @@ import { useNavPrefs } from "@/hooks/use-nav-prefs";
 // Every destination is program-scoped. The leading "/p/$programId" is a literal
 // route id, not a template string — TanStack fills the param from `params`.
 const NAV = [
+  { to: "/p/$programId/search", label: "Search", icon: Search },
   { to: "/p/$programId/program-overview", label: "Command centre", icon: LayoutDashboard },
   { to: "/p/$programId/brief", label: "Brief", icon: Sparkles },
   { to: "/p/$programId/customer-health", label: "Customer health", icon: HeartPulse },
-  { to: "/p/$programId/search", label: "Search", icon: Search },
   { to: "/p/$programId", label: "What's important", icon: Star },
   {
     to: "/p/$programId/team-tasks",

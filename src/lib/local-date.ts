@@ -31,17 +31,3 @@ export function daysUntilLocal(iso: string, now: Date = new Date()): number {
 export function shortDate(iso: string): string {
   return localDate(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
-
-/**
- * Add a signed day count to a YYYY-MM-DD and return YYYY-MM-DD. The math is
- * done in local calendar space, matching the rest of this module: no timezone
- * skew, no off-by-one across DST boundaries.
- */
-export function addDaysIso(iso: string, days: number): string {
-  const d = localDate(iso);
-  d.setDate(d.getDate() + days);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
