@@ -114,9 +114,15 @@ export interface WorkItemRecord {
    * report the split instead of presenting a guess as a reading.
    */
   attribution: AttributionBasis;
-  /** Real values from Linear. Both nullable — most issues have neither. */
+  /** Real values from Linear. All nullable — an unfilled field is not a
+   *  fabricated one. */
   dueDate: string | null;
   createdAt: string | null;
+  /** Last change on the issue (any field, any comment). Powers aging /
+   *  stalled-work signals in the same way as StoredLinearIssue's
+   *  source_updated_at — the shape is identical, threaded through the model
+   *  so server-only consumers (the brief writer) have it too. */
+  updatedAt: string | null;
   origin: Origin;
 }
 
@@ -259,6 +265,7 @@ export function workItemFromLinear(
     url: string | null;
     due_date?: string | null;
     source_created_at?: string | null;
+    source_updated_at?: string | null;
     synced_at: string;
   },
   bucket: string,
@@ -278,6 +285,7 @@ export function workItemFromLinear(
     attribution,
     dueDate: row.due_date ?? null,
     createdAt: row.source_created_at ? row.source_created_at.slice(0, 10) : null,
+    updatedAt: row.source_updated_at ? row.source_updated_at.slice(0, 10) : null,
     origin: {
       kind: "sourced",
       refs: [

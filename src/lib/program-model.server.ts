@@ -81,7 +81,7 @@ export async function assembleProgramModel(
       const { data, error } = await supabaseAdmin
         .from("linear_issues")
         .select(
-          "source_id, identifier, title, state_name, state_type, priority, assignee, workstream, labels, url, due_date, source_created_at, synced_at",
+          "source_id, identifier, title, state_name, state_type, priority, assignee, workstream, labels, url, due_date, source_created_at, source_updated_at, synced_at",
         )
         .order("source_updated_at", { ascending: false });
       if (error) throw new Error(error.message);
