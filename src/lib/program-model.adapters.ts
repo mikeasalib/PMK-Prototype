@@ -380,3 +380,57 @@ export function recentlyClosed(
   // before "last week."
   return out.sort((a, b) => a.daysSinceClosed - b.daysSinceClosed);
 }
+
+/**
+ * Throughput for a bounded window, and the delta vs the equal-length prior
+ * window. Two counts — the current one and its "did we go up or down" — are
+ * enough for the command centre; a full burn-up chart belongs elsewhere.
+ *
+ * "Closed" here is the same rule as recentlyClosed (bucket done or canceled)
+ * and the same signal (source_updated_at), so a strategist reading both
+ * panels sees consistent numbers. The window is inclusive on both ends.
+ *
+ * Programs on the sprint axis pass their sprint window; programs on phases
+ * pass a rolling 14-day window. The function does not decide which — the
+ * caller does, so each program uses its own timekeeping.
+ */
+export interface VelocityWindow {
+  /** Inclusive YYYY-MM-DD. */
+  start: string;
+  end: string;
+  /** Human label used verbatim in the UI: "Sprint 5", "the last 14 days", … */
+  label: string;
+}
+
+export interface VelocityReading {
+  window: VelocityWindow;
+  priorWindow: VelocityWindow | null;
+  /** Items whose state changed to done/canceled within `window`. */
+  closed: number;
+  /** Same count for `priorWindow`, or null if no prior window was passed. */
+  priorClosed: number | null;
+  /** closed − priorClosed, or null if no prior. Positive = accelerating. */
+  delta: number | null;
+}
+
+function countClosedIn(items: AgingCandidate[], w: VelocityWindow): number {
+  let n = 0;
+  for (const item of items) {
+    if (item.bucket !== "done" && item.bucket !== "canceled") continue;
+    if (!item.updatedAt) continue;
+    const day = item.updatedAt.slice(0, 10);
+    if (day >= w.start && day <= w.end) n++;
+  }
+  return n;
+}
+
+export function computeVelocity(
+  items: AgingCandidate[],
+  window: VelocityWindow,
+  priorWindow: VelocityWindow | null,
+): VelocityReading {
+  const closed = countClosedIn(items, window);
+  const priorClosed = priorWindow ? countClosedIn(items, priorWindow) : null;
+  const delta = priorClosed === null ? null : closed - priorClosed;
+  return { window, priorWindow, closed, priorClosed, delta };
+}
