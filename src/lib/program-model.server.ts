@@ -69,6 +69,7 @@ export async function assembleProgramModel(
 
   // ---- Linear work items, from the synced cache
   let workItems: WorkItemRecord[] = [];
+  let liveIssuesLoaded = false;
   if (!src.linear) {
     sources.push({
       key: "linear",
@@ -91,10 +92,33 @@ export async function assembleProgramModel(
         const a = classifyWorkstreamDetailed(r.title, r.workstream, program);
         return workItemFromLinear(r, bucketOf(r.state_type), a.workstream, a.basis);
       });
+      if (workItems.length > 0) liveIssuesLoaded = true;
       sources.push({ key: "linear", ok: true, message: `${workItems.length} issues` });
     } catch (e) {
       sources.push({ key: "linear", ok: false, message: (e as Error).message });
     }
+
+  // Snapshot fallback for work items — mirrors sync.functions.ts's rule.
+  // Without this, the artifacts render empty in any environment where
+  // SUPABASE_SERVICE_ROLE_KEY isn't set (local dev, unconfigured deploys),
+  // which is why the sprint / weekly rollups came out with "0 issues" when
+  // Supabase was silent. Snapshot origin stays honest in the provenance.
+  if (!liveIssuesLoaded) {
+    const { snapshotFor, snapshotFallbackAllowed } = await import("./snapshots");
+    const snap = snapshotFallbackAllowed() ? snapshotFor(program.id) : null;
+    if (snap && snap.linear_issues.length > 0) {
+      const { classifyWorkstreamDetailed } = await import("./program.config");
+      workItems = snap.linear_issues.map((r) => {
+        const a = classifyWorkstreamDetailed(r.title, r.workstream, program);
+        return workItemFromLinear(r, bucketOf(r.state_type), a.workstream, a.basis);
+      });
+      sources.push({
+        key: "linear:snapshot",
+        ok: true,
+        message: `${workItems.length} issues (captured ${snap.fetchedAt})`,
+      });
+    }
+  }
 
   // ---- Linear project milestones. The real dated backbone; falls back to
   //      config only if Linear has none, and says which was used.

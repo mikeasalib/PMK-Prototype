@@ -29,6 +29,7 @@ export const Route = createFileRoute("/p/$programId/artifacts")({
 
 const ICON: Record<ArtifactKind, typeof FileText> = {
   rollup: FileText,
+  "sprint-rollup": FileText,
   "project-plan": FileType,
   poam: FileSpreadsheet,
 };
@@ -55,7 +56,7 @@ function Artifacts() {
   async function generate(kind: ArtifactKind) {
     setBusy(kind);
     try {
-      const out = await run({ data: kind });
+      const out = await run({ data: { kind, programId: program.id } });
       setLast((p) => ({ ...p, [kind]: out }));
       download(out);
       toast.success(`${out.filename} generated`);

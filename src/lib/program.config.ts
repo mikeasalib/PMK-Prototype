@@ -64,7 +64,7 @@ export interface ProgramConfig {
   /** Which artifacts this program can produce. A POA&M is a federal compliance
    *  deliverable — offering one for a parks deployment would be nonsense, so
    *  applicability is per-program rather than global. */
-  artifacts: Array<"rollup" | "project-plan" | "poam">;
+  artifacts: Array<"rollup" | "sprint-rollup" | "project-plan" | "poam">;
   /**
    * How the program organises time on its overview. VA-style engagements run on
    * fixed sprints against a launch date; rec deployments run on canonical phases
@@ -170,7 +170,7 @@ const VA: ProgramConfig = {
   domainLabel: "VA.gov modernization",
   navColor: "#1f3d2b",
   seal: { src: "/seal-va.png", alt: "Department of Veterans Affairs seal" },
-  artifacts: ["rollup", "project-plan", "poam"],
+  artifacts: ["rollup", "sprint-rollup", "project-plan", "poam"],
   timeAxis: "sprint",
   contract: {
     displayNumber: "36C10G24D0048",
@@ -300,7 +300,7 @@ const VENTURA: ProgramConfig = {
   seal: { src: "/seal-ventura.png", alt: "County of Ventura Parks logo" },
   // No POA&M. It is a federal compliance artifact and has no meaning for a
   // county parks reservation system.
-  artifacts: ["rollup", "project-plan"],
+  artifacts: ["rollup", "sprint-rollup", "project-plan"],
   timeAxis: "phase",
   contract: {
     // Commercial SOW rather than a federal contract vehicle. AE Will Harrison,
@@ -481,7 +481,7 @@ export const PROGRAM: ProgramConfig = PROGRAMS[DEFAULT_PROGRAM_ID];
 
 /** Is this artifact offered for this program? */
 export function artifactApplies(
-  kind: "rollup" | "project-plan" | "poam",
+  kind: "rollup" | "sprint-rollup" | "project-plan" | "poam",
   program: ProgramConfig = PROGRAM,
 ): boolean {
   return program.artifacts.includes(kind);
