@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CLoginRouteImport } from './routes/c/login'
 import { Route as CProgramIdRouteImport } from './routes/c/$programId'
 import { Route as PProgramIdRouteRouteImport } from './routes/p/$programId/route'
 import { Route as PProgramIdIndexRouteImport } from './routes/p/$programId/index'
@@ -36,6 +37,11 @@ const LoginRoute = LoginRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CLoginRoute = CLoginRouteImport.update({
+  id: '/c/login',
+  path: '/c/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CProgramIdRoute = CProgramIdRouteImport.update({
@@ -126,6 +132,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/p/$programId': typeof PProgramIdRouteRouteWithChildren
   '/c/$programId': typeof CProgramIdRoute
+  '/c/login': typeof CLoginRoute
   '/p/$programId/activity': typeof PProgramIdActivityRoute
   '/p/$programId/artifacts': typeof PProgramIdArtifactsRoute
   '/p/$programId/brief': typeof PProgramIdBriefRoute
@@ -145,6 +152,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/c/$programId': typeof CProgramIdRoute
+  '/c/login': typeof CLoginRoute
   '/p/$programId/activity': typeof PProgramIdActivityRoute
   '/p/$programId/artifacts': typeof PProgramIdArtifactsRoute
   '/p/$programId/brief': typeof PProgramIdBriefRoute
@@ -166,6 +174,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/p/$programId': typeof PProgramIdRouteRouteWithChildren
   '/c/$programId': typeof CProgramIdRoute
+  '/c/login': typeof CLoginRoute
   '/p/$programId/activity': typeof PProgramIdActivityRoute
   '/p/$programId/artifacts': typeof PProgramIdArtifactsRoute
   '/p/$programId/brief': typeof PProgramIdBriefRoute
@@ -188,6 +197,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/p/$programId'
     | '/c/$programId'
+    | '/c/login'
     | '/p/$programId/activity'
     | '/p/$programId/artifacts'
     | '/p/$programId/brief'
@@ -207,6 +217,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/c/$programId'
+    | '/c/login'
     | '/p/$programId/activity'
     | '/p/$programId/artifacts'
     | '/p/$programId/brief'
@@ -227,6 +238,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/p/$programId'
     | '/c/$programId'
+    | '/c/login'
     | '/p/$programId/activity'
     | '/p/$programId/artifacts'
     | '/p/$programId/brief'
@@ -248,6 +260,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   PProgramIdRouteRoute: typeof PProgramIdRouteRouteWithChildren
   CProgramIdRoute: typeof CProgramIdRoute
+  CLoginRoute: typeof CLoginRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -264,6 +277,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/c/login': {
+      id: '/c/login'
+      path: '/c/login'
+      fullPath: '/c/login'
+      preLoaderRoute: typeof CLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/c/$programId': {
@@ -424,6 +444,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   PProgramIdRouteRoute: PProgramIdRouteRouteWithChildren,
   CProgramIdRoute: CProgramIdRoute,
+  CLoginRoute: CLoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -1,35 +1,31 @@
-import { createFileRoute, notFound } from "@tanstack/react-router";
-import { CheckCircle2, Circle, ExternalLink } from "lucide-react";
+import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { CheckCircle2, Circle, LogOut } from "lucide-react";
 import { PROGRAMS, programById, upcomingMilestones, type ProgramConfig } from "@/lib/program.config";
-import { useStoredData, bucketOf } from "@/hooks/use-stored-data";
+import { useStoredData, bucketOf, type StoredLinearIssue } from "@/hooks/use-stored-data";
 import { useFollowUps } from "@/hooks/use-follow-ups";
+import { useClientAuth } from "@/hooks/use-client-auth";
 import {
   phasesFromLifecycle,
   upcomingGateReadiness,
   recentlyClosed,
   lifecyclePhasesFor,
-  derivePhaseState,
   today as todayIso,
 } from "@/lib/program-model.adapters";
 import { localDate, shortDate, daysUntilLocal } from "@/lib/local-date";
 
 /**
- * Client-facing read-only portal.
+ * Client-facing portal.
  *
- * A calmer, executive-scoped view of the same program: launch countdown,
- * where the program stands, the next few things that need to close, the
- * open items on the client's side, and the wins in the last fortnight. No
- * assignees, no workstream-inference badges, no stalled-work panel, no
- * internal admin controls — every one of those reads as "internal team
- * pain" to a customer and doesn't belong here.
+ * Gated on useClientAuth: without a session, redirects to /c/login. The
+ * session names the customer contact + which program they're allowed to
+ * see, so someone signed in as "Chad Bowie / ventura" cannot land on /c/va
+ * even by typing the URL — beforeLoad redirects them home.
  *
- * Not gated. Anyone with the URL can view — appropriate for a shared demo
- * link, NOT for production. Real deployment must add: Supabase RLS
- * lockdown (today `anon` has SELECT USING (true) on every table), a signed
- * token flow (magic-link or JWT), and per-program policy on what's
- * legally exposable to a customer (VA carve-outs in R17, e.g., must never
- * surface). Marked in-page as "internal demo preview" so no one confuses
- * this shell for the shipped product.
+ * Demo-scoped: the session lives in localStorage, and the picker on
+ * /c/login is unrestricted. Real deployment must swap in a signed-token
+ * flow (Supabase magic-link is the drop-in) and pair it with Supabase RLS
+ * on every table filtered by the client's authorised program id.
  */
 export const Route = createFileRoute("/c/$programId")({
   beforeLoad: ({ params }) => {
@@ -43,7 +39,7 @@ export const Route = createFileRoute("/c/$programId")({
         { title: `${client} — Program status` },
         {
           name: "description",
-          content: `Delivery status for ${client}. Read-only client preview.`,
+          content: `Delivery status for ${client}. Client portal.`,
         },
       ],
     };
@@ -54,9 +50,29 @@ export const Route = createFileRoute("/c/$programId")({
 function ClientPortal() {
   const { programId } = Route.useParams();
   const program = programById(programId);
+  const navigate = useNavigate();
+  const { user, hydrated, signOut } = useClientAuth();
+
+  // Gate: unauthenticated visitors go to sign-in; a signed-in visitor whose
+  // authorised program doesn't match this URL is bounced to theirs. Waits
+  // for hydration so the first client render never contradicts the server.
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!user) {
+      navigate({ to: "/c/login", replace: true });
+      return;
+    }
+    if (user.programId !== programId) {
+      navigate({
+        to: "/c/$programId",
+        params: { programId: user.programId },
+        replace: true,
+      });
+    }
+  }, [hydrated, user, programId, navigate]);
+
   const asOf = todayIso();
   const daysToLaunch = daysUntilLocal(program.keyDates.launch);
-
   const { linear, origin, isLoading } = useStoredData(program.id);
   const { items: followUps } = useFollowUps(program.id);
 
@@ -68,7 +84,20 @@ function ClientPortal() {
     { asOf, program },
   );
 
-  const closed = recentlyClosed(
+  // Progress-so-far tallies. Everything that's ever closed, not just the
+  // last 14 days — a client's "what's been done thus far" is the running
+  // total, not a fortnight slice.
+  const totalTracked = linear.filter((i) => bucketOf(i) !== "canceled").length;
+  const totalDone = linear.filter((i) => bucketOf(i) === "done").length;
+  const pctDone = totalTracked ? Math.round((totalDone / totalTracked) * 100) : 0;
+  const passedPhases = phases.filter((p) => p.state === "complete");
+  const passedMilestones = [...program.sprintStrip, ...program.namedMilestones.map((m) => ({ key: m.id, label: m.label, end: m.date, start: m.date }))].filter(
+    (m) => m.end < asOf,
+  );
+
+  const historyByMonth = groupClosedByMonth(linear);
+
+  const closedRecent = recentlyClosed(
     linear.map((i) => ({
       identifier: i.identifier,
       title: i.title,
@@ -86,14 +115,39 @@ function ClientPortal() {
     .filter((f) => f.status === "open" && f.direction === "they-owe")
     .slice(0, 10);
 
-  const milestones = upcomingMilestones(program, asOf, 6);
-
+  const milestonesAhead = upcomingMilestones(program, asOf, 6);
   const statusHeadline = deriveHeadline(daysToLaunch, gates.length, gates[0]?.pressure);
   const usesPhases = program.timeAxis === "phase";
 
+  // Nothing gated after hydration + auth check — render blank while
+  // redirecting so a stale VA screen doesn't flash on a Ventura contact.
+  if (!hydrated || !user || user.programId !== programId) {
+    return <div style={{ minHeight: "100vh", backgroundColor: "#f7f7f5" }} />;
+  }
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#f7f7f5", color: "#1b1b1b" }}>
-      <PreviewBanner />
+      {/* Top bar — customer sign-in identity + sign out. Not a full nav.
+          A client portal doesn't need program switching or admin controls. */}
+      <div
+        className="flex items-center justify-between border-b px-4 py-2 text-[12px] md:px-8"
+        style={{ backgroundColor: "#ffffff", borderColor: "#e5e5e2", color: "#565c65" }}
+      >
+        <div className="truncate">
+          Signed in as <span style={{ color: "#1b1b1b", fontWeight: 600 }}>{user.name}</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            signOut();
+            navigate({ to: "/c/login", replace: true });
+          }}
+          className="inline-flex items-center gap-1.5 rounded px-2 py-1 font-medium hover:bg-neutral-100"
+          style={{ color: "#565c65" }}
+        >
+          <LogOut size={12} /> Sign out
+        </button>
+      </div>
 
       {/* Hero */}
       <header
@@ -141,11 +195,20 @@ function ClientPortal() {
         {isLoading ? (
           <p style={{ color: "#565c65" }}>Loading…</p>
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-10">
+            <ProgressSoFarSection
+              pctDone={pctDone}
+              totalDone={totalDone}
+              totalTracked={totalTracked}
+              passedPhases={passedPhases.length}
+              totalPhases={phases.length}
+              milestonesPassed={passedMilestones.length}
+            />
             <NextUpSection gates={gates} program={program} />
-            <MilestonesSection milestones={milestones} asOf={asOf} />
+            <MilestonesSection milestones={milestonesAhead} asOf={asOf} />
             <ClientOwesSection items={clientOwes} customer={program.contract.customer} />
-            <RecentWinsSection items={closed} />
+            <RecentWinsSection items={closedRecent} />
+            <HistorySection history={historyByMonth} />
           </div>
         )}
 
@@ -155,8 +218,8 @@ function ClientPortal() {
         >
           Delivered by Kaizen Laboratories. As of {asOf}. Data
           {origin === "snapshot" ? " last captured" : " read live"} from Linear
-          {program.artifacts.includes("poam") ? " and Notion" : ""}. This preview omits
-          internal team detail and inference-classified content.
+          {program.artifacts.includes("poam") ? " and Notion" : ""}. Detail omitted where it
+          would misrepresent as inferred what the source didn't state.
         </footer>
       </main>
     </div>
@@ -164,6 +227,47 @@ function ClientPortal() {
 }
 
 // -------- sections --------
+
+function ProgressSoFarSection({
+  pctDone,
+  totalDone,
+  totalTracked,
+  passedPhases,
+  totalPhases,
+  milestonesPassed,
+}: {
+  pctDone: number;
+  totalDone: number;
+  totalTracked: number;
+  passedPhases: number;
+  totalPhases: number;
+  milestonesPassed: number;
+}) {
+  return (
+    <Section title="Progress so far">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <ProgressCard label="Work completed" primary={`${pctDone}%`} sub={`${totalDone} of ${totalTracked} tracked items`} />
+        <ProgressCard
+          label={totalPhases > 0 ? "Phases passed" : "—"}
+          primary={totalPhases > 0 ? `${passedPhases} / ${totalPhases}` : "—"}
+          sub={totalPhases > 0 ? "delivery stages complete" : ""}
+        />
+        <ProgressCard label="Milestones passed" primary={`${milestonesPassed}`} sub="dated checkpoints already met" />
+      </div>
+      {totalTracked > 0 ? (
+        <div
+          className="mt-4 h-2 w-full overflow-hidden rounded-full"
+          style={{ backgroundColor: "#e5e5e2" }}
+        >
+          <div
+            className="h-full rounded-full"
+            style={{ width: `${pctDone}%`, backgroundColor: "#2e8540" }}
+          />
+        </div>
+      ) : null}
+    </Section>
+  );
+}
 
 function NextUpSection({
   gates,
@@ -173,7 +277,6 @@ function NextUpSection({
   program: ProgramConfig;
 }) {
   if (gates.length === 0) return null;
-  // Show at most 3 gates client-side; the ranked-lower ones are noise here.
   const top = gates.slice(0, 3);
   return (
     <Section title="What we're driving next">
@@ -318,6 +421,39 @@ function RecentWinsSection({ items }: { items: ReturnType<typeof recentlyClosed>
   );
 }
 
+/**
+ * The "what's been done thus far" history — every closed item grouped by
+ * the month it closed. Answers a client returning after a month with
+ * "what happened since I last checked."
+ */
+function HistorySection({ history }: { history: Array<{ month: string; label: string; items: StoredLinearIssue[] }> }) {
+  if (history.length === 0) return null;
+  return (
+    <Section title="Delivery history">
+      <div className="space-y-4">
+        {history.map((group) => (
+          <div key={group.month}>
+            <h3
+              className="mb-2 text-xs font-semibold uppercase tracking-wide"
+              style={{ color: "#565c65" }}
+            >
+              {group.label} · {group.items.length} shipped
+            </h3>
+            <ul className="space-y-1.5">
+              {group.items.map((i) => (
+                <li key={i.identifier} className="flex items-start gap-2 text-sm">
+                  <CheckCircle2 size={14} className="mt-0.5 shrink-0" style={{ color: "#1f5c2f" }} />
+                  <span style={{ color: "#1b1b1b" }}>{i.title}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
 // -------- primitives --------
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -336,10 +472,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function HeroStat({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
-    <div
-      className="rounded-lg px-4 py-3"
-      style={{ backgroundColor: "rgba(255,255,255,0.10)" }}
-    >
+    <div className="rounded-lg px-4 py-3" style={{ backgroundColor: "rgba(255,255,255,0.10)" }}>
       <div className="text-xs uppercase tracking-wide opacity-70">{label}</div>
       <div className="mt-1 text-lg font-semibold">{value}</div>
       {sub ? <div className="mt-0.5 text-xs opacity-80">{sub}</div> : null}
@@ -347,26 +480,25 @@ function HeroStat({ label, value, sub }: { label: string; value: string; sub: st
   );
 }
 
-function PreviewBanner() {
+function ProgressCard({ label, primary, sub }: { label: string; primary: string; sub: string }) {
   return (
-    <div
-      className="px-4 py-2 text-center text-[11px]"
-      style={{ backgroundColor: "#fdf5e6", color: "#7a5a00", borderBottom: "1px solid #e5e5e2" }}
-    >
-      <span className="font-semibold">Internal demo preview.</span> Not auth-gated; do not share
-      the URL outside Kaizen until Supabase RLS + a signed token flow are in place.
-      <ExternalLink size={11} className="ml-1 inline" />
+    <div className="rounded-lg bg-white p-4" style={{ border: "1px solid #e5e5e2" }}>
+      <div className="text-xs uppercase tracking-wide" style={{ color: "#565c65" }}>
+        {label}
+      </div>
+      <div
+        className="mt-1 text-2xl font-semibold"
+        style={{ fontFamily: "var(--font-display)", color: "#1b1b1b" }}
+      >
+        {primary}
+      </div>
+      {sub ? <div className="mt-0.5 text-xs" style={{ color: "#565c65" }}>{sub}</div> : null}
     </div>
   );
 }
 
 // -------- helpers --------
 
-/**
- * A single-word status headline for the hero. Deliberately coarse — a
- * customer-facing status should read decisively, not simulate precision
- * that requires footnotes.
- */
 function deriveHeadline(
   daysToLaunch: number,
   openGates: number,
@@ -381,8 +513,6 @@ function deriveHeadline(
   return { label: "On track", sub: "" };
 }
 
-/** Colour band for a client-facing gate card. Softer palette than the
- *  internal command centre — no "critical" red on a customer's screen. */
 function clientBand(p: number): { fg: string; border: string } {
   if (p >= 0.75) return { fg: "#8a1c1c", border: "#f0c9c9" };
   if (p >= 0.5) return { fg: "#8a4a00", border: "#f0d9b8" };
@@ -390,24 +520,43 @@ function clientBand(p: number): { fg: string; border: string } {
   return { fg: "#1f5c2f", border: "#d0e0d0" };
 }
 
-/**
- * Client-safe phase summary. The phase's raw `goal` string is authored for
- * internal use and can carry references to Kaizen team members; the summary
- * strips those to first-name-only. For a real portal we would carry a
- * per-phase client-facing description in the config rather than laundering
- * the internal one.
- */
 function phaseSummary(program: ProgramConfig, phaseId: string): string {
   const raw = lifecyclePhasesFor(program).find((p) => p.id === phaseId);
   if (!raw) return "";
-  // First-name only sanitiser — collapse "Michael Salib" style refs to first
-  // name, and drop email hosts. Best-effort; a config-authored version is
-  // the real fix.
   return raw.goal.replace(/([a-z]+)@[a-z0-9.-]+/gi, "$1");
 }
 
 function daysBetween(fromIso: string, toIso: string): number {
-  return Math.round(
-    (localDate(toIso).getTime() - localDate(fromIso).getTime()) / 86400000,
-  );
+  return Math.round((localDate(toIso).getTime() - localDate(fromIso).getTime()) / 86400000);
+}
+
+/**
+ * Group done items by the month their state changed to done. Uses
+ * source_updated_at (closure time in Linear). Sorted newest month first.
+ * Items missing updatedAt are omitted — a shipped item with no closure
+ * timestamp is a data-quality problem, not a customer-facing surprise.
+ */
+function groupClosedByMonth(
+  items: StoredLinearIssue[],
+): Array<{ month: string; label: string; items: StoredLinearIssue[] }> {
+  const closed = items.filter((i) => bucketOf(i) === "done" && i.source_updated_at);
+  const byMonth = new Map<string, StoredLinearIssue[]>();
+  for (const item of closed) {
+    const day = item.source_updated_at!.slice(0, 7); // YYYY-MM
+    const arr = byMonth.get(day) ?? [];
+    arr.push(item);
+    byMonth.set(day, arr);
+  }
+  const groups = Array.from(byMonth.entries()).map(([month, items]) => ({
+    month,
+    label: monthLabel(month),
+    items: items.sort((a, b) => (b.source_updated_at ?? "").localeCompare(a.source_updated_at ?? "")),
+  }));
+  return groups.sort((a, b) => b.month.localeCompare(a.month));
+}
+
+function monthLabel(monthIso: string): string {
+  const [y, m] = monthIso.split("-").map(Number);
+  const d = new Date(y, (m ?? 1) - 1, 1);
+  return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 }
