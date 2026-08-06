@@ -5,10 +5,9 @@ import {
   getStoredData,
   type StoredLinearIssue,
   type StoredNotionPage,
-  type StoredGranolaNote,
 } from "@/lib/sync.functions";
 
-export type { StoredLinearIssue, StoredNotionPage, StoredGranolaNote };
+export type { StoredLinearIssue, StoredNotionPage };
 
 export function useStoredData(programId: string) {
   const fn = useServerFn(getStoredData);
@@ -23,7 +22,6 @@ export function useStoredData(programId: string) {
     isLoading,
     linear: data?.linear ?? [],
     notion: data?.notion ?? [],
-    granola: data?.granola ?? [],
     origin: data?.origin ?? "empty",
     capturedAt: data?.capturedAt ?? null,
     capturedFrom: data?.capturedFrom ?? null,

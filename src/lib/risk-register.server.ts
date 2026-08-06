@@ -8,41 +8,20 @@
 // Parsing lives in risk-register.ts as a pure function so it can be verified
 // against captured content without a network call. This file only fetches.
 
-import { GATEWAY_URL, sourcesFor } from "./program.sources.server";
+import { sourcesFor } from "./program.sources.server";
+import { notionChildren } from "./sources.direct.server";
 import { parseRiskRegister, type ParseResult } from "./risk-register";
 import type { SourceRef } from "./program-model";
 
-const GATEWAY = GATEWAY_URL;
-
-function headers(connKey: string) {
-  return {
-    Authorization: `Bearer ${process.env.LOVABLE_API_KEY}`,
-    "X-Connection-Api-Key": connKey,
-    "Content-Type": "application/json",
-  };
-}
-
+// Reads go straight to api.notion.com with a NOTION_API_KEY personal token.
+// Was routed through the Lovable connector gateway, which additionally needed
+// LOVABLE_API_KEY — so setting only NOTION_API_KEY produced an auth failure
+// that surfaced as an empty register rather than a configuration error.
 type Block = Record<string, unknown>;
 
 /** All children of a block or page, following pagination. */
-async function children(blockId: string, key: string): Promise<Block[]> {
-  const out: Block[] = [];
-  let cursor: string | undefined;
-  do {
-    const u = new URL(`${GATEWAY}/notion/v1/blocks/${blockId}/children`);
-    u.searchParams.set("page_size", "100");
-    if (cursor) u.searchParams.set("start_cursor", cursor);
-    const res = await fetch(u.toString(), { headers: headers(key) });
-    if (!res.ok) throw new Error(`HTTP ${res.status} reading children of ${blockId}`);
-    const d = (await res.json()) as {
-      results?: Block[];
-      next_cursor?: string;
-      has_more?: boolean;
-    };
-    out.push(...(d.results ?? []));
-    cursor = d.has_more ? d.next_cursor : undefined;
-  } while (cursor);
-  return out;
+async function children(blockId: string): Promise<Block[]> {
+  return notionChildren(blockId);
 }
 
 /** Flatten a table_row's cells into plain strings, one per column. */
@@ -88,7 +67,7 @@ export async function fetchRiskRegister(programId: string): Promise<RegisterFetc
   try {
     // 1. Find the register page among the hub's children. syncNotion already
     //    enumerates these, so this is a path we know works.
-    const hubChildren = await children(src.notion.rootPageId, key);
+    const hubChildren = await children(src.notion.rootPageId);
     const page = hubChildren.find((b) => {
       if (b.type !== "child_page") return false;
       const t = (b.child_page as { title?: string } | undefined)?.title ?? "";
@@ -104,14 +83,14 @@ export async function fetchRiskRegister(programId: string): Promise<RegisterFetc
     const pageId = page.id as string;
 
     // 2. First table block on that page is the register.
-    const blocks = await children(pageId, key);
+    const blocks = await children(pageId);
     const table = blocks.find((b) => b.type === "table");
     if (!table) {
       return { ...empty, pageId, ok: false, message: "register page has no table block" };
     }
 
     // 3. Rows are the table block's children.
-    const rows = (await children(table.id as string, key))
+    const rows = (await children(table.id as string))
       .filter((b) => b.type === "table_row")
       .map(rowCells);
 
