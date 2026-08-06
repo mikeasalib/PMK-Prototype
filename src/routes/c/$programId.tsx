@@ -1,5 +1,5 @@
 import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { CheckCircle2, Circle, LogOut } from "lucide-react";
 import { PROGRAMS, programById, upcomingMilestones, type ProgramConfig } from "@/lib/program.config";
 import { useStoredData, bucketOf, type StoredLinearIssue } from "@/hooks/use-stored-data";
@@ -155,13 +155,7 @@ function ClientPortal() {
         style={{ backgroundColor: program.navColor, color: "#ffffff" }}
       >
         <div className="mx-auto max-w-4xl">
-          {program.seal.src ? (
-            <img
-              src={program.seal.src}
-              alt={program.seal.alt}
-              className="mb-4 h-10 w-10 object-contain md:h-12 md:w-12"
-            />
-          ) : null}
+          <SealMark program={program} />
           <h1
             className="text-2xl font-semibold md:text-3xl"
             style={{ fontFamily: "var(--font-display)" }}
@@ -467,6 +461,53 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       </h2>
       {children}
     </section>
+  );
+}
+
+/**
+ * Program seal for the hero. Attempts the configured src; on 404 or missing
+ * config, falls back to an initials chip rather than showing a broken image
+ * glyph. A hand-approximated seal on a customer-facing screen would
+ * misrepresent an official mark, so the fallback is deliberately a flat
+ * lettermark instead.
+ */
+function SealMark({ program }: { program: ProgramConfig }) {
+  const [failed, setFailed] = useState(false);
+  if (program.seal.src && !failed) {
+    return (
+      <img
+        src={program.seal.src}
+        alt={program.seal.alt}
+        onError={() => setFailed(true)}
+        className="mb-4 h-10 w-10 object-contain md:h-12 md:w-12"
+      />
+    );
+  }
+  // Initials source: program.name reads cleaner than the long-form customer
+  // string. Two rules:
+  //   1. If the first token is an existing short all-caps acronym (VA, USDA,
+  //      NASA, etc.), use it as-is. "VA Website Redesign" -> "VA", not "VW".
+  //   2. Otherwise, first character of the first two non-filler words.
+  //      "Ventura County Parks" -> "VC".
+  const filler = new Set(["of", "the", "and", "for", "a", "an"]);
+  const tokens = program.name.split(/\s+/).filter((w) => w && !filler.has(w.toLowerCase()));
+  const first = tokens[0] ?? "";
+  const isAcronym = first.length >= 2 && first.length <= 5 && first === first.toUpperCase();
+  const initials = isAcronym
+    ? first
+    : tokens
+        .slice(0, 2)
+        .map((w) => w[0])
+        .join("")
+        .toUpperCase();
+  return (
+    <div
+      aria-hidden="true"
+      className="mb-4 flex h-10 w-10 items-center justify-center rounded-md text-sm font-semibold md:h-12 md:w-12 md:text-base"
+      style={{ backgroundColor: "rgba(255,255,255,0.14)", color: "#ffffff" }}
+    >
+      {initials || "•"}
+    </div>
   );
 }
 
