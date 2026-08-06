@@ -29,6 +29,7 @@ import {
 } from "@/lib/program-model.adapters";
 import type { GateReadiness, PhaseRecord } from "@/lib/program-model";
 import { useFollowUps } from "@/hooks/use-follow-ups";
+import { useNotionTasks } from "@/hooks/use-notion-tasks";
 import { useProgram } from "./route";
 
 export const Route = createFileRoute("/p/$programId/program-overview")({
@@ -202,6 +203,13 @@ function Overview() {
           <FollowUpsSummary program={program} />
         </div>
       ) : null}
+
+      {/* Notion tracker summary. The command centre reported open work off the
+          Linear board alone, which on VA is roughly a third of what is actually
+          in flight — the hand-maintained tracker carries the rest. */}
+      <div className="px-6 pt-4">
+        <NotionTrackerSummary program={program} />
+      </div>
 
       {isLoading ? (
         <div className="p-6 text-[13px]" style={{ color: "#565c65" }}>
@@ -821,6 +829,84 @@ function RecentlyClosedPanel({
         {RECENTLY_CLOSED_WINDOW_DAYS} days. Canceled items are shown as "dropped" —
         a scope decision worth seeing, not a shipped win.
       </div>
+    </section>
+  );
+}
+
+/**
+ * Command-centre summary of the Notion checkbox tracker: an open count, the
+ * per-section split, and a link through to the full list on Team tasks.
+ *
+ * Renders nothing when the program keeps no tracker (Ventura), because an empty
+ * panel labelled "Notion tracker" would imply a page exists and is empty rather
+ * than that none was configured. Configuration problems DO render, with the
+ * reason, since a silently missing 42 open items is the failure this whole
+ * panel exists to prevent.
+ */
+function NotionTrackerSummary({ program }: { program: ProgramConfig }) {
+  const { isLoading, open, bySection, status } = useNotionTasks(program.id);
+  if (status === "not-configured") return null;
+
+  return (
+    <section
+      className="rounded-md p-4"
+      style={{ backgroundColor: "#fff", border: "1px solid #e5e5e2" }}
+    >
+      <div className="mb-3 flex items-baseline justify-between">
+        <h2
+          className="text-sm font-semibold"
+          style={{ color: "#3a5a40", fontFamily: "Public Sans, system-ui, sans-serif" }}
+        >
+          Notion tracker{status === "ok" ? ` \u00b7 ${open.length} open` : ""}
+        </h2>
+        <Link
+          to="/p/$programId/team-tasks"
+          params={{ programId: program.id }}
+          className="text-[11px] font-medium"
+          style={{ color: "#3a5a40" }}
+        >
+          Team tasks →
+        </Link>
+      </div>
+
+      {isLoading ? (
+        <div className="text-[12px]" style={{ color: "#565c65" }}>
+          Reading the tracker…
+        </div>
+      ) : status !== "ok" ? (
+        <div className="text-[12px]" style={{ color: "#8a5a00" }}>
+          {status === "no-token"
+            ? "NOTION_API_KEY is not set, so the hand-maintained tracker is not being read. Open counts on this page reflect Linear only."
+            : "Could not read the tracker page \u2014 usually it has not been shared with the Notion integration. Open counts on this page reflect Linear only."}
+        </div>
+      ) : open.length === 0 ? (
+        <div className="text-[12px]" style={{ color: "#565c65" }}>
+          Every checkbox on the tracker is ticked.
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {bySection
+            .filter((g) => g.open.length > 0)
+            .map((g) => (
+              <div key={g.section} className="flex items-baseline gap-3 text-[12px]">
+                <div
+                  className="w-10 shrink-0 text-right font-semibold"
+                  style={{ color: "#1b1b1b" }}
+                >
+                  {g.open.length}
+                </div>
+                <div className="min-w-0 flex-1 truncate" style={{ color: "#565c65" }}>
+                  {g.section}
+                </div>
+              </div>
+            ))}
+          <div className="pt-1 text-[10px]" style={{ color: "#8a8a80" }}>
+            Checkbox tasks from the sprint tracker page. Separate from the Linear
+            board — most of these never became tickets, which is why counts here
+            and on the sprint board do not add up to the same total.
+          </div>
+        </div>
+      )}
     </section>
   );
 }

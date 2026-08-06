@@ -101,6 +101,50 @@ export type StoredNotionPage = {
 
 export type StoredDataOrigin = "live" | "snapshot" | "empty";
 
+/** Mirrors NotionTask in sources.direct.server, client-safe. */
+export type NotionTaskRow = {
+  id: string;
+  text: string;
+  checked: boolean;
+  section: string | null;
+  depth: number;
+  ticketRefs: string[];
+  url: string;
+};
+
+export type NotionTasksResult = {
+  tasks: NotionTaskRow[];
+  /** Null when no tracker is configured for this program. */
+  readAt: string | null;
+  /** Why the list is empty, when it is. Rendered in place so a configuration
+   *  problem does not read as "no work in flight". */
+  status: "ok" | "not-configured" | "no-token" | "read-failed";
+};
+
+/**
+ * Hand-maintained checkbox tasks from the program's Notion tracker.
+ *
+ * Separate from getStoredData because the two answer different questions and
+ * fail independently: Linear can be live while the tracker page is unshared,
+ * and a page full of open checkboxes is meaningful even when Linear is down.
+ */
+export const getNotionTasks = createServerFn({ method: "GET" })
+  .inputValidator((programId: string) => programId)
+  .handler(async ({ data: programId }): Promise<NotionTasksResult> => {
+    const { readNotionTasks, notionConfigured } = await import("./sources.direct.server");
+    const { sourcesFor } = await import("./program.sources.server");
+    const src = sourcesFor(programId);
+    if (!src.notion?.taskTrackerPageId) {
+      return { tasks: [], readAt: null, status: "not-configured" };
+    }
+    if (!notionConfigured()) {
+      return { tasks: [], readAt: null, status: "no-token" };
+    }
+    const read = await readNotionTasks(programId);
+    if (!read) return { tasks: [], readAt: null, status: "read-failed" };
+    return { tasks: read.rows, readAt: read.readAt, status: "ok" };
+  });
+
 export interface StoredData {
   linear: StoredLinearIssue[];
   notion: StoredNotionPage[];

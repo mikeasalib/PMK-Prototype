@@ -25,6 +25,25 @@ export interface SprintRollupOptions {
    * re-reading from PROGRAM (which is only the landing default).
    */
   program: ProgramConfig;
+  /**
+   * Checkbox tasks off the program's Notion tracker, if it keeps one.
+   *
+   * These are the reason the rollup was under-reporting: on the VA program the
+   * tracker holds ~42 open items against 26 open Linear issues, so a status doc
+   * built off the board alone described a third of the work. Undefined means no
+   * tracker is configured; an empty array means one was read and is fully
+   * ticked — different facts, rendered differently.
+   */
+  trackerTasks?: TrackerTask[];
+}
+
+/** One hand-maintained checkbox task. Mirrors NotionTask without importing the
+ *  server module into this pure renderer. */
+export interface TrackerTask {
+  text: string;
+  checked: boolean;
+  section: string | null;
+  ticketRefs: string[];
 }
 
 interface WindowMeta {
@@ -140,6 +159,48 @@ export function renderSprintRollup(model: ProgramModel, opts: SprintRollupOption
   //      moves; follow-ups are what the strategist personally chases.
   //      Sourced from the follow-ups snapshot passed in through the model's
   //      unsourced-list is a signal that the follow-ups file isn't wired.
+  // ---- Notion tracker tasks. Rendered before Follow-ups because on a program
+  //      that keeps a tracker these ARE the working list; the Linear section
+  //      above is only the subset that got ticketed.
+  const tracker = opts.trackerTasks;
+  if (tracker !== undefined) {
+    const trackerOpen = tracker.filter((t) => !t.checked);
+    const trackerDone = tracker.filter((t) => t.checked);
+    L.push("## Tracker tasks");
+    L.push("");
+    if (tracker.length === 0) {
+      L.push("_The tracker page holds no checkbox items._");
+      L.push("");
+    } else {
+      // Section order is first-seen, which is page order — the order the author
+      // chose. Re-sorting would discard a real editorial signal.
+      const order: string[] = [];
+      const bySection = new Map<string, TrackerTask[]>();
+      for (const t of tracker) {
+        const key = t.section ?? "Ungrouped";
+        if (!bySection.has(key)) {
+          bySection.set(key, []);
+          order.push(key);
+        }
+        bySection.get(key)!.push(t);
+      }
+      for (const section of order) {
+        const rows = bySection.get(section)!;
+        const open = rows.filter((t) => !t.checked);
+        const closedRows = rows.filter((t) => t.checked);
+        if (open.length === 0 && closedRows.length === 0) continue;
+        L.push(`### ${section} (${open.length} open, ${closedRows.length} done)`);
+        for (const t of open) L.push(`- [ ] ${trackerLine(t)}`);
+        for (const t of closedRows) L.push(`- [x] ${trackerLine(t)}`);
+        L.push("");
+      }
+      L.push(
+        `_${trackerOpen.length} open · ${trackerDone.length} done on the Notion tracker. These are hand-maintained checkboxes, most of which never became Linear tickets — the counts here and in the Linear section above are separate populations, not a single total._`,
+      );
+      L.push("");
+    }
+  }
+
   L.push("## Follow-ups");
   L.push("");
   L.push(TODO);
@@ -295,6 +356,20 @@ function priorityTag(item: WorkItemRecord): string {
   if (item.priority === 1) return " · **urgent**";
   if (item.priority === 2) return " · **high**";
   return "";
+}
+
+/**
+ * A tracker row. Ticket refs are appended only when the author did not already
+ * write them into the text — the tracker usually does ("… on prototype
+ * [DEP-1922]"), and appending unconditionally printed the id twice.
+ *
+ * Refs stay as citations rather than resolved links: they are hand-typed and
+ * can point at a closed or renamed issue.
+ */
+function trackerLine(t: TrackerTask): string {
+  const missing = t.ticketRefs.filter((r) => !t.text.includes(r));
+  const refs = missing.length ? ` [${missing.join(", ")}]` : "";
+  return `${t.text}${refs}`;
 }
 
 function cell(v: string | null): string {

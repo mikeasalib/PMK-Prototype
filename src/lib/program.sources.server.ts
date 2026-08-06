@@ -37,6 +37,20 @@ export interface NotionSource {
   hubLabel: string;
   /** Page title to look for when locating the risk register, if the program keeps one. */
   riskRegisterMatch: RegExp | null;
+  /**
+   * Page holding hand-maintained checkbox tasks — the ones that never became
+   * Linear tickets.
+   *
+   * This exists because the Linear board is NOT the whole picture. On the VA
+   * program the strategist keeps a per-sprint tracker in Notion with ~70 `to_do`
+   * blocks (design revisions, calls to schedule, admin items) of which only a
+   * handful have Linear issues. Reading Linear alone made the app confidently
+   * report 26 open items when the real in-flight count was several times that.
+   *
+   * Null when a program keeps no such page. Do not point this at the risk
+   * register — different shape, different reader.
+   */
+  taskTrackerPageId: string | null;
 }
 
 /**
@@ -92,6 +106,11 @@ const VA_SOURCES: ProgramSources = {
     rootPageId: process.env.NOTION_ROOT_PAGE_ID ?? "35968467f30f80ef87dbc6e3585b52de",
     hubLabel: process.env.NOTION_HUB_LABEL ?? "VA",
     riskRegisterMatch: /risk register/i,
+    // "Mike - VA Task Tracking (Sprint 5)". Env-overridable because the tracker
+    // is per-sprint: a new sprint means a new page, and rotating it should be a
+    // config change rather than a deploy.
+    taskTrackerPageId:
+      process.env.NOTION_TASK_TRACKER_PAGE_ID ?? "3b368467f30f81758a65f0ba3ad9f349",
   },
   risks: { kind: "notionTable" },
 };
@@ -118,6 +137,9 @@ const VENTURA_SOURCES: ProgramSources = {
     // team holds it mentally. Null because nothing exists to find, not because
     // it was not looked for.
     riskRegisterMatch: null,
+    // No hand-maintained checkbox tracker either: this account's work lives on
+    // the Linear board, and the between-call items come off Granola syncs.
+    taskTrackerPageId: process.env.VENTURA_NOTION_TASK_TRACKER_PAGE_ID ?? null,
   },
   // Risks come off the Linear board instead. "Bug" is the register-worthy
   // label, and anything past its due date counts regardless of label — an

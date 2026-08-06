@@ -3,6 +3,8 @@ import { useMemo, useState } from "react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
 import { PROGRAMS, pageTitle } from "@/lib/program.config";
 import { useProgram } from "./route";
+import { useNotionTasks } from "@/hooks/use-notion-tasks";
+import { relativeTime } from "@/hooks/use-program-data";
 import {
   useStoredData,
   bucketOf,
@@ -157,6 +159,12 @@ function TeamTasks() {
         }
       />
       <div className="px-6 py-5 space-y-6">
+        {/* Notion tracker tasks. First on the page because on the VA program
+            they outnumber the Linear board roughly two to one: 42 open
+            checkboxes against 26 open issues. Reading Linear alone made this
+            page confidently under-report what is actually in flight. */}
+        <NotionTrackerSection programId={program.id} />
+
         {/* Right now */}
         <section
           style={{
@@ -448,10 +456,146 @@ function TeamTasks() {
         </section>
 
         <p className="text-[11px]" style={{ color: "#888" }}>
-          Source of truth is Linear. Reassign, restatus, or reprioritize there and hit Refresh to
-          pull the latest.
+          Two sources of truth, on purpose. Tickets live in Linear; the checkbox
+          tracker lives in Notion. Edit either at source and hit Refresh — nothing
+          typed here is written back.
         </p>
       </div>
     </AppLayout>
+  );
+}
+
+/**
+ * The Notion checkbox tracker, grouped by the headings the author wrote.
+ *
+ * These tasks are not Linear issues and are not presented as if they were: no
+ * fabricated identifier, no assignee column, no status pill. What the source
+ * gives is text, checked/unchecked, and a section — so that is what renders,
+ * plus any DEP-/REC- reference the author typed inline, shown as a citation.
+ *
+ * Done items collapse behind a toggle. A tracker accumulates completed work all
+ * sprint, and 21 checked rows above 42 open ones buries the thing you came for.
+ */
+function NotionTrackerSection({ programId }: { programId: string }) {
+  const { isLoading, open, done, bySection, readAt, status } = useNotionTasks(programId);
+  const [showDone, setShowDone] = useState(false);
+
+  if (status === "not-configured") return null;
+
+  return (
+    <section
+      style={{
+        border: "1px solid #dfe1e2",
+        borderLeft: "4px solid #2e6b2f",
+        backgroundColor: "#fff",
+        padding: 16,
+      }}
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <div
+            className="text-[13px] font-semibold uppercase tracking-wide"
+            style={{ color: "#2e6b2f", fontFamily: "Public Sans, system-ui, sans-serif" }}
+          >
+            Notion tracker{status === "ok" ? ` — ${open.length} open` : ""}
+          </div>
+          <div className="mt-1 text-[12px]" style={{ color: "#565c65" }}>
+            Hand-maintained checkboxes that never became Linear tickets.
+            {status === "ok" && readAt ? ` Read ${relativeTime(readAt)}.` : ""}
+          </div>
+        </div>
+        {status === "ok" && done.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => setShowDone((v) => !v)}
+            className="rounded px-2 py-1 text-[11px] font-semibold uppercase tracking-wide"
+            style={{ border: "1px solid #dfe1e2", backgroundColor: "#fff", color: "#3a5a40" }}
+          >
+            {showDone ? "Hide" : "Show"} {done.length} done
+          </button>
+        ) : null}
+      </div>
+
+      {isLoading ? (
+        <div className="mt-3 text-[13px]" style={{ color: "#565c65" }}>
+          Reading the tracker…
+        </div>
+      ) : status === "no-token" ? (
+        <div className="mt-3 text-[13px]" style={{ color: "#8a5a00" }}>
+          NOTION_API_KEY is not set, so the tracker cannot be read. The Linear
+          sections below are unaffected.
+        </div>
+      ) : status === "read-failed" ? (
+        <div className="mt-3 text-[13px]" style={{ color: "#8a5a00" }}>
+          Could not read the tracker page. Most often this means the page is not
+          shared with the Notion integration — Notion answers 404 rather than 403
+          for that, so it looks like a missing page.
+        </div>
+      ) : open.length === 0 && done.length === 0 ? (
+        <div className="mt-3 text-[13px]" style={{ color: "#565c65" }}>
+          The tracker page has no checkbox items.
+        </div>
+      ) : (
+        <div className="mt-4 space-y-4">
+          {bySection.map((group) => {
+            const rows = showDone ? [...group.open, ...group.done] : group.open;
+            if (rows.length === 0) return null;
+            return (
+              <div key={group.section}>
+                <div
+                  className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide"
+                  style={{ color: "#565c65" }}
+                >
+                  {group.section} · {group.open.length} open
+                  {group.done.length ? ` · ${group.done.length} done` : ""}
+                </div>
+                <ul className="space-y-1">
+                  {rows.map((t) => (
+                    <li
+                      key={t.id}
+                      className="flex items-start gap-2 text-[13px]"
+                      style={{ paddingLeft: t.depth * 16 }}
+                    >
+                      <span
+                        aria-hidden
+                        className="mt-0.5 shrink-0 font-mono text-[11px]"
+                        style={{ color: t.checked ? "#2e8540" : "#8a8a80" }}
+                      >
+                        {t.checked ? "\u2713" : "\u25a2"}
+                      </span>
+                      <span
+                        className="min-w-0 flex-1"
+                        style={{
+                          color: t.checked ? "#8a8a80" : "#1b1b1b",
+                          textDecoration: t.checked ? "line-through" : undefined,
+                        }}
+                      >
+                        <a
+                          href={t.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:underline"
+                          style={{ color: "inherit" }}
+                        >
+                          {t.text}
+                        </a>
+                        {/* Only refs the author did not already type inline.
+                            The tracker usually writes them into the text, and
+                            echoing them printed each id twice. */}
+                        {t.ticketRefs.filter((r) => !t.text.includes(r)).length ? (
+                          <span className="ml-2 font-mono text-[10px]" style={{ color: "#4a3fb5" }}>
+                            {t.ticketRefs.filter((r) => !t.text.includes(r)).join(" ")}
+                          </span>
+                        ) : null}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }

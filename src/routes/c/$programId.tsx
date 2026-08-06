@@ -4,6 +4,7 @@ import { CheckCircle2, Circle, LogOut } from "lucide-react";
 import { PROGRAMS, programById, upcomingMilestones, type ProgramConfig } from "@/lib/program.config";
 import { useStoredData, bucketOf, type StoredLinearIssue } from "@/hooks/use-stored-data";
 import { useFollowUps } from "@/hooks/use-follow-ups";
+import { useNotionTasks } from "@/hooks/use-notion-tasks";
 import { useClientAuth } from "@/hooks/use-client-auth";
 import {
   phasesFromLifecycle,
@@ -75,6 +76,15 @@ function ClientPortal() {
   const daysToLaunch = daysUntilLocal(program.keyDates.launch);
   const { linear, origin, isLoading } = useStoredData(program.id);
   const { items: followUps } = useFollowUps(program.id);
+  // Hand-maintained tracker tasks. Same source the internal Team tasks page
+  // reads; the client view shows counts and recent completions, not the raw
+  // internal wording of every checkbox.
+  const {
+    tasks: trackerTasks,
+    open: trackerOpen,
+    done: trackerDone,
+    status: trackerStatus,
+  } = useNotionTasks(program.id);
 
   const phases = phasesFromLifecycle(program, asOf);
   const currentPhase = phases.find((p) => p.state === "in_progress") ?? null;
@@ -87,8 +97,14 @@ function ClientPortal() {
   // Progress-so-far tallies. Everything that's ever closed, not just the
   // last 14 days — a client's "what's been done thus far" is the running
   // total, not a fortnight slice.
-  const totalTracked = linear.filter((i) => bucketOf(i) !== "canceled").length;
-  const totalDone = linear.filter((i) => bucketOf(i) === "done").length;
+  // Both populations count. The Linear board is only the ticketed subset of the
+  // work; the Notion tracker carries the rest, and on the VA program that is
+  // the larger half. A client-facing "33% complete" computed off tickets alone
+  // was describing a third of the engagement.
+  const linearTracked = linear.filter((i) => bucketOf(i) !== "canceled").length;
+  const linearDone = linear.filter((i) => bucketOf(i) === "done").length;
+  const totalTracked = linearTracked + trackerTasks.length;
+  const totalDone = linearDone + trackerDone.length;
   const pctDone = totalTracked ? Math.round((totalDone / totalTracked) * 100) : 0;
   const passedPhases = phases.filter((p) => p.state === "complete");
   const passedMilestones = [...program.sprintStrip, ...program.namedMilestones.map((m) => ({ key: m.id, label: m.label, end: m.date, start: m.date }))].filter(
@@ -194,6 +210,11 @@ function ClientPortal() {
               pctDone={pctDone}
               totalDone={totalDone}
               totalTracked={totalTracked}
+              linearDone={linearDone}
+              linearTracked={linearTracked}
+              trackerDone={trackerDone.length}
+              trackerTotal={trackerTasks.length}
+              trackerAvailable={trackerStatus === "ok"}
               passedPhases={passedPhases.length}
               totalPhases={phases.length}
               milestonesPassed={passedMilestones.length}
@@ -202,6 +223,9 @@ function ClientPortal() {
             <MilestonesSection milestones={milestonesAhead} asOf={asOf} />
             <ClientOwesSection items={clientOwes} customer={program.contract.customer} />
             <RecentWinsSection items={closedRecent} />
+            {trackerStatus === "ok" && trackerDone.length > 0 ? (
+              <TrackerCompletedSection done={trackerDone} openCount={trackerOpen.length} />
+            ) : null}
             <HistorySection history={historyByMonth} />
           </div>
         )}
@@ -210,10 +234,10 @@ function ClientPortal() {
           className="mt-12 border-t pt-6 text-xs"
           style={{ borderColor: "#e5e5e2", color: "#8a8a80" }}
         >
-          Delivered by Kaizen Laboratories. As of {asOf}. Data
+          Delivered by Kaizen Laboratories. As of {asOf}. Engineering tickets
           {origin === "snapshot" ? " last captured" : " read live"} from Linear
-          {program.artifacts.includes("poam") ? " and Notion" : ""}. Detail omitted where it
-          would misrepresent as inferred what the source didn't state.
+          {trackerStatus === "ok" ? "; delivery tasks read live from Notion" : ""}. Detail
+          omitted where it would misrepresent as inferred what the source didn't state.
         </footer>
       </main>
     </div>
@@ -226,6 +250,11 @@ function ProgressSoFarSection({
   pctDone,
   totalDone,
   totalTracked,
+  linearDone,
+  linearTracked,
+  trackerDone,
+  trackerTotal,
+  trackerAvailable,
   passedPhases,
   totalPhases,
   milestonesPassed,
@@ -233,6 +262,11 @@ function ProgressSoFarSection({
   pctDone: number;
   totalDone: number;
   totalTracked: number;
+  linearDone: number;
+  linearTracked: number;
+  trackerDone: number;
+  trackerTotal: number;
+  trackerAvailable: boolean;
   passedPhases: number;
   totalPhases: number;
   milestonesPassed: number;
@@ -240,13 +274,21 @@ function ProgressSoFarSection({
   return (
     <Section title="Progress so far">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <ProgressCard label="Work completed" primary={`${pctDone}%`} sub={`${totalDone} of ${totalTracked} tracked items`} />
+        <ProgressCard
+          label="Work completed"
+          primary={`${pctDone}%`}
+          sub={`${totalDone} of ${totalTracked} tracked items`}
+        />
         <ProgressCard
           label={totalPhases > 0 ? "Phases passed" : "—"}
           primary={totalPhases > 0 ? `${passedPhases} / ${totalPhases}` : "—"}
           sub={totalPhases > 0 ? "delivery stages complete" : ""}
         />
-        <ProgressCard label="Milestones passed" primary={`${milestonesPassed}`} sub="dated checkpoints already met" />
+        <ProgressCard
+          label="Milestones passed"
+          primary={`${milestonesPassed}`}
+          sub="dated checkpoints already met"
+        />
       </div>
       {totalTracked > 0 ? (
         <div
@@ -257,6 +299,15 @@ function ProgressSoFarSection({
             className="h-full rounded-full"
             style={{ width: `${pctDone}%`, backgroundColor: "#2e8540" }}
           />
+        </div>
+      ) : null}
+      {/* Where the number comes from. A single percentage over two populations
+          invites "percent of what?", and the honest answer is worth one line:
+          the engineering board plus the delivery-task tracker. */}
+      {trackerAvailable && trackerTotal > 0 ? (
+        <div className="mt-3 text-xs" style={{ color: "#565c65" }}>
+          {linearDone} of {linearTracked} engineering tickets · {trackerDone} of {trackerTotal}{" "}
+          delivery tasks.
         </div>
       ) : null}
     </Section>
@@ -411,6 +462,41 @@ function RecentWinsSection({ items }: { items: ReturnType<typeof recentlyClosed>
           </li>
         ))}
       </ul>
+    </Section>
+  );
+}
+
+/**
+ * Delivery tasks completed off the hand-maintained tracker.
+ *
+ * Kept separate from "Recently shipped" (which is Linear closures with real
+ * dates) because a ticked checkbox carries no completion timestamp — Notion
+ * does not record when a to_do was checked. So this section can say WHAT was
+ * completed but not WHEN, and it says so rather than borrowing the page's
+ * last-edited time and presenting it as a per-item date.
+ */
+function TrackerCompletedSection({
+  done,
+  openCount,
+}: {
+  done: ReturnType<typeof useNotionTasks>["done"];
+  openCount: number;
+}) {
+  return (
+    <Section title="Delivery tasks completed">
+      <ul className="space-y-1.5">
+        {done.map((t) => (
+          <li key={t.id} className="flex items-start gap-2 text-sm">
+            <CheckCircle2 size={14} className="mt-0.5 shrink-0" style={{ color: "#1f5c2f" }} />
+            <span style={{ color: "#1b1b1b" }}>{t.text}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-3 text-xs" style={{ color: "#8a8a80" }}>
+        {done.length} complete · {openCount} still open. These are delivery
+        tasks tracked outside the engineering board. No completion dates: the
+        source records that an item is done, not when it was ticked.
+      </div>
     </Section>
   );
 }

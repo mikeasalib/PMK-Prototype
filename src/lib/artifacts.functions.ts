@@ -105,7 +105,18 @@ export const generateArtifact = createServerFn({ method: "POST" })
     if (kind === "sprint-rollup") {
       const { renderSprintRollup } = await import("./artifacts/sprint-rollup");
       const { programById } = await import("./program.config");
-      const md = renderSprintRollup(model, { asOf, program: programById(programId) });
+      const { readNotionTasks } = await import("./sources.direct.server");
+      const { sourcesFor } = await import("./program.sources.server");
+      // Undefined when the program keeps no tracker, so the renderer omits the
+      // section entirely rather than printing an empty one that would imply a
+      // page exists and is clear.
+      const hasTracker = Boolean(sourcesFor(programId).notion?.taskTrackerPageId);
+      const tracker = hasTracker ? await readNotionTasks(programId) : null;
+      const md = renderSprintRollup(model, {
+        asOf,
+        program: programById(programId),
+        trackerTasks: hasTracker ? (tracker?.rows ?? []) : undefined,
+      });
       return { ...base, data: Buffer.from(md, "utf8").toString("base64") };
     }
 
