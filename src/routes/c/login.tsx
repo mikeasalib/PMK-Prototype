@@ -31,7 +31,7 @@ interface DemoContact {
 /** Named contacts per program, for the demo picker. Real portal reads this
  *  off a per-program stakeholder allow-list. */
 const CONTACTS: DemoContact[] = [
-  { name: "Vivian Nguyen", programId: "va", role: "GovCIO / VA delivery lead" },
+  { name: "Vivian Ellis", programId: "va", role: "GovCIO / VA delivery lead" },
   { name: "Matt Dingee", programId: "va", role: "VA Design System" },
   { name: "Denise Randolph", programId: "va", role: "VA Authenticated Experience" },
   { name: "Chad Bowie", programId: "ventura", role: "Ventura County Parks — Operations" },
