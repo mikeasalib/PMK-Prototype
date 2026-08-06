@@ -15,6 +15,7 @@
 import type { ProgramModel, WorkItemRecord } from "../program-model";
 import type { ProgramConfig } from "../program.config";
 import { derivePhaseState, lifecyclePhasesFor } from "../program-model.adapters";
+import { summarizeTask, tidySection } from "../task-summary";
 
 export interface SprintRollupOptions {
   /** Reporting date, YYYY-MM-DD. Determines which sprint/phase is "current". */
@@ -189,9 +190,9 @@ export function renderSprintRollup(model: ProgramModel, opts: SprintRollupOption
         const open = rows.filter((t) => !t.checked);
         const closedRows = rows.filter((t) => t.checked);
         if (open.length === 0 && closedRows.length === 0) continue;
-        L.push(`### ${section} (${open.length} open, ${closedRows.length} done)`);
-        for (const t of open) L.push(`- [ ] ${trackerLine(t)}`);
-        for (const t of closedRows) L.push(`- [x] ${trackerLine(t)}`);
+        L.push(`### ${tidySection(section)} (${open.length} open, ${closedRows.length} done)`);
+        for (const t of open) emitTracker(L, t, false);
+        for (const t of closedRows) emitTracker(L, t, true);
         L.push("");
       }
       L.push(
@@ -359,17 +360,28 @@ function priorityTag(item: WorkItemRecord): string {
 }
 
 /**
- * A tracker row. Ticket refs are appended only when the author did not already
- * write them into the text — the tracker usually does ("… on prototype
- * [DEP-1922]"), and appending unconditionally printed the id twice.
+ * Emit one tracker row as a checkbox line plus, when the author's note ran
+ * long, an indented continuation.
  *
- * Refs stay as citations rather than resolved links: they are hand-typed and
- * can point at a closed or renamed issue.
+ * Two lines rather than one because the tracker writes working notes: a single
+ * `- [ ]` carrying three sentences is unreadable in Markdown and unusable when
+ * pasted back into Notion, where each checkbox should be one thing. The
+ * headline is the thing; the detail sits under it and stays exact.
+ *
+ * Ticket refs append only when absent from the text — the tracker usually
+ * writes them inline ("… on prototype [DEP-1922]"), and appending
+ * unconditionally printed the id twice. Refs stay as citations rather than
+ * links: hand-typed, and they can point at a closed or renamed issue.
  */
-function trackerLine(t: TrackerTask): string {
+function emitTracker(L: string[], t: TrackerTask, checked: boolean): void {
+  const sum = summarizeTask(t.text);
   const missing = t.ticketRefs.filter((r) => !t.text.includes(r));
   const refs = missing.length ? ` [${missing.join(", ")}]` : "";
-  return `${t.text}${refs}`;
+  L.push(`- [${checked ? "x" : " "}] ${sum.headline}${refs}`);
+  // Detail only on open items. A completed line needs to state what shipped,
+  // not re-litigate how — and printing it doubles the length of the done half
+  // of every section.
+  if (sum.detail && !checked) L.push(`  ${sum.detail}`);
 }
 
 function cell(v: string | null): string {

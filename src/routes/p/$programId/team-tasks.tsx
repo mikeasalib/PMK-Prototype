@@ -4,6 +4,7 @@ import { AppLayout, PageHeader } from "@/components/AppLayout";
 import { PROGRAMS, pageTitle } from "@/lib/program.config";
 import { useProgram } from "./route";
 import { useNotionTasks } from "@/hooks/use-notion-tasks";
+import { summarizeTask, tidySection } from "@/lib/task-summary";
 import { relativeTime } from "@/hooks/use-program-data";
 import {
   useStoredData,
@@ -546,50 +547,67 @@ function NotionTrackerSection({ programId }: { programId: string }) {
                   className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide"
                   style={{ color: "#565c65" }}
                 >
-                  {group.section} · {group.open.length} open
+                  {tidySection(group.section)} · {group.open.length} open
                   {group.done.length ? ` · ${group.done.length} done` : ""}
                 </div>
                 <ul className="space-y-1">
-                  {rows.map((t) => (
-                    <li
-                      key={t.id}
-                      className="flex items-start gap-2 text-[13px]"
-                      style={{ paddingLeft: t.depth * 16 }}
-                    >
-                      <span
-                        aria-hidden
-                        className="mt-0.5 shrink-0 font-mono text-[11px]"
-                        style={{ color: t.checked ? "#2e8540" : "#8a8a80" }}
+                  {rows.map((t) => {
+                    const sum = summarizeTask(t.text);
+                    const refs = t.ticketRefs.filter((r) => !t.text.includes(r));
+                    return (
+                      <li
+                        key={t.id}
+                        className="flex items-start gap-2 text-[13px]"
+                        style={{ paddingLeft: t.depth * 16 }}
                       >
-                        {t.checked ? "\u2713" : "\u25a2"}
-                      </span>
-                      <span
-                        className="min-w-0 flex-1"
-                        style={{
-                          color: t.checked ? "#8a8a80" : "#1b1b1b",
-                          textDecoration: t.checked ? "line-through" : undefined,
-                        }}
-                      >
-                        <a
-                          href={t.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="hover:underline"
-                          style={{ color: "inherit" }}
+                        <span
+                          aria-hidden
+                          className="mt-0.5 shrink-0 font-mono text-[11px]"
+                          style={{ color: t.checked ? "#2e8540" : "#8a8a80" }}
                         >
-                          {t.text}
-                        </a>
-                        {/* Only refs the author did not already type inline.
-                            The tracker usually writes them into the text, and
-                            echoing them printed each id twice. */}
-                        {t.ticketRefs.filter((r) => !t.text.includes(r)).length ? (
-                          <span className="ml-2 font-mono text-[10px]" style={{ color: "#4a3fb5" }}>
-                            {t.ticketRefs.filter((r) => !t.text.includes(r)).join(" ")}
-                          </span>
-                        ) : null}
-                      </span>
-                    </li>
-                  ))}
+                          {t.checked ? "\u2713" : "\u25a2"}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          {/* Headline carries the link and the emphasis. Full
+                              original stays on the title attribute so nothing
+                              the author wrote is unreachable from the row. */}
+                          <a
+                            href={t.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium hover:underline"
+                            title={t.text}
+                            style={{
+                              color: t.checked ? "#8a8a80" : "#1b1b1b",
+                              textDecoration: t.checked ? "line-through" : undefined,
+                            }}
+                          >
+                            {sum.headline}
+                          </a>
+                          {refs.length ? (
+                            <span
+                              className="ml-2 font-mono text-[10px]"
+                              style={{ color: "#4a3fb5" }}
+                            >
+                              {refs.join(" ")}
+                            </span>
+                          ) : null}
+                          {/* Detail on its own muted line rather than inline.
+                              Sixty lines of running prose is the wall this
+                              page had; a headline column with the specifics
+                              underneath is scannable at the same density. */}
+                          {sum.detail && !t.checked ? (
+                            <div
+                              className="mt-0.5 text-[11px] leading-snug"
+                              style={{ color: "#6b7280" }}
+                            >
+                              {sum.detail}
+                            </div>
+                          ) : null}
+                        </span>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             );

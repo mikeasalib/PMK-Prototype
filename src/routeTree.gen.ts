@@ -15,6 +15,7 @@ import { Route as CLoginRouteImport } from './routes/c/login'
 import { Route as CProgramIdRouteImport } from './routes/c/$programId'
 import { Route as PProgramIdRouteRouteImport } from './routes/p/$programId/route'
 import { Route as PProgramIdIndexRouteImport } from './routes/p/$programId/index'
+import { Route as CProgramIdIndexRouteImport } from './routes/c/$programId/index'
 import { Route as PProgramIdTeamTasksRouteImport } from './routes/p/$programId/team-tasks'
 import { Route as PProgramIdStakeholdersRouteImport } from './routes/p/$programId/stakeholders'
 import { Route as PProgramIdSprintBoardRouteImport } from './routes/p/$programId/sprint-board'
@@ -28,6 +29,7 @@ import { Route as PProgramIdCustomerHealthRouteImport } from './routes/p/$progra
 import { Route as PProgramIdBriefRouteImport } from './routes/p/$programId/brief'
 import { Route as PProgramIdArtifactsRouteImport } from './routes/p/$programId/artifacts'
 import { Route as PProgramIdActivityRouteImport } from './routes/p/$programId/activity'
+import { Route as CProgramIdHistoryRouteImport } from './routes/c/$programId/history'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -58,6 +60,11 @@ const PProgramIdIndexRoute = PProgramIdIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => PProgramIdRouteRoute,
+} as any)
+const CProgramIdIndexRoute = CProgramIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => CProgramIdRoute,
 } as any)
 const PProgramIdTeamTasksRoute = PProgramIdTeamTasksRouteImport.update({
   id: '/team-tasks',
@@ -126,13 +133,19 @@ const PProgramIdActivityRoute = PProgramIdActivityRouteImport.update({
   path: '/activity',
   getParentRoute: () => PProgramIdRouteRoute,
 } as any)
+const CProgramIdHistoryRoute = CProgramIdHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => CProgramIdRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/p/$programId': typeof PProgramIdRouteRouteWithChildren
-  '/c/$programId': typeof CProgramIdRoute
+  '/c/$programId': typeof CProgramIdRouteWithChildren
   '/c/login': typeof CLoginRoute
+  '/c/$programId/history': typeof CProgramIdHistoryRoute
   '/p/$programId/activity': typeof PProgramIdActivityRoute
   '/p/$programId/artifacts': typeof PProgramIdArtifactsRoute
   '/p/$programId/brief': typeof PProgramIdBriefRoute
@@ -146,13 +159,14 @@ export interface FileRoutesByFullPath {
   '/p/$programId/sprint-board': typeof PProgramIdSprintBoardRoute
   '/p/$programId/stakeholders': typeof PProgramIdStakeholdersRoute
   '/p/$programId/team-tasks': typeof PProgramIdTeamTasksRoute
+  '/c/$programId/': typeof CProgramIdIndexRoute
   '/p/$programId/': typeof PProgramIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/c/$programId': typeof CProgramIdRoute
   '/c/login': typeof CLoginRoute
+  '/c/$programId/history': typeof CProgramIdHistoryRoute
   '/p/$programId/activity': typeof PProgramIdActivityRoute
   '/p/$programId/artifacts': typeof PProgramIdArtifactsRoute
   '/p/$programId/brief': typeof PProgramIdBriefRoute
@@ -166,6 +180,7 @@ export interface FileRoutesByTo {
   '/p/$programId/sprint-board': typeof PProgramIdSprintBoardRoute
   '/p/$programId/stakeholders': typeof PProgramIdStakeholdersRoute
   '/p/$programId/team-tasks': typeof PProgramIdTeamTasksRoute
+  '/c/$programId': typeof CProgramIdIndexRoute
   '/p/$programId': typeof PProgramIdIndexRoute
 }
 export interface FileRoutesById {
@@ -173,8 +188,9 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/p/$programId': typeof PProgramIdRouteRouteWithChildren
-  '/c/$programId': typeof CProgramIdRoute
+  '/c/$programId': typeof CProgramIdRouteWithChildren
   '/c/login': typeof CLoginRoute
+  '/c/$programId/history': typeof CProgramIdHistoryRoute
   '/p/$programId/activity': typeof PProgramIdActivityRoute
   '/p/$programId/artifacts': typeof PProgramIdArtifactsRoute
   '/p/$programId/brief': typeof PProgramIdBriefRoute
@@ -188,6 +204,7 @@ export interface FileRoutesById {
   '/p/$programId/sprint-board': typeof PProgramIdSprintBoardRoute
   '/p/$programId/stakeholders': typeof PProgramIdStakeholdersRoute
   '/p/$programId/team-tasks': typeof PProgramIdTeamTasksRoute
+  '/c/$programId/': typeof CProgramIdIndexRoute
   '/p/$programId/': typeof PProgramIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -198,6 +215,7 @@ export interface FileRouteTypes {
     | '/p/$programId'
     | '/c/$programId'
     | '/c/login'
+    | '/c/$programId/history'
     | '/p/$programId/activity'
     | '/p/$programId/artifacts'
     | '/p/$programId/brief'
@@ -211,13 +229,14 @@ export interface FileRouteTypes {
     | '/p/$programId/sprint-board'
     | '/p/$programId/stakeholders'
     | '/p/$programId/team-tasks'
+    | '/c/$programId/'
     | '/p/$programId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
-    | '/c/$programId'
     | '/c/login'
+    | '/c/$programId/history'
     | '/p/$programId/activity'
     | '/p/$programId/artifacts'
     | '/p/$programId/brief'
@@ -231,6 +250,7 @@ export interface FileRouteTypes {
     | '/p/$programId/sprint-board'
     | '/p/$programId/stakeholders'
     | '/p/$programId/team-tasks'
+    | '/c/$programId'
     | '/p/$programId'
   id:
     | '__root__'
@@ -239,6 +259,7 @@ export interface FileRouteTypes {
     | '/p/$programId'
     | '/c/$programId'
     | '/c/login'
+    | '/c/$programId/history'
     | '/p/$programId/activity'
     | '/p/$programId/artifacts'
     | '/p/$programId/brief'
@@ -252,6 +273,7 @@ export interface FileRouteTypes {
     | '/p/$programId/sprint-board'
     | '/p/$programId/stakeholders'
     | '/p/$programId/team-tasks'
+    | '/c/$programId/'
     | '/p/$programId/'
   fileRoutesById: FileRoutesById
 }
@@ -259,7 +281,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
   PProgramIdRouteRoute: typeof PProgramIdRouteRouteWithChildren
-  CProgramIdRoute: typeof CProgramIdRoute
+  CProgramIdRoute: typeof CProgramIdRouteWithChildren
   CLoginRoute: typeof CLoginRoute
 }
 
@@ -306,6 +328,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/p/$programId/'
       preLoaderRoute: typeof PProgramIdIndexRouteImport
       parentRoute: typeof PProgramIdRouteRoute
+    }
+    '/c/$programId/': {
+      id: '/c/$programId/'
+      path: '/'
+      fullPath: '/c/$programId/'
+      preLoaderRoute: typeof CProgramIdIndexRouteImport
+      parentRoute: typeof CProgramIdRoute
     }
     '/p/$programId/team-tasks': {
       id: '/p/$programId/team-tasks'
@@ -398,6 +427,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PProgramIdActivityRouteImport
       parentRoute: typeof PProgramIdRouteRoute
     }
+    '/c/$programId/history': {
+      id: '/c/$programId/history'
+      path: '/history'
+      fullPath: '/c/$programId/history'
+      preLoaderRoute: typeof CProgramIdHistoryRouteImport
+      parentRoute: typeof CProgramIdRoute
+    }
   }
 }
 
@@ -439,11 +475,25 @@ const PProgramIdRouteRouteWithChildren = PProgramIdRouteRoute._addFileChildren(
   PProgramIdRouteRouteChildren,
 )
 
+interface CProgramIdRouteChildren {
+  CProgramIdHistoryRoute: typeof CProgramIdHistoryRoute
+  CProgramIdIndexRoute: typeof CProgramIdIndexRoute
+}
+
+const CProgramIdRouteChildren: CProgramIdRouteChildren = {
+  CProgramIdHistoryRoute: CProgramIdHistoryRoute,
+  CProgramIdIndexRoute: CProgramIdIndexRoute,
+}
+
+const CProgramIdRouteWithChildren = CProgramIdRoute._addFileChildren(
+  CProgramIdRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   PProgramIdRouteRoute: PProgramIdRouteRouteWithChildren,
-  CProgramIdRoute: CProgramIdRoute,
+  CProgramIdRoute: CProgramIdRouteWithChildren,
   CLoginRoute: CLoginRoute,
 }
 export const routeTree = rootRouteImport
