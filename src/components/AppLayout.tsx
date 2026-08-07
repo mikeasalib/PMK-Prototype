@@ -20,8 +20,9 @@ import {
   EyeOff,
   SlidersHorizontal,
   Check,
+  Menu,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DataSourcesFooter } from "./DataSourcesFooter";
 import { ProgramSwitcher } from "./ProgramSwitcher";
 import { RefreshButton } from "./RefreshButton";
@@ -134,6 +135,25 @@ export function AppLayout({ children }: { children?: ReactNode }) {
   const program = useProgram();
   const { hydrated, isHidden, toggle, hidden } = useNavPrefs();
   const [editing, setEditing] = useState(false);
+  // Below md the sidebar is a drawer rather than a fixed column. At 240px on a
+  // 375px phone it left a 135px content well, which no panel on this app can
+  // render into.
+  const [navOpen, setNavOpen] = useState(false);
+
+  // Close on navigate: a drawer that stays open over the page you just chose is
+  // a trap on a phone, where it covers most of the viewport.
+  useEffect(() => {
+    setNavOpen(false);
+  }, [pathname]);
+
+  // Escape closes too — same reasoning as the ProgramSwitcher menu: a control
+  // that only closes by re-clicking its trigger is unusable without a mouse.
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setNavOpen(false);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [navOpen]);
   // Green nav chrome — mirrors Cedar's admin shell, kept green so the internal
   // tool reads as clearly distinct from the external-facing product. Per-program
   // so a second engagement can be visually distinguishable.
@@ -147,8 +167,41 @@ export function AppLayout({ children }: { children?: ReactNode }) {
 
   return (
     <div className="flex min-h-screen" style={{ color: "#1b1b1b" }}>
+      {/* Mobile top bar. Only below md, where the sidebar is a drawer and there
+          would otherwise be no way to reach the nav. */}
+      <div
+        className="fixed inset-x-0 top-0 z-20 flex items-center gap-3 px-4 py-3 md:hidden"
+        style={{ backgroundColor: NAV_BG, color: "#ffffff" }}
+      >
+        <button
+          type="button"
+          onClick={() => setNavOpen(true)}
+          aria-label="Open navigation"
+          aria-expanded={navOpen}
+          className="-ml-1 rounded p-1"
+          style={{ color: "#ffffff" }}
+        >
+          <Menu size={20} />
+        </button>
+        <div className="min-w-0 truncate text-[14px] font-semibold">{program.name}</div>
+      </div>
+
+      {/* Backdrop. Rendered only while the drawer is open so it never eats
+          clicks on desktop. */}
+      {navOpen ? (
+        <button
+          type="button"
+          aria-label="Close navigation"
+          onClick={() => setNavOpen(false)}
+          className="fixed inset-0 z-30 md:hidden"
+          style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+        />
+      ) : null}
+
       <aside
-        className="fixed inset-y-0 left-0 z-30 flex w-60 shrink-0 flex-col"
+        className={`fixed inset-y-0 left-0 z-40 flex w-60 shrink-0 flex-col transition-transform duration-200 md:translate-x-0 ${
+          navOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
         style={{ backgroundColor: NAV_BG, color: "#ffffff" }}
       >
         <div className="px-5 pb-4 pt-5">
@@ -224,8 +277,12 @@ export function AppLayout({ children }: { children?: ReactNode }) {
         <DataSourcesFooter />
       </aside>
 
+      {/* overflow-x-auto, not hidden: when a panel does exceed its column the
+          user must still be able to reach the right-hand columns. Clipping made
+          assignee and workstream silently vanish. pt-14 clears the mobile top
+          bar, which is fixed. */}
       <main
-        className="ml-60 flex-1 overflow-x-hidden"
+        className="ml-0 flex-1 overflow-x-auto pt-14 md:ml-60 md:pt-0"
         style={{ backgroundColor: "#ffffff", minHeight: "100vh" }}
       >
         {children ?? <Outlet />}
@@ -266,10 +323,13 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="px-6 pb-4 pt-6">
-      <div className="flex items-start justify-between gap-4">
+    <div className="px-4 pb-4 pt-5 sm:px-6 sm:pt-6">
+      {/* Stacks below sm. The actions cluster is shrink-0 and never yielded, so
+          on a narrow viewport the title crushed to two or three lines while
+          Refresh and the account chip kept a fixed slab on the right. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0">
-          <h1 className="cedar-title" style={{ fontSize: 26 }}>
+          <h1 className="cedar-title text-[22px] sm:text-[26px]">
             {title}
           </h1>
           {subtitle ? (
@@ -278,7 +338,7 @@ export function PageHeader({
             </p>
           ) : null}
         </div>
-        <div className="flex shrink-0 items-center gap-3 pt-1">
+        <div className="flex shrink-0 items-center gap-3 sm:pt-1">
           {actions}
           <RefreshButton />
           {/* The account control sits in the far corner, the way it does on the

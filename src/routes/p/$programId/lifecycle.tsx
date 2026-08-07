@@ -53,7 +53,7 @@ function LifecyclePage() {
 
       {/* KPI strip */}
       <div
-        className="grid grid-cols-4 gap-3 px-6 py-4"
+        className="grid grid-cols-2 gap-3 px-4 py-4 sm:px-6 md:grid-cols-4"
         style={{ borderBottom: "1px solid #dfe1e2", backgroundColor: "#f8f8f6" }}
       >
         <Kpi label="Phases complete" value={`${done} / ${total}`} sub={`${pctDone}% of program`} />
@@ -79,14 +79,14 @@ function LifecyclePage() {
           program has real phase dates — a program with an empty lifecycle
           config (there are none today, but the safety belongs here) hides
           this section rather than drawing an empty axis. */}
-      <div className="px-6 pt-5">
+      <div className="px-4 pt-5 sm:px-6">
         <LifecycleTimeline program={program} />
       </div>
 
       {/* Original equal-width strip: kept as the compact scan/jump index. Sized
           panels above give proportional time; this one gives one-click jumps
           to each phase card below. */}
-      <div className="px-6 pt-4">
+      <div className="px-4 pt-4 sm:px-6">
         <div
           className="flex items-stretch overflow-hidden rounded"
           style={{ border: "1px solid #dfe1e2" }}
@@ -124,7 +124,7 @@ function LifecyclePage() {
       </div>
 
       {/* Phase cards */}
-      <div className="p-6 space-y-4">
+      <div className="p-4 space-y-4 sm:p-6">
         <div className="flex items-center justify-end gap-2 text-[11px]">
           <button
             type="button"

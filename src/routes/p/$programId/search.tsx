@@ -82,7 +82,7 @@ function Search() {
         subtitle={`${program.domainLabel} — Linear, follow-ups, milestones. Program-scoped.`}
       />
 
-      <div className="px-6 pb-10 pt-2">
+      <div className="px-4 pb-10 pt-2 sm:px-6">
         <div
           className="mb-4 flex items-center gap-3 rounded-lg bg-white px-3 py-2"
           style={{ border: "1px solid #e5e5e2" }}
@@ -118,9 +118,12 @@ function Search() {
             {results.linear.length > 0 ? (
               <ResultGroup label={`Linear (${results.linear.length})`}>
                 {results.linear.map((h) => (
-                  <div key={h.identifier} className="flex items-center gap-3 py-1.5 text-[13px]">
+                  <div
+                    key={h.identifier}
+                    className="flex flex-col gap-1 py-1.5 text-[13px] md:flex-row md:items-center md:gap-3"
+                  >
                     <span
-                      className="w-16 shrink-0 font-mono text-[11px]"
+                      className="shrink-0 font-mono text-[11px] md:w-16"
                       style={{ color: "#565c65" }}
                     >
                       {h.identifier}
@@ -141,20 +144,24 @@ function Search() {
                         h.title
                       )}
                     </div>
-                    <span
-                      className="w-24 shrink-0 truncate text-right text-[11px]"
-                      style={{ color: "#565c65" }}
-                      title={h.assignee ?? "Unassigned"}
-                    >
-                      {h.assignee ?? "—"}
-                    </span>
-                    <span
-                      className="w-24 shrink-0 text-right text-[10px] uppercase tracking-wide"
-                      style={{ color: "#565c65" }}
-                    >
-                      {h.state ?? "—"}
-                    </span>
-                    <MatchedBadge label={h.matched} />
+                    {/* Meta wraps to its own row below md rather than
+                        competing with the title for a narrow column. */}
+                    <div className="flex items-center gap-3 md:contents">
+                      <span
+                        className="min-w-0 truncate text-[11px] md:w-24 md:shrink-0 md:text-right"
+                        style={{ color: "#565c65" }}
+                        title={h.assignee ?? "Unassigned"}
+                      >
+                        {h.assignee ?? "—"}
+                      </span>
+                      <span
+                        className="shrink-0 text-[10px] uppercase tracking-wide md:w-24 md:text-right"
+                        style={{ color: "#565c65" }}
+                      >
+                        {h.state ?? "—"}
+                      </span>
+                      <MatchedBadge label={h.matched} />
+                    </div>
                   </div>
                 ))}
               </ResultGroup>
@@ -163,7 +170,10 @@ function Search() {
             {results.followUps.length > 0 ? (
               <ResultGroup label={`Follow-ups (${results.followUps.length})`}>
                 {results.followUps.map((h) => (
-                  <div key={h.id} className="flex items-center gap-3 py-1.5 text-[13px]">
+                  <div
+                    key={h.id}
+                    className="flex flex-col gap-1 py-1.5 text-[13px] md:flex-row md:items-center md:gap-3"
+                  >
                     <div className="min-w-0 flex-1">
                       <div className="truncate" style={{ color: "#1b1b1b" }}>
                         {h.title}
@@ -177,18 +187,20 @@ function Search() {
                         </div>
                       ) : null}
                     </div>
-                    <span
-                      className="w-24 shrink-0 truncate text-right text-[11px]"
-                      style={{ color: "#565c65" }}
-                    >
-                      {h.owner ?? "—"}
-                    </span>
-                    <span
-                      className="w-16 shrink-0 text-right text-[10px] uppercase tracking-wide"
-                      style={{ color: h.status === "done" ? "#1f5c2f" : "#565c65" }}
-                    >
-                      {h.status}
-                    </span>
+                    <div className="flex items-center gap-3 md:contents">
+                      <span
+                        className="min-w-0 truncate text-[11px] md:w-24 md:shrink-0 md:text-right"
+                        style={{ color: "#565c65" }}
+                      >
+                        {h.owner ?? "—"}
+                      </span>
+                      <span
+                        className="shrink-0 text-[10px] uppercase tracking-wide md:w-16 md:text-right"
+                        style={{ color: h.status === "done" ? "#1f5c2f" : "#565c65" }}
+                      >
+                        {h.status}
+                      </span>
+                    </div>
                     <Link
                       to="/p/$programId/follow-ups"
                       params={{ programId: program.id }}
@@ -205,7 +217,10 @@ function Search() {
             {results.milestones.length > 0 ? (
               <ResultGroup label={`Milestones (${results.milestones.length})`}>
                 {results.milestones.map((m) => (
-                  <div key={m.identifier} className="flex items-center gap-3 py-1.5 text-[13px]">
+                  <div
+                    key={m.identifier}
+                    className="flex flex-col gap-1 py-1.5 text-[13px] md:flex-row md:items-center md:gap-3"
+                  >
                     <div className="min-w-0 flex-1 truncate" style={{ color: "#1b1b1b" }}>
                       {m.url ? (
                         <a
@@ -221,7 +236,7 @@ function Search() {
                       )}
                     </div>
                     <span
-                      className="w-32 shrink-0 text-right text-[11px]"
+                      className="shrink-0 text-[11px] md:w-32 md:text-right"
                       style={{ color: "#565c65" }}
                     >
                       {m.targetDate ? shortDate(m.targetDate) : "no target"}

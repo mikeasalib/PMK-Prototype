@@ -124,7 +124,7 @@ function ActivityFeed() {
           Loading live data…
         </div>
       ) : (
-        <div className="p-6 space-y-4">
+        <div className="p-4 space-y-4 sm:p-6">
           {grouped.map(([date, items]) => (
             <section key={date}>
               <div

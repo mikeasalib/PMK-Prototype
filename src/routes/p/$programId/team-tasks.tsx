@@ -159,7 +159,7 @@ function TeamTasks() {
             : "Live from Linear · assignees, statuses, and priorities update on sync"
         }
       />
-      <div className="px-6 py-5 space-y-6">
+      <div className="px-4 py-5 space-y-6 sm:px-6">
         {/* Notion tracker tasks. First on the page because on the VA program
             they outnumber the Linear board roughly two to one: 42 open
             checkboxes against 26 open issues. Reading Linear alone made this
@@ -253,7 +253,7 @@ function TeamTasks() {
         </section>
 
         {/* Owner summary */}
-        <section className="grid grid-cols-5 gap-3">
+        <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
           {team.map((p) => {
             const c = countsByOwner[p];
             const active = filter === p;
@@ -316,7 +316,8 @@ function TeamTasks() {
               No issues match.
             </div>
           ) : (
-            <table className="w-full text-[13px]" style={{ borderCollapse: "collapse" }}>
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-[13px]" style={{ borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid #dfe1e2", backgroundColor: "#f8f9fa" }}>
                   <th
@@ -453,6 +454,7 @@ function TeamTasks() {
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </section>
 

@@ -74,7 +74,7 @@ function RisksPage() {
       />
 
       <div
-        className="grid grid-cols-4 gap-3 px-6 py-4"
+        className="grid grid-cols-2 gap-3 px-4 py-4 sm:px-6 md:grid-cols-4"
         style={{ borderBottom: "1px solid #dfe1e2", backgroundColor: "#f7f7f5" }}
       >
         <Kpi label="Open" value={openTotal} color="#b3261e" />
@@ -153,7 +153,8 @@ function RisksPage() {
       </div>
 
       <div className="p-6">
-        <table className="w-full text-[12px]" style={{ border: "1px solid #e5e5e2" }}>
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[720px] text-[12px]" style={{ border: "1px solid #e5e5e2" }}>
           <thead style={{ backgroundColor: "#f7f7f5" }}>
             <tr
               className="text-left uppercase tracking-wide"
@@ -210,6 +211,7 @@ function RisksPage() {
             })}
           </tbody>
         </table>
+            </div>
       </div>
     </AppLayout>
   );

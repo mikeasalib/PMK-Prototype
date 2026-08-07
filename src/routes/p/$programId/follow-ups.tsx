@@ -55,7 +55,7 @@ function FollowUps() {
         subtitle="The small things caught between calls — proposed from your calls and issues, kept or waved off by you."
       />
 
-      <div className="px-6 pb-10 pt-2">
+      <div className="px-4 pb-10 pt-2 sm:px-6">
         {/* The read-only exception, stated plainly. */}
         <div
           className="mb-5 rounded-md p-3 text-[12px]"

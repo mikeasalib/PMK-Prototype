@@ -153,15 +153,18 @@ function Overview() {
       />
 
       {/* Milestone strip */}
-      <div className="px-6 pt-5">
-        <div className="flex overflow-hidden rounded" style={{ border: "1px solid #dfe1e2" }}>
+      <div className="px-4 pt-5 sm:px-6">
+        <div
+          className="flex overflow-x-auto rounded"
+          style={{ border: "1px solid #dfe1e2" }}
+        >
           {SPRINT_MILESTONES.map((s) => {
             const isActive = s.key === activeSprint.key;
             const past = s.end < now.slice(0, 10);
             return (
               <div
                 key={s.key}
-                className="flex-1 px-3 py-2 text-[11px]"
+                className="min-w-[116px] flex-1 px-3 py-2 text-[11px]"
                 style={{
                   backgroundColor: isActive ? "#fff5c2" : past ? "#ecf3ec" : "#eef2f7",
                   color: "#3a5a40",
@@ -190,7 +193,7 @@ function Overview() {
           us" signal from the readout: already computed for the rollup, now on
           the command centre so it is visible during the day. */}
       {!isLoading && gates.length > 0 ? (
-        <div className="px-6 pt-4">
+        <div className="px-4 pt-4 sm:px-6">
           <GateReadinessPanel gates={gates} />
         </div>
       ) : null}
@@ -199,7 +202,7 @@ function Overview() {
           between calls are the most action-shaped signal on this page —
           promoted above "No recent updates" per the strategist's own steer. */}
       {!isLoading ? (
-        <div className="px-6 pt-4">
+        <div className="px-4 pt-4 sm:px-6">
           <FollowUpsSummary program={program} />
         </div>
       ) : null}
@@ -207,7 +210,7 @@ function Overview() {
       {/* Notion tracker summary. The command centre reported open work off the
           Linear board alone, which on VA is roughly a third of what is actually
           in flight — the hand-maintained tracker carries the rest. */}
-      <div className="px-6 pt-4">
+      <div className="px-4 pt-4 sm:px-6">
         <NotionTrackerSummary program={program} />
       </div>
 
@@ -216,7 +219,7 @@ function Overview() {
           Loading live data…
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 p-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 p-4 sm:p-6 lg:grid-cols-2">
           {/* Current sprint / current phase — same slot, different concept per
               program.timeAxis. VA keeps its sprint framing; a rec deployment
               shows the current lifecycle phase from the playbook instead. */}
@@ -295,7 +298,7 @@ function Overview() {
             {/* Program-driven, from the same helper as the What's Important
                 panel. Was four fixed slots labelled "Sprint 5 start" / "Code
                 freeze" — VA wording that read wrong on a rec deployment. */}
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               {upcomingMilestones(program, now.slice(0, 10)).map((m) => (
                 <Milestone
                   key={`${m.label}-${m.date}`}
@@ -327,7 +330,8 @@ function Overview() {
                   : ""}
               </span>
             </div>
-            <table className="w-full text-[12px]">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[680px] text-[12px]">
               <thead>
                 <tr
                   className="text-left uppercase tracking-wide"
@@ -439,6 +443,7 @@ function Overview() {
                 })}
               </tbody>
             </table>
+            </div>
             <div className="mt-2 text-[10px]" style={{ color: "#565c65" }}>
               Burn-down blends Linear ticket completion (60%) with logged program progress vs open
               risks/next-steps (40%). Signals: ▲ progress items logged · ● open risks + next steps.
@@ -565,8 +570,11 @@ function GateReadinessPanel({ gates }: { gates: GateReadiness[] }) {
         {gates.map((g) => {
           const band = pressureBand(g.pressure);
           return (
-            <div key={g.phaseId} className="flex items-center gap-3">
-              <div className="w-40 shrink-0 truncate text-[12px]" title={g.phaseName}>
+            <div
+              key={g.phaseId}
+              className="flex flex-col gap-1.5 md:flex-row md:items-center md:gap-3"
+            >
+              <div className="truncate text-[12px] md:w-40 md:shrink-0" title={g.phaseName}>
                 {g.phaseName}
               </div>
               <div
@@ -578,13 +586,16 @@ function GateReadinessPanel({ gates }: { gates: GateReadiness[] }) {
                   style={{ width: `${Math.round(g.pressure * 100)}%`, backgroundColor: band.color }}
                 />
               </div>
+              {/* Band + detail share a wrapped row below md; above it they
+                  return to their own fixed columns via md:contents. */}
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 md:contents">
               <div
-                className="w-24 shrink-0 text-right text-[11px] font-semibold"
+                className="shrink-0 text-[11px] font-semibold md:w-24 md:text-right"
                 style={{ color: band.color }}
               >
                 {band.label}
               </div>
-              <div className="w-52 shrink-0 text-[11px]" style={{ color: "#565c65" }}>
+              <div className="text-[11px] md:w-52 md:shrink-0" style={{ color: "#565c65" }}>
                 {g.daysRemaining >= 0 ? `${g.daysRemaining}d out` : `${-g.daysRemaining}d overdue`}
                 {/* Exit criteria are not individually tracked in any source yet,
                     so exitCriteriaMet is always 0. Labelled a placeholder in
@@ -597,6 +608,7 @@ function GateReadinessPanel({ gates }: { gates: GateReadiness[] }) {
                   {" · not tracked yet"}
                 </span>
                 {g.blockingWorkItems > 0 ? ` · ${g.blockingWorkItems} blocking` : ""}
+              </div>
               </div>
             </div>
           );
@@ -663,16 +675,24 @@ function SittingUntouchedPanel({
           {top.map((i) => {
             const band = agingBand(i.severity);
             return (
-              <div key={i.identifier} className="flex items-center gap-3 text-[12px]">
-                <div className="w-16 shrink-0 font-mono text-[11px]" style={{ color: "#565c65" }}>
-                  {i.identifier}
-                </div>
-                <div
-                  className="w-16 shrink-0 rounded px-1.5 py-0.5 text-center text-[10px] font-semibold"
-                  style={{ backgroundColor: band.bg, color: band.fg }}
-                  title={`${i.daysSinceUpdate} days since Linear last saw a change on this issue (${i.severity})`}
-                >
-                  {i.daysSinceUpdate}d
+              <div
+                key={i.identifier}
+                className="flex flex-col gap-1 text-[12px] md:flex-row md:items-center md:gap-3"
+              >
+                {/* Below md the fixed columns (id + chip + workstream +
+                    assignee) summed past the available width and the title
+                    flexed to zero. Meta wraps onto its own line instead. */}
+                <div className="flex items-center gap-2 md:contents">
+                  <div className="w-16 shrink-0 font-mono text-[11px]" style={{ color: "#565c65" }}>
+                    {i.identifier}
+                  </div>
+                  <div
+                    className="w-16 shrink-0 rounded px-1.5 py-0.5 text-center text-[10px] font-semibold"
+                    style={{ backgroundColor: band.bg, color: band.fg }}
+                    title={`${i.daysSinceUpdate} days since Linear last saw a change on this issue (${i.severity})`}
+                  >
+                    {i.daysSinceUpdate}d
+                  </div>
                 </div>
                 <div className="min-w-0 flex-1 truncate">
                   {i.url ? (
@@ -689,15 +709,20 @@ function SittingUntouchedPanel({
                     i.title
                   )}
                 </div>
-                <div className="w-16 shrink-0 text-right text-[10px]" style={{ color: "#565c65" }}>
-                  {i.workstream}
-                </div>
-                <div
-                  className="w-28 shrink-0 truncate text-right text-[10px]"
-                  style={{ color: "#565c65" }}
-                  title={i.assignee ?? "Unassigned"}
-                >
-                  {i.assignee ?? "—"}
+                <div className="flex items-center gap-3 text-[10px] md:contents">
+                  <div
+                    className="shrink-0 md:w-16 md:text-right"
+                    style={{ color: "#565c65" }}
+                  >
+                    {i.workstream}
+                  </div>
+                  <div
+                    className="min-w-0 truncate md:w-28 md:shrink-0 md:text-right"
+                    style={{ color: "#565c65" }}
+                    title={i.assignee ?? "Unassigned"}
+                  >
+                    {i.assignee ?? "—"}
+                  </div>
                 </div>
               </div>
             );
@@ -770,7 +795,11 @@ function RecentlyClosedPanel({
           {top.map((i) => {
             const dropped = i.bucket === "canceled";
             return (
-              <div key={i.identifier} className="flex items-center gap-3 text-[12px]">
+              <div
+                key={i.identifier}
+                className="flex flex-col gap-1 text-[12px] md:flex-row md:items-center md:gap-3"
+              >
+                <div className="flex items-center gap-2 md:contents">
                 <div className="w-16 shrink-0 font-mono text-[11px]" style={{ color: "#565c65" }}>
                   {i.identifier}
                 </div>
@@ -789,6 +818,7 @@ function RecentlyClosedPanel({
                 >
                   {dropped ? "dropped" : `${i.daysSinceClosed}d`}
                 </div>
+                </div>
                 <div className="min-w-0 flex-1 truncate">
                   {i.url ? (
                     <a
@@ -804,15 +834,20 @@ function RecentlyClosedPanel({
                     i.title
                   )}
                 </div>
-                <div className="w-16 shrink-0 text-right text-[10px]" style={{ color: "#565c65" }}>
-                  {i.workstream}
-                </div>
-                <div
-                  className="w-28 shrink-0 truncate text-right text-[10px]"
-                  style={{ color: "#565c65" }}
-                  title={i.assignee ?? "Unassigned"}
-                >
-                  {i.assignee ?? "—"}
+                <div className="flex items-center gap-3 text-[10px] md:contents">
+                  <div
+                    className="shrink-0 md:w-16 md:text-right"
+                    style={{ color: "#565c65" }}
+                  >
+                    {i.workstream}
+                  </div>
+                  <div
+                    className="min-w-0 truncate md:w-28 md:shrink-0 md:text-right"
+                    style={{ color: "#565c65" }}
+                    title={i.assignee ?? "Unassigned"}
+                  >
+                    {i.assignee ?? "—"}
+                  </div>
                 </div>
               </div>
             );

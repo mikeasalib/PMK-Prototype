@@ -69,7 +69,7 @@ function WhatsImportant() {
 
       {/* Headline KPIs */}
       <div
-        className="grid grid-cols-4 gap-3 px-6 py-4"
+        className="grid grid-cols-2 gap-3 px-4 py-4 sm:px-6 md:grid-cols-4"
         style={{ borderBottom: "1px solid #dfe1e2", backgroundColor: "#f7f7f5" }}
       >
         <Kpi
@@ -93,7 +93,7 @@ function WhatsImportant() {
           Loading live data…
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 p-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 p-4 sm:p-6 lg:grid-cols-2">
           {/* Active work */}
           <Panel title={`Active right now (${active.length})`} accent="#005ea2">
             {active.length === 0 ? (
