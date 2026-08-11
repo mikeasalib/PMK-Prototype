@@ -172,6 +172,10 @@ function Overview() {
                   color: "#3a5a40",
                   borderRight: "1px solid #dfe1e2",
                 }}
+                // Focus and gate come from the program's plan of record. On the
+                // strip they are a tooltip; the active sprint prints its focus
+                // and gate in full below, since that is the one you are in.
+                title={[s.focus, s.gate ? `Gate: ${s.gate}` : null].filter(Boolean).join(" — ")}
               >
                 <div className="font-mono text-xs" style={{ opacity: 0.65 }}>
                   {s.key}
@@ -189,6 +193,15 @@ function Overview() {
             );
           })}
         </div>
+        {activeSprint.focus || activeSprint.gate ? (
+          <div className="mt-2 text-xs" style={{ color: "#565c65" }}>
+            {activeSprint.focus ? (
+              <span style={{ color: "#1b1b1b" }}>{activeSprint.focus}</span>
+            ) : null}
+            {activeSprint.focus && activeSprint.gate ? " · " : ""}
+            {activeSprint.gate ? <>To advance: {activeSprint.gate}</> : null}
+          </div>
+        ) : null}
       </div>
 
       {/* What's at risk — gate readiness, worst first. The "asteroid coming at

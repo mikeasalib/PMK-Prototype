@@ -384,7 +384,7 @@ export function PageHeader({
             </p>
           ) : null}
         </div>
-        <div className="flex shrink-0 items-center gap-3 sm:pt-1">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:gap-3 sm:pt-1">
           {actions}
           {/* Lookup and activity live in the header, not the nav: both are
               things you reach for mid-task rather than navigate to. */}

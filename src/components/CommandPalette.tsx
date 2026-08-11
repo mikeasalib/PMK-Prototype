@@ -47,9 +47,9 @@ export function CommandPalette() {
         style={{ color: "#565c65", border: "1px solid #dfe1e2" }}
       >
         <SearchIcon size={15} />
-        <span className="hidden whitespace-nowrap sm:inline">Search or @ Dust</span>
+        <span className="hidden whitespace-nowrap lg:inline">Search or @ Dust</span>
         <kbd
-          className="hidden rounded px-1 text-xs sm:inline"
+          className="hidden rounded px-1 text-xs lg:inline"
           style={{ backgroundColor: "#f0f0ec", color: "#8a8a80" }}
         >
           ⌘K

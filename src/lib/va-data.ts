@@ -153,6 +153,12 @@ export interface LifecyclePhase {
   milestone?: string;
 }
 
+// Sprint labels below cite the MyVA Delivery Timeline numbering (Sprints 5-9,
+// then 10+), which is the plan of record. They previously ran S1-S11 — a third
+// numbering that agreed with neither the timeline nor program.config's strip,
+// so a phase card and the milestone strip above it named different sprints for
+// the same fortnight. Phase windows themselves are unchanged: they are a
+// deliberately coarser cut over the same calendar.
 export const LIFECYCLE: LifecyclePhase[] = [
   {
     id: "P1",
@@ -160,7 +166,7 @@ export const LIFECYCLE: LifecyclePhase[] = [
     window: "Jun 8 – Jul 3, 2026",
     startsOn: "2026-06-08",
     endsOn: "2026-07-03",
-    sprints: "S1–S2",
+    sprints: "pre-S5",
     status: "complete",
     goal: "Lock scope across all five workstreams; establish contract-level dependency and reporting cadence.",
     exitCriteria: [
@@ -184,7 +190,7 @@ export const LIFECYCLE: LifecyclePhase[] = [
     window: "Jul 6 – Jul 31, 2026",
     startsOn: "2026-07-06",
     endsOn: "2026-07-31",
-    sprints: "S3–S4",
+    sprints: "pre-S5",
     status: "in_progress",
     goal: "Approve architecture intents, unblock repo + platform access, finalize magic-link + SNS specs so build can start on schedule.",
     exitCriteria: [
@@ -258,7 +264,7 @@ export const LIFECYCLE: LifecyclePhase[] = [
     window: "Sep 28 – Oct 23, 2026",
     startsOn: "2026-09-28",
     endsOn: "2026-10-23",
-    sprints: "S9–S10",
+    sprints: "S9",
     status: "upcoming",
     goal: "Complete UAT 1 → UAT 2, PRR sign-off, ORR entry. This is the full deliverable to VA — code freeze end of October.",
     milestone: "★ Full deliverable to VA — end of October",
@@ -284,7 +290,7 @@ export const LIFECYCLE: LifecyclePhase[] = [
     window: "Oct 26 – Nov 11, 2026",
     startsOn: "2026-10-26",
     endsOn: "2026-11-11",
-    sprints: "S11",
+    sprints: "S10+",
     status: "upcoming",
     goal: "Production checkout, ORR completion, launch, and contract close by the Nov 11 hard deadline.",
     milestone: "★ Production launch — November 11, 2026 (contract deadline)",
