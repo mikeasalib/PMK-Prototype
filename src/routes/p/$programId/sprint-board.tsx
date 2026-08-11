@@ -36,7 +36,7 @@ function SprintBoard() {
   // Per-program. Was module-level.
   const WS_KEYS: (WorkstreamKey | "all")[] = ["all", ...workstreamKeys(program)];
   const seed = seedFor(program.id);
-  const { linear, isLoading } = useStoredData();
+  const { linear, isLoading } = useStoredData(program.id);
   const [ws, setWs] = useState<WorkstreamKey | "all">("all");
 
   const filtered = useMemo(
@@ -133,7 +133,7 @@ function SprintBoard() {
           Loading live data…
         </div>
       ) : (
-        <div className="grid grid-cols-4 gap-3 p-6">
+        <div className="grid grid-cols-1 gap-3 p-4 sm:p-6 md:grid-cols-2 lg:grid-cols-4">
           {COLUMNS.map((col) => {
             const items = filtered.filter((t) => bucketOf(t) === col.key);
             return (

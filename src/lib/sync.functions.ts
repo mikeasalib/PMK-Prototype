@@ -1,7 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 
+// Granola is deliberately absent from this union. Its content sync was never
+// wired (the VA folder returns 403 at the workspace-policy level), so it sat in
+// the footer permanently reading "not synced" — a row that told the reader
+// nothing except that we had listed something we don't read.
 export type SyncSourceStatus = {
-  key: "granola" | "notion" | "linear";
+  key: "notion" | "linear";
   ok: boolean;
   count: number;
   scope: string;
@@ -13,59 +17,48 @@ export type SyncResult = {
   sources: SyncSourceStatus[];
 };
 
-export const syncAll = createServerFn({ method: "POST" }).handler(async (): Promise<SyncResult> => {
-  const { syncGranola, syncNotion, syncLinear } = await import("./sync.server");
-  const sources = await Promise.all([syncGranola(), syncNotion(), syncLinear()]);
-  return { syncedAt: new Date().toISOString(), sources };
-});
+/**
+ * "Refresh" now just drops the in-memory read cache and reports what a fresh
+ * read of each source returns. There is no mirror to write into: the previous
+ * implementation pushed rows into Supabase tables that don't exist behind this
+ * deployment, so every sync reported failure and every read fell back.
+ */
+export const syncAll = createServerFn({ method: "POST" })
+  .inputValidator((programId: unknown) => (typeof programId === "string" ? programId : "va"))
+  .handler(async ({ data: programId }): Promise<SyncResult> => {
+    const { probeSources } = await import("./sources.probe.server");
+    const sources = await probeSources(programId, { bustCache: true });
+    return { syncedAt: new Date().toISOString(), sources };
+  });
 
 export type SyncedSnapshot = {
   syncedAt: string | null;
   sources: SyncSourceStatus[];
-  counts: { linear: number; notion: number; granola: number };
+  counts: { linear: number; notion: number };
 };
 
-export const getSyncedSnapshot = createServerFn({ method: "GET" }).handler(
-  async (): Promise<SyncedSnapshot> => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    const [runs, li, np, gn] = await Promise.all([
-      supabaseAdmin
-        .from("sync_runs")
-        .select("source, ok, count, scope, message, ran_at")
-        .order("ran_at", { ascending: false })
-        .limit(30),
-      supabaseAdmin.from("linear_issues").select("*", { count: "exact", head: true }),
-      supabaseAdmin.from("notion_pages").select("*", { count: "exact", head: true }),
-      supabaseAdmin.from("granola_notes").select("*", { count: "exact", head: true }),
-    ]);
-
-    const latestBySource = new Map<string, SyncSourceStatus & { ran_at: string }>();
-    for (const r of runs.data ?? []) {
-      if (!latestBySource.has(r.source)) {
-        latestBySource.set(r.source, {
-          key: r.source as SyncSourceStatus["key"],
-          ok: r.ok,
-          count: r.count ?? 0,
-          scope: r.scope ?? "",
-          message: r.message ?? "",
-          ran_at: r.ran_at,
-        });
-      }
-    }
-    const sources = Array.from(latestBySource.values()).map(({ ran_at: _r, ...rest }) => rest);
-    const syncedAt = runs.data?.[0]?.ran_at ?? null;
-    return {
-      syncedAt,
-      sources,
-      counts: {
-        linear: li.count ?? 0,
-        notion: np.count ?? 0,
-        granola: gn.count ?? 0,
-      },
+/**
+ * Current source status, for the sidebar footer. Reads each source directly
+ * and reports what it actually got — the previous version counted rows in
+ * Supabase mirror tables, which is why the footer said "not synced" on a page
+ * full of rendered issues.
+ */
+export const getSyncedSnapshot = createServerFn({ method: "GET" })
+  .inputValidator((programId: unknown) => (typeof programId === "string" ? programId : "va"))
+  .handler(async ({ data: programId }): Promise<SyncedSnapshot> => {
+    const { probeSources } = await import("./sources.probe.server");
+    const sources = await probeSources(programId);
+    const counts = {
+      linear: sources.find((s) => s.key === "linear")?.count ?? 0,
+      notion: sources.find((s) => s.key === "notion")?.count ?? 0,
     };
-  },
-);
+    const anyOk = sources.some((s) => s.ok);
+    return {
+      syncedAt: anyOk ? new Date().toISOString() : null,
+      sources,
+      counts,
+    };
+  });
 
 export type StoredLinearMilestone = {
   source_id: string;
@@ -106,36 +99,104 @@ export type StoredNotionPage = {
   synced_at: string;
 };
 
-export type StoredGranolaNote = {
+export type StoredDataOrigin = "live" | "snapshot" | "empty";
+
+/** Mirrors NotionTask in sources.direct.server, client-safe. */
+export type NotionTaskRow = {
   id: string;
-  source_id: string;
-  title: string;
-  url: string | null;
-  source_updated_at: string | null;
-  synced_at: string;
+  text: string;
+  checked: boolean;
+  section: string | null;
+  depth: number;
+  ticketRefs: string[];
+  url: string;
 };
 
-export const getStoredData = createServerFn({ method: "GET" }).handler(async () => {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const [linear, notion, granola] = await Promise.all([
-    supabaseAdmin
-      .from("linear_issues")
-      .select(
-        "id, source_id, identifier, title, state_name, state_type, priority, assignee, workstream, labels, url, source_updated_at, synced_at",
-      )
-      .order("source_updated_at", { ascending: false }),
-    supabaseAdmin
-      .from("notion_pages")
-      .select("id, source_id, title, url, parent_type, source_updated_at, synced_at")
-      .order("source_updated_at", { ascending: false }),
-    supabaseAdmin
-      .from("granola_notes")
-      .select("id, source_id, title, url, source_updated_at, synced_at")
-      .order("source_updated_at", { ascending: false }),
-  ]);
-  return {
-    linear: (linear.data ?? []) as StoredLinearIssue[],
-    notion: (notion.data ?? []) as StoredNotionPage[],
-    granola: (granola.data ?? []) as StoredGranolaNote[],
-  };
-});
+export type NotionTasksResult = {
+  tasks: NotionTaskRow[];
+  /** Null when no tracker is configured for this program. */
+  readAt: string | null;
+  /** Why the list is empty, when it is. Rendered in place so a configuration
+   *  problem does not read as "no work in flight". */
+  status: "ok" | "not-configured" | "no-token" | "read-failed";
+};
+
+/**
+ * Hand-maintained checkbox tasks from the program's Notion tracker.
+ *
+ * Separate from getStoredData because the two answer different questions and
+ * fail independently: Linear can be live while the tracker page is unshared,
+ * and a page full of open checkboxes is meaningful even when Linear is down.
+ */
+export const getNotionTasks = createServerFn({ method: "GET" })
+  .inputValidator((programId: string) => programId)
+  .handler(async ({ data: programId }): Promise<NotionTasksResult> => {
+    const { readNotionTasks, notionConfigured } = await import("./sources.direct.server");
+    const { sourcesFor } = await import("./program.sources.server");
+    const src = sourcesFor(programId);
+    if (!src.notion?.taskTrackerPageId) {
+      return { tasks: [], readAt: null, status: "not-configured" };
+    }
+    if (!notionConfigured()) {
+      return { tasks: [], readAt: null, status: "no-token" };
+    }
+    const read = await readNotionTasks(programId);
+    if (!read) return { tasks: [], readAt: null, status: "read-failed" };
+    return { tasks: read.rows, readAt: read.readAt, status: "ok" };
+  });
+
+export interface StoredData {
+  linear: StoredLinearIssue[];
+  notion: StoredNotionPage[];
+  /** Where these rows came from. The UI must not present a snapshot as live. */
+  origin: StoredDataOrigin;
+  /** For a snapshot, when it was captured. Null when live or empty. */
+  capturedAt: string | null;
+  /** Human-readable provenance for a snapshot. */
+  capturedFrom: string | null;
+}
+
+export const getStoredData = createServerFn({ method: "GET" })
+  .inputValidator((programId: string) => programId)
+  .handler(async ({ data: programId }): Promise<StoredData> => {
+    // Direct read against Linear's API. No mirror table, no sync step: a page
+    // request reads the source. Replaces a Supabase-mirror read that could
+    // never succeed — there is no Supabase instance behind this app, so every
+    // "live" read failed and silently fell back, which is why setting
+    // NOTION_API_KEY changed nothing.
+    const { readLinearIssues, linearConfigured } = await import("./sources.direct.server");
+    const live = await readLinearIssues(programId);
+    if (live && live.rows.length > 0) {
+      return {
+        linear: live.rows as unknown as StoredLinearIssue[],
+        notion: [],
+        origin: "live",
+        capturedAt: live.readAt,
+        capturedFrom: `Linear API (read ${live.readAt})`,
+      };
+    }
+
+    // No token, or the call failed. Fall back to a captured snapshot so the app
+    // is developable and demonstrable — but never in preference to a live read,
+    // and never silently: the origin travels with the rows.
+    const { snapshotFor, snapshotFallbackAllowed } = await import("./snapshots");
+    const snap = snapshotFallbackAllowed() ? snapshotFor(programId) : null;
+    if (!snap) {
+      return {
+        linear: [],
+        notion: [],
+        origin: "empty",
+        capturedAt: null,
+        capturedFrom: linearConfigured()
+          ? "Linear read failed and snapshot fallback is off"
+          : "LINEAR_API_KEY not set and snapshot fallback is off",
+      };
+    }
+    return {
+      linear: snap.linear_issues as unknown as StoredLinearIssue[],
+      notion: [],
+      origin: "snapshot",
+      capturedAt: snap.fetchedAt,
+      capturedFrom: snap.source,
+    };
+  });

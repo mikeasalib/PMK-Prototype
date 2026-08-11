@@ -1,9 +1,11 @@
 import { toast } from "sonner";
 import { RefreshCw } from "lucide-react";
 import { useProgramData, relativeTime, absoluteTime } from "@/hooks/use-program-data";
+import { useProgram } from "@/routes/p/$programId/route";
 
 export function RefreshButton() {
-  const { refresh, isRefreshing, lastSyncedAt } = useProgramData();
+  const program = useProgram();
+  const { refresh, isRefreshing, lastSyncedAt } = useProgramData(program.id);
 
   const onClick = async () => {
     try {

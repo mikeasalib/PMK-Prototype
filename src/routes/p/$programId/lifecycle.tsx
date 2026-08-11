@@ -2,9 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
 import { WsTag } from "@/components/va-ui";
-import { type PhaseStatus, type WorkstreamKey } from "@/lib/va-data";
-import { PROGRAMS, pageTitle, workstreamOf } from "@/lib/program.config";
+import { type LifecyclePhase, type PhaseStatus, type WorkstreamKey } from "@/lib/va-data";
+import { PROGRAMS, pageTitle, upcomingMilestones, workstreamOf } from "@/lib/program.config";
 import { seedFor } from "@/lib/program-seed";
+import { lifecyclePhasesFor, today as todayIso, derivePhaseState } from "@/lib/program-model.adapters";
+import { shortDate, localDate } from "@/lib/local-date";
 import { useProgram } from "./route";
 
 export const Route = createFileRoute("/p/$programId/lifecycle")({
@@ -51,7 +53,7 @@ function LifecyclePage() {
 
       {/* KPI strip */}
       <div
-        className="grid grid-cols-4 gap-3 px-6 py-4"
+        className="grid grid-cols-2 gap-3 px-4 py-4 sm:px-6 md:grid-cols-4"
         style={{ borderBottom: "1px solid #dfe1e2", backgroundColor: "#f8f8f6" }}
       >
         <Kpi label="Phases complete" value={`${done} / ${total}`} sub={`${pctDone}% of program`} />
@@ -72,8 +74,19 @@ function LifecyclePage() {
         />
       </div>
 
-      {/* Timeline strip */}
-      <div className="px-6 pt-5">
+      {/* Gantt-style timeline. Phases sized to their actual duration, milestones
+          as tick marks, "today" as a vertical line. Only rendered when the
+          program has real phase dates — a program with an empty lifecycle
+          config (there are none today, but the safety belongs here) hides
+          this section rather than drawing an empty axis. */}
+      <div className="px-4 pt-5 sm:px-6">
+        <LifecycleTimeline program={program} />
+      </div>
+
+      {/* Original equal-width strip: kept as the compact scan/jump index. Sized
+          panels above give proportional time; this one gives one-click jumps
+          to each phase card below. */}
+      <div className="px-4 pt-4 sm:px-6">
         <div
           className="flex items-stretch overflow-hidden rounded"
           style={{ border: "1px solid #dfe1e2" }}
@@ -111,7 +124,7 @@ function LifecyclePage() {
       </div>
 
       {/* Phase cards */}
-      <div className="p-6 space-y-4">
+      <div className="p-4 space-y-4 sm:p-6">
         <div className="flex items-center justify-end gap-2 text-[11px]">
           <button
             type="button"
@@ -277,6 +290,242 @@ function LifecyclePage() {
     </AppLayout>
   );
 }
+
+/**
+ * Proportional timeline of phases with milestones and "today" as an overlay.
+ *
+ * Positions are percentages of the program window (earliest phase start →
+ * latest phase end, or the launch date if it falls past that). Every element
+ * that renders past the window is clipped rather than drawn off-canvas — the
+ * chart is a proportional read of what's in front of us, not a scroll.
+ *
+ * A milestone that falls outside the window (e.g. a post-launch date not
+ * covered by any phase) is silently omitted rather than glued to an edge,
+ * because a tick at 100% would read as "same day as launch" and lie.
+ */
+type ProgramLike = ReturnType<typeof useProgram>;
+function LifecycleTimeline({ program }: { program: ProgramLike }) {
+  const phases = lifecyclePhasesFor(program);
+  if (phases.length === 0) return null;
+
+  const iso = todayIso();
+  const windowStart = phases[0].startsOn;
+  const windowEnd = phases[phases.length - 1].endsOn;
+  const startMs = localDate(windowStart).getTime();
+  const endMs = localDate(windowEnd).getTime();
+  const span = Math.max(1, endMs - startMs);
+
+  const pct = (dayIso: string) => {
+    const t = localDate(dayIso).getTime();
+    return Math.max(0, Math.min(100, ((t - startMs) / span) * 100));
+  };
+
+  const todayInside = iso >= windowStart && iso <= windowEnd;
+  const milestones = upcomingMilestones(program, windowStart).filter(
+    (m) => m.date >= windowStart && m.date <= windowEnd,
+  );
+
+  const monthTicks = monthMarkers(windowStart, windowEnd);
+
+  return (
+    <section
+      className="rounded-md bg-white p-4"
+      style={{ border: "1px solid #e5e5e2" }}
+    >
+      <div className="mb-3 flex items-baseline justify-between">
+        <h2
+          className="text-sm font-semibold"
+          style={{ color: "#3a5a40", fontFamily: "Public Sans, system-ui, sans-serif" }}
+        >
+          Timeline · {shortDate(windowStart)} – {shortDate(windowEnd)}
+        </h2>
+        <span className="text-[11px]" style={{ color: "#565c65" }}>
+          Bars sized to phase duration · milestones as ticks · today line
+        </span>
+      </div>
+
+      <div className="relative" style={{ height: 24 + 34 * phases.length + 40 }}>
+        {/* Month gridlines. Faint verticals so the eye can measure spans
+            without a full ruler. */}
+        {monthTicks.map((t) => (
+          <div
+            key={`gl-${t.iso}`}
+            className="absolute top-0 bottom-10"
+            style={{
+              left: `${pct(t.iso)}%`,
+              width: 1,
+              backgroundColor: "#f0f0ec",
+            }}
+          />
+        ))}
+
+        {/* Phase bars, stacked one row per phase. */}
+        {phases.map((p, idx) => {
+          const state = derivePhaseState(p, iso);
+          const s = STATUS_STYLE[state];
+          const left = pct(p.startsOn);
+          const right = pct(p.endsOn);
+          const width = Math.max(1, right - left);
+          return (
+            <a
+              key={p.id}
+              href={`#${p.id}`}
+              className="absolute rounded"
+              style={{
+                top: 24 + idx * 34,
+                left: `${left}%`,
+                width: `${width}%`,
+                height: 26,
+                backgroundColor: s.bar,
+                opacity: state === "upcoming" ? 0.55 : 1,
+                textDecoration: "none",
+                overflow: "hidden",
+              }}
+              title={`${p.name} · ${p.window}`}
+            >
+              <div
+                className="truncate px-2 py-1 text-[11px] font-semibold"
+                style={{ color: "#ffffff" }}
+              >
+                {p.name.replace(/^Phase \d+ · /, "")}
+              </div>
+            </a>
+          );
+        })}
+
+        {/* Today line — only when today falls inside the plotted window;
+            outside it, a tick clamped to the edge would misread as "today is
+            launch day." */}
+        {todayInside ? (
+          <>
+            <div
+              className="absolute top-0"
+              style={{
+                left: `${pct(iso)}%`,
+                width: 2,
+                bottom: 40,
+                backgroundColor: "#b3261e",
+              }}
+            />
+            <div
+              className="absolute rounded px-1.5 py-0.5 text-[10px] font-semibold"
+              style={{
+                left: `calc(${pct(iso)}% - 20px)`,
+                top: 4,
+                backgroundColor: "#b3261e",
+                color: "#ffffff",
+              }}
+            >
+              today
+            </div>
+          </>
+        ) : null}
+
+        {/* Milestone ticks along the bottom. Labels stack vertically-offset to
+            avoid overlap when two milestones are close in time. */}
+        {milestones.map((m, i) => (
+          <div
+            key={`ms-${m.date}-${m.label}`}
+            className="absolute"
+            style={{ left: `${pct(m.date)}%`, bottom: 0 }}
+          >
+            <div
+              style={{
+                width: 2,
+                height: 24,
+                backgroundColor: "#3a5a40",
+                position: "absolute",
+                left: -1,
+                bottom: 16,
+              }}
+            />
+            <div
+              className="absolute whitespace-nowrap text-[10px] font-medium"
+              style={{
+                color: "#3a5a40",
+                bottom: -2 + (i % 2 === 0 ? 0 : 12),
+                left: 4,
+              }}
+              title={`${m.label} · ${m.date}`}
+            >
+              {m.label} · {shortDate(m.date)}
+            </div>
+          </div>
+        ))}
+
+        {/* Bottom axis: month labels aligned to the tick lines. */}
+        {monthTicks.map((t) => (
+          <div
+            key={`ml-${t.iso}`}
+            className="absolute text-[10px]"
+            style={{
+              left: `${pct(t.iso)}%`,
+              bottom: -18,
+              color: "#8a8a80",
+              transform: "translateX(-50%)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {t.label}
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-2 flex items-center gap-4 text-[10px]" style={{ color: "#8a8a80" }}>
+        <span className="inline-flex items-center gap-1">
+          <span className="inline-block h-2 w-2 rounded" style={{ backgroundColor: STATUS_STYLE.complete.bar }} /> complete
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="inline-block h-2 w-2 rounded" style={{ backgroundColor: STATUS_STYLE.in_progress.bar }} /> in progress
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span
+            className="inline-block h-2 w-2 rounded"
+            style={{ backgroundColor: STATUS_STYLE.upcoming.bar, opacity: 0.55 }}
+          />{" "}
+          upcoming
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="inline-block h-2 w-2" style={{ backgroundColor: "#b3261e" }} /> today
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="inline-block h-2 w-2" style={{ backgroundColor: "#3a5a40" }} /> milestone
+        </span>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Month boundaries within a window, for axis labels. Emits the first of each
+ * month falling in [startIso, endIso], plus the window start if it isn't
+ * itself the first — this keeps the leftmost label anchored.
+ */
+function monthMarkers(startIso: string, endIso: string): { iso: string; label: string }[] {
+  const out: { iso: string; label: string }[] = [];
+  const start = localDate(startIso);
+  const end = localDate(endIso);
+  // Start at the first of the month at or after startIso.
+  let cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  if (cursor.getTime() < start.getTime()) {
+    cursor = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+  }
+  while (cursor.getTime() <= end.getTime()) {
+    const y = cursor.getFullYear();
+    const m = String(cursor.getMonth() + 1).padStart(2, "0");
+    out.push({
+      iso: `${y}-${m}-01`,
+      label: cursor.toLocaleDateString(undefined, { month: "short" }),
+    });
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+  }
+  return out;
+}
+
+// Kept-legacy note: LifecyclePhase type is imported for the timeline helpers
+// even though it's only structurally used here — importing keeps the intent
+// obvious to a reader following the phase-shape.
+type _KeepLifecyclePhase = LifecyclePhase;
 
 function Kpi({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (

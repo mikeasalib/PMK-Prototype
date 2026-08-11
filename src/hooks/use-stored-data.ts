@@ -5,23 +5,26 @@ import {
   getStoredData,
   type StoredLinearIssue,
   type StoredNotionPage,
-  type StoredGranolaNote,
 } from "@/lib/sync.functions";
 
-export type { StoredLinearIssue, StoredNotionPage, StoredGranolaNote };
+export type { StoredLinearIssue, StoredNotionPage };
 
-export function useStoredData() {
+export function useStoredData(programId: string) {
   const fn = useServerFn(getStoredData);
   const { data, isLoading } = useQuery({
-    queryKey: ["stored-data"],
-    queryFn: () => fn(),
+    // Keyed by program: without this, switching engagements served the previous
+    // program's cached rows until the query went stale.
+    queryKey: ["stored-data", programId],
+    queryFn: () => fn({ data: programId }),
     staleTime: 30_000,
   });
   return {
     isLoading,
     linear: data?.linear ?? [],
     notion: data?.notion ?? [],
-    granola: data?.granola ?? [],
+    origin: data?.origin ?? "empty",
+    capturedAt: data?.capturedAt ?? null,
+    capturedFrom: data?.capturedFrom ?? null,
   };
 }
 

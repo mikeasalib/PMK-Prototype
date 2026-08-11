@@ -1,0 +1,148 @@
+{
+  "programId": "ventura",
+  "capturedAt": "2026-08-04T21:30:33Z",
+  "note": "Refreshed 2026-08-04 from Granola meeting summaries (last 30 days: Ventura x Kaizen 7/29, Ventura x Kaizen 7/21, Jeri quick chat 7/15) plus one still-past-due Linear item. Older follow-ups from prior captures are dropped unless the current Granola material substantiates them — the point of refreshing is to reflect what's actually open now.",
+  "candidates": [
+    {
+      "id": "ven-fu-1",
+      "title": "Investigate check refund flow — cancel + no-card-refund interaction with reporting",
+      "direction": "we-owe",
+      "origin": "granola",
+      "source": {
+        "label": "Ventura x Kaizen 7/29 (Granola)"
+      },
+      "capturedAt": "2026-08-04T21:30:33Z",
+      "owner": "Nico",
+      "detail": "Explicit follow-up from the 7/29 sync"
+    },
+    {
+      "id": "ven-fu-2",
+      "title": "Finalize and send the payout report structure to Tina",
+      "direction": "we-owe",
+      "origin": "granola",
+      "source": {
+        "label": "Ventura x Kaizen 7/29 (Granola)"
+      },
+      "capturedAt": "2026-08-04T21:30:33Z",
+      "owner": "Nico",
+      "detail": "Two tabs (summary + transaction detail); automation to follow"
+    },
+    {
+      "id": "ven-fu-3",
+      "title": "Explore nightly-rate line-item breakdown feasibility for Brandon's payout report",
+      "direction": "we-owe",
+      "origin": "granola",
+      "source": {
+        "label": "Ventura x Kaizen 7/29 (Granola)"
+      },
+      "capturedAt": "2026-08-04T21:30:33Z",
+      "owner": "Nico",
+      "detail": "Plus cancellation/refund breakdowns on receipts"
+    },
+    {
+      "id": "ven-fu-4",
+      "title": "Build the four permit types (film, special use, professional photography, commercial activity) in staging for Ventura to test",
+      "direction": "we-owe",
+      "origin": "granola",
+      "source": {
+        "label": "Ventura x Kaizen 7/29 (Granola)"
+      },
+      "capturedAt": "2026-08-04T21:30:33Z",
+      "owner": "Kaizen",
+      "detail": "Staging-first; migrate to production after Ventura sign-off"
+    },
+    {
+      "id": "ven-fu-5",
+      "title": "Add $2/person post-event vendor/public-event fee to permits system",
+      "direction": "we-owe",
+      "origin": "granola",
+      "source": {
+        "label": "Ventura x Kaizen 7/29 (Granola)"
+      },
+      "capturedAt": "2026-08-04T21:30:33Z",
+      "owner": "Kaizen",
+      "detail": "Deadline: Dec 1"
+    },
+    {
+      "id": "ven-fu-6",
+      "title": "Introduce legacy ID / license-plate lookup across memberships and day-use passes",
+      "direction": "we-owe",
+      "origin": "granola",
+      "source": {
+        "label": "Ventura x Kaizen 7/29 (Granola)"
+      },
+      "capturedAt": "2026-08-04T21:30:33Z",
+      "owner": "Kaizen",
+      "detail": "Chad's preference — annual pass numbers currently in un-searchable notes"
+    },
+    {
+      "id": "ven-fu-7",
+      "title": "Fix security-fee multiplication bug on community-center hourly past 6pm",
+      "direction": "we-owe",
+      "origin": "granola",
+      "source": {
+        "label": "Ventura x Kaizen 7/21 (Granola)"
+      },
+      "capturedAt": "2026-08-04T21:30:33Z",
+      "owner": "Kaizen",
+      "detail": "Manual-invoicing workaround in place; still open as of 7/21 sync"
+    },
+    {
+      "id": "ven-fu-8",
+      "title": "Configure youth group rate ($5/person/day, call-in only) once site scope is aligned",
+      "direction": "we-owe",
+      "origin": "granola",
+      "source": {
+        "label": "Ventura x Kaizen 7/21 (Granola)"
+      },
+      "capturedAt": "2026-08-04T21:30:33Z",
+      "owner": "Kaizen",
+      "detail": "Blocked on Jeri and Chad aligning on eligible sites"
+    },
+    {
+      "id": "ven-fu-9",
+      "title": "Jeri and Chad to align on which sites accept the youth group rate",
+      "direction": "they-owe",
+      "origin": "granola",
+      "source": {
+        "label": "Ventura x Kaizen 7/21 (Granola)"
+      },
+      "capturedAt": "2026-08-04T21:30:33Z",
+      "owner": "Jeri Cooper / Chad Bowie"
+    },
+    {
+      "id": "ven-fu-10",
+      "title": "Ventura team to test the four permit types in staging",
+      "direction": "they-owe",
+      "origin": "granola",
+      "source": {
+        "label": "Ventura x Kaizen 7/29 (Granola)"
+      },
+      "capturedAt": "2026-08-04T21:30:33Z",
+      "owner": "Chad / Ventura team"
+    },
+    {
+      "id": "ven-fu-11",
+      "title": "Brandon to confirm nightly-rate + cancellation/refund breakdown structure",
+      "direction": "they-owe",
+      "origin": "granola",
+      "source": {
+        "label": "Ventura x Kaizen 7/29 (Granola)"
+      },
+      "capturedAt": "2026-08-04T21:30:33Z",
+      "owner": "Brandon Nakamoto"
+    },
+    {
+      "id": "ven-fu-12",
+      "title": "Nudge: `price_modifiers` save-not-persisting bug is still open",
+      "direction": "we-owe",
+      "origin": "linear",
+      "source": {
+        "label": "Linear REC-335 (in progress, no update since 2026-07-14)",
+        "url": "https://linear.app/kaizenlabs/issue/REC-335"
+      },
+      "capturedAt": "2026-08-04T21:30:33Z",
+      "owner": "Kaizen"
+    }
+  ]
+}

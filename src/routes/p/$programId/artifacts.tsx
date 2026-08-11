@@ -29,6 +29,7 @@ export const Route = createFileRoute("/p/$programId/artifacts")({
 
 const ICON: Record<ArtifactKind, typeof FileText> = {
   rollup: FileText,
+  "sprint-rollup": FileText,
   "project-plan": FileType,
   poam: FileSpreadsheet,
 };
@@ -55,7 +56,7 @@ function Artifacts() {
   async function generate(kind: ArtifactKind) {
     setBusy(kind);
     try {
-      const out = await run({ data: kind });
+      const out = await run({ data: { kind, programId: program.id } });
       setLast((p) => ({ ...p, [kind]: out }));
       download(out);
       toast.success(`${out.filename} generated`);
@@ -73,7 +74,7 @@ function Artifacts() {
         subtitle={`Formal documents generated from the ${program.domainLabel} program model. Every one is a draft to review, not a finished deliverable.`}
       />
 
-      <div className="px-6 pb-10 pt-2">
+      <div className="px-4 pb-10 pt-2 sm:px-6">
         <div
           className="mb-5 rounded-md p-3 text-[12px]"
           style={{ backgroundColor: "#f7f7f5", border: "1px solid #e5e5e2", color: "#565c65" }}

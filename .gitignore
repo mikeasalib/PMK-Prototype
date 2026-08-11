@@ -19,6 +19,12 @@ dist-ssr
 # Local env — never commit
 .env
 
+# Scratchpad raw MCP dumps — not the scripts, just the transient payloads.
+# The refresh script (scratchpad/build-snapshots.py) is checked in so a
+# refresh is reproducible; the *.raw.json files it consumes are not, since
+# they change every time we re-pull.
+scratchpad/*.raw.json
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars

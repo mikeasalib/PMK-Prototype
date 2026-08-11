@@ -20,12 +20,11 @@ export const Route = createFileRoute("/p/$programId/activity")({
   component: ActivityFeed,
 });
 
-type Kind = "linear" | "notion" | "granola";
+type Kind = "linear" | "notion";
 
 const KIND_META: Record<Kind, { label: string; color: string }> = {
   linear: { label: "Linear", color: "#4a3fb5" },
   notion: { label: "Notion", color: "#2e6b2f" },
-  granola: { label: "Granola", color: "#8a5a00" },
 };
 
 type Event = {
@@ -39,7 +38,7 @@ type Event = {
 
 function ActivityFeed() {
   const program = useProgram();
-  const { linear, notion, granola, isLoading } = useStoredData();
+  const { linear, notion, isLoading, origin } = useStoredData(program.id);
   const [kind, setKind] = useState<Kind | "all">("all");
 
   const events: Event[] = useMemo(() => {
@@ -65,18 +64,8 @@ function ActivityFeed() {
         url: n.url,
       });
     }
-    for (const g of granola) {
-      if (!g.source_updated_at) continue;
-      out.push({
-        ts: g.source_updated_at,
-        kind: "granola",
-        title: g.title,
-        detail: "Meeting captured",
-        url: g.url,
-      });
-    }
     return out.sort((a, b) => b.ts.localeCompare(a.ts));
-  }, [linear, notion, granola]);
+  }, [linear, notion, program]);
 
   const filtered = kind === "all" ? events : events.filter((e) => e.kind === kind);
 
@@ -94,7 +83,11 @@ function ActivityFeed() {
     <AppLayout>
       <PageHeader
         title="Activity feed"
-        subtitle="Everything that changed, newest first — live from all three sources."
+        subtitle={
+          origin === "snapshot"
+            ? "Everything that changed, newest first — from a captured snapshot."
+            : "Everything that changed, newest first — live from Linear and Notion."
+        }
       />
       <div
         className="flex flex-wrap items-center gap-3 px-6 py-3"
@@ -103,7 +96,7 @@ function ActivityFeed() {
         <span className="text-[11px] uppercase tracking-wide" style={{ color: "#666" }}>
           Source
         </span>
-        {(["all", "linear", "notion", "granola"] as const).map((k) => {
+        {(["all", "linear", "notion"] as const).map((k) => {
           const active = kind === k;
           const c = k === "all" ? "#3a5a40" : KIND_META[k].color;
           return (
@@ -131,7 +124,7 @@ function ActivityFeed() {
           Loading live data…
         </div>
       ) : (
-        <div className="p-6 space-y-4">
+        <div className="p-4 space-y-4 sm:p-6">
           {grouped.map(([date, items]) => (
             <section key={date}>
               <div

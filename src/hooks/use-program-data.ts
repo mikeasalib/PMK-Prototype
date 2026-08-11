@@ -5,7 +5,7 @@ import { syncAll, getSyncedSnapshot, type SyncResult, type SyncSourceStatus } fr
 
 const AUTO_TICK_MS = 60 * 1000;
 
-export function useProgramData() {
+export function useProgramData(programId: string) {
   const qc = useQueryClient();
   const fetchSnapshot = useServerFn(getSyncedSnapshot);
   const runSync = useServerFn(syncAll);
@@ -13,8 +13,11 @@ export function useProgramData() {
   const [, setTick] = useState(0);
 
   const { data } = useQuery({
-    queryKey: ["sync-snapshot"],
-    queryFn: () => fetchSnapshot(),
+    // Keyed by program: source status is per-program (different Linear project,
+    // different Notion hub), so a shared key served the previous program's
+    // status after a switch.
+    queryKey: ["sync-snapshot", programId],
+    queryFn: () => fetchSnapshot({ data: programId }),
     staleTime: 30_000,
   });
 
@@ -26,20 +29,20 @@ export function useProgramData() {
   const refresh = useCallback(async (): Promise<SyncResult> => {
     setIsRefreshing(true);
     try {
-      const result = await runSync();
+      const result = await runSync({ data: programId });
       await qc.invalidateQueries({ queryKey: ["sync-snapshot"] });
       await qc.invalidateQueries({ queryKey: ["stored-data"] });
       return result;
     } finally {
       setIsRefreshing(false);
     }
-  }, [runSync, qc]);
+  }, [runSync, qc, programId]);
 
   const sources: SyncSourceStatus[] = data?.sources ?? [];
   return {
     lastSyncedAt: data?.syncedAt ?? null,
     sources,
-    counts: data?.counts ?? { linear: 0, notion: 0, granola: 0 },
+    counts: data?.counts ?? { linear: 0, notion: 0 },
     isRefreshing,
     refresh,
   };

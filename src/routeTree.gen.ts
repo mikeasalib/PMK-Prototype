@@ -9,22 +9,46 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CLoginRouteImport } from './routes/c/login'
+import { Route as CProgramIdRouteImport } from './routes/c/$programId'
 import { Route as PProgramIdRouteRouteImport } from './routes/p/$programId/route'
 import { Route as PProgramIdIndexRouteImport } from './routes/p/$programId/index'
+import { Route as CProgramIdIndexRouteImport } from './routes/c/$programId/index'
 import { Route as PProgramIdTeamTasksRouteImport } from './routes/p/$programId/team-tasks'
 import { Route as PProgramIdStakeholdersRouteImport } from './routes/p/$programId/stakeholders'
 import { Route as PProgramIdSprintBoardRouteImport } from './routes/p/$programId/sprint-board'
+import { Route as PProgramIdSearchRouteImport } from './routes/p/$programId/search'
 import { Route as PProgramIdRisksRouteImport } from './routes/p/$programId/risks'
 import { Route as PProgramIdProgramOverviewRouteImport } from './routes/p/$programId/program-overview'
 import { Route as PProgramIdLifecycleRouteImport } from './routes/p/$programId/lifecycle'
+import { Route as PProgramIdFollowUpsRouteImport } from './routes/p/$programId/follow-ups'
 import { Route as PProgramIdDependenciesRouteImport } from './routes/p/$programId/dependencies'
+import { Route as PProgramIdCustomerHealthRouteImport } from './routes/p/$programId/customer-health'
+import { Route as PProgramIdBriefRouteImport } from './routes/p/$programId/brief'
 import { Route as PProgramIdArtifactsRouteImport } from './routes/p/$programId/artifacts'
 import { Route as PProgramIdActivityRouteImport } from './routes/p/$programId/activity'
+import { Route as CProgramIdHistoryRouteImport } from './routes/c/$programId/history'
 
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CLoginRoute = CLoginRouteImport.update({
+  id: '/c/login',
+  path: '/c/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CProgramIdRoute = CProgramIdRouteImport.update({
+  id: '/c/$programId',
+  path: '/c/$programId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PProgramIdRouteRoute = PProgramIdRouteRouteImport.update({
@@ -36,6 +60,11 @@ const PProgramIdIndexRoute = PProgramIdIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => PProgramIdRouteRoute,
+} as any)
+const CProgramIdIndexRoute = CProgramIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => CProgramIdRoute,
 } as any)
 const PProgramIdTeamTasksRoute = PProgramIdTeamTasksRouteImport.update({
   id: '/team-tasks',
@@ -50,6 +79,11 @@ const PProgramIdStakeholdersRoute = PProgramIdStakeholdersRouteImport.update({
 const PProgramIdSprintBoardRoute = PProgramIdSprintBoardRouteImport.update({
   id: '/sprint-board',
   path: '/sprint-board',
+  getParentRoute: () => PProgramIdRouteRoute,
+} as any)
+const PProgramIdSearchRoute = PProgramIdSearchRouteImport.update({
+  id: '/search',
+  path: '/search',
   getParentRoute: () => PProgramIdRouteRoute,
 } as any)
 const PProgramIdRisksRoute = PProgramIdRisksRouteImport.update({
@@ -68,9 +102,25 @@ const PProgramIdLifecycleRoute = PProgramIdLifecycleRouteImport.update({
   path: '/lifecycle',
   getParentRoute: () => PProgramIdRouteRoute,
 } as any)
+const PProgramIdFollowUpsRoute = PProgramIdFollowUpsRouteImport.update({
+  id: '/follow-ups',
+  path: '/follow-ups',
+  getParentRoute: () => PProgramIdRouteRoute,
+} as any)
 const PProgramIdDependenciesRoute = PProgramIdDependenciesRouteImport.update({
   id: '/dependencies',
   path: '/dependencies',
+  getParentRoute: () => PProgramIdRouteRoute,
+} as any)
+const PProgramIdCustomerHealthRoute =
+  PProgramIdCustomerHealthRouteImport.update({
+    id: '/customer-health',
+    path: '/customer-health',
+    getParentRoute: () => PProgramIdRouteRoute,
+  } as any)
+const PProgramIdBriefRoute = PProgramIdBriefRouteImport.update({
+  id: '/brief',
+  path: '/brief',
   getParentRoute: () => PProgramIdRouteRoute,
 } as any)
 const PProgramIdArtifactsRoute = PProgramIdArtifactsRouteImport.update({
@@ -83,105 +133,186 @@ const PProgramIdActivityRoute = PProgramIdActivityRouteImport.update({
   path: '/activity',
   getParentRoute: () => PProgramIdRouteRoute,
 } as any)
+const CProgramIdHistoryRoute = CProgramIdHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => CProgramIdRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/p/$programId': typeof PProgramIdRouteRouteWithChildren
+  '/c/$programId': typeof CProgramIdRouteWithChildren
+  '/c/login': typeof CLoginRoute
+  '/c/$programId/history': typeof CProgramIdHistoryRoute
   '/p/$programId/activity': typeof PProgramIdActivityRoute
   '/p/$programId/artifacts': typeof PProgramIdArtifactsRoute
+  '/p/$programId/brief': typeof PProgramIdBriefRoute
+  '/p/$programId/customer-health': typeof PProgramIdCustomerHealthRoute
   '/p/$programId/dependencies': typeof PProgramIdDependenciesRoute
+  '/p/$programId/follow-ups': typeof PProgramIdFollowUpsRoute
   '/p/$programId/lifecycle': typeof PProgramIdLifecycleRoute
   '/p/$programId/program-overview': typeof PProgramIdProgramOverviewRoute
   '/p/$programId/risks': typeof PProgramIdRisksRoute
+  '/p/$programId/search': typeof PProgramIdSearchRoute
   '/p/$programId/sprint-board': typeof PProgramIdSprintBoardRoute
   '/p/$programId/stakeholders': typeof PProgramIdStakeholdersRoute
   '/p/$programId/team-tasks': typeof PProgramIdTeamTasksRoute
+  '/c/$programId/': typeof CProgramIdIndexRoute
   '/p/$programId/': typeof PProgramIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/c/login': typeof CLoginRoute
+  '/c/$programId/history': typeof CProgramIdHistoryRoute
   '/p/$programId/activity': typeof PProgramIdActivityRoute
   '/p/$programId/artifacts': typeof PProgramIdArtifactsRoute
+  '/p/$programId/brief': typeof PProgramIdBriefRoute
+  '/p/$programId/customer-health': typeof PProgramIdCustomerHealthRoute
   '/p/$programId/dependencies': typeof PProgramIdDependenciesRoute
+  '/p/$programId/follow-ups': typeof PProgramIdFollowUpsRoute
   '/p/$programId/lifecycle': typeof PProgramIdLifecycleRoute
   '/p/$programId/program-overview': typeof PProgramIdProgramOverviewRoute
   '/p/$programId/risks': typeof PProgramIdRisksRoute
+  '/p/$programId/search': typeof PProgramIdSearchRoute
   '/p/$programId/sprint-board': typeof PProgramIdSprintBoardRoute
   '/p/$programId/stakeholders': typeof PProgramIdStakeholdersRoute
   '/p/$programId/team-tasks': typeof PProgramIdTeamTasksRoute
+  '/c/$programId': typeof CProgramIdIndexRoute
   '/p/$programId': typeof PProgramIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/p/$programId': typeof PProgramIdRouteRouteWithChildren
+  '/c/$programId': typeof CProgramIdRouteWithChildren
+  '/c/login': typeof CLoginRoute
+  '/c/$programId/history': typeof CProgramIdHistoryRoute
   '/p/$programId/activity': typeof PProgramIdActivityRoute
   '/p/$programId/artifacts': typeof PProgramIdArtifactsRoute
+  '/p/$programId/brief': typeof PProgramIdBriefRoute
+  '/p/$programId/customer-health': typeof PProgramIdCustomerHealthRoute
   '/p/$programId/dependencies': typeof PProgramIdDependenciesRoute
+  '/p/$programId/follow-ups': typeof PProgramIdFollowUpsRoute
   '/p/$programId/lifecycle': typeof PProgramIdLifecycleRoute
   '/p/$programId/program-overview': typeof PProgramIdProgramOverviewRoute
   '/p/$programId/risks': typeof PProgramIdRisksRoute
+  '/p/$programId/search': typeof PProgramIdSearchRoute
   '/p/$programId/sprint-board': typeof PProgramIdSprintBoardRoute
   '/p/$programId/stakeholders': typeof PProgramIdStakeholdersRoute
   '/p/$programId/team-tasks': typeof PProgramIdTeamTasksRoute
+  '/c/$programId/': typeof CProgramIdIndexRoute
   '/p/$programId/': typeof PProgramIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/login'
     | '/p/$programId'
+    | '/c/$programId'
+    | '/c/login'
+    | '/c/$programId/history'
     | '/p/$programId/activity'
     | '/p/$programId/artifacts'
+    | '/p/$programId/brief'
+    | '/p/$programId/customer-health'
     | '/p/$programId/dependencies'
+    | '/p/$programId/follow-ups'
     | '/p/$programId/lifecycle'
     | '/p/$programId/program-overview'
     | '/p/$programId/risks'
+    | '/p/$programId/search'
     | '/p/$programId/sprint-board'
     | '/p/$programId/stakeholders'
     | '/p/$programId/team-tasks'
+    | '/c/$programId/'
     | '/p/$programId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/login'
+    | '/c/login'
+    | '/c/$programId/history'
     | '/p/$programId/activity'
     | '/p/$programId/artifacts'
+    | '/p/$programId/brief'
+    | '/p/$programId/customer-health'
     | '/p/$programId/dependencies'
+    | '/p/$programId/follow-ups'
     | '/p/$programId/lifecycle'
     | '/p/$programId/program-overview'
     | '/p/$programId/risks'
+    | '/p/$programId/search'
     | '/p/$programId/sprint-board'
     | '/p/$programId/stakeholders'
     | '/p/$programId/team-tasks'
+    | '/c/$programId'
     | '/p/$programId'
   id:
     | '__root__'
     | '/'
+    | '/login'
     | '/p/$programId'
+    | '/c/$programId'
+    | '/c/login'
+    | '/c/$programId/history'
     | '/p/$programId/activity'
     | '/p/$programId/artifacts'
+    | '/p/$programId/brief'
+    | '/p/$programId/customer-health'
     | '/p/$programId/dependencies'
+    | '/p/$programId/follow-ups'
     | '/p/$programId/lifecycle'
     | '/p/$programId/program-overview'
     | '/p/$programId/risks'
+    | '/p/$programId/search'
     | '/p/$programId/sprint-board'
     | '/p/$programId/stakeholders'
     | '/p/$programId/team-tasks'
+    | '/c/$programId/'
     | '/p/$programId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LoginRoute: typeof LoginRoute
   PProgramIdRouteRoute: typeof PProgramIdRouteRouteWithChildren
+  CProgramIdRoute: typeof CProgramIdRouteWithChildren
+  CLoginRoute: typeof CLoginRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/c/login': {
+      id: '/c/login'
+      path: '/c/login'
+      fullPath: '/c/login'
+      preLoaderRoute: typeof CLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/c/$programId': {
+      id: '/c/$programId'
+      path: '/c/$programId'
+      fullPath: '/c/$programId'
+      preLoaderRoute: typeof CProgramIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/p/$programId': {
@@ -197,6 +328,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/p/$programId/'
       preLoaderRoute: typeof PProgramIdIndexRouteImport
       parentRoute: typeof PProgramIdRouteRoute
+    }
+    '/c/$programId/': {
+      id: '/c/$programId/'
+      path: '/'
+      fullPath: '/c/$programId/'
+      preLoaderRoute: typeof CProgramIdIndexRouteImport
+      parentRoute: typeof CProgramIdRoute
     }
     '/p/$programId/team-tasks': {
       id: '/p/$programId/team-tasks'
@@ -217,6 +355,13 @@ declare module '@tanstack/react-router' {
       path: '/sprint-board'
       fullPath: '/p/$programId/sprint-board'
       preLoaderRoute: typeof PProgramIdSprintBoardRouteImport
+      parentRoute: typeof PProgramIdRouteRoute
+    }
+    '/p/$programId/search': {
+      id: '/p/$programId/search'
+      path: '/search'
+      fullPath: '/p/$programId/search'
+      preLoaderRoute: typeof PProgramIdSearchRouteImport
       parentRoute: typeof PProgramIdRouteRoute
     }
     '/p/$programId/risks': {
@@ -240,11 +385,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PProgramIdLifecycleRouteImport
       parentRoute: typeof PProgramIdRouteRoute
     }
+    '/p/$programId/follow-ups': {
+      id: '/p/$programId/follow-ups'
+      path: '/follow-ups'
+      fullPath: '/p/$programId/follow-ups'
+      preLoaderRoute: typeof PProgramIdFollowUpsRouteImport
+      parentRoute: typeof PProgramIdRouteRoute
+    }
     '/p/$programId/dependencies': {
       id: '/p/$programId/dependencies'
       path: '/dependencies'
       fullPath: '/p/$programId/dependencies'
       preLoaderRoute: typeof PProgramIdDependenciesRouteImport
+      parentRoute: typeof PProgramIdRouteRoute
+    }
+    '/p/$programId/customer-health': {
+      id: '/p/$programId/customer-health'
+      path: '/customer-health'
+      fullPath: '/p/$programId/customer-health'
+      preLoaderRoute: typeof PProgramIdCustomerHealthRouteImport
+      parentRoute: typeof PProgramIdRouteRoute
+    }
+    '/p/$programId/brief': {
+      id: '/p/$programId/brief'
+      path: '/brief'
+      fullPath: '/p/$programId/brief'
+      preLoaderRoute: typeof PProgramIdBriefRouteImport
       parentRoute: typeof PProgramIdRouteRoute
     }
     '/p/$programId/artifacts': {
@@ -261,16 +427,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PProgramIdActivityRouteImport
       parentRoute: typeof PProgramIdRouteRoute
     }
+    '/c/$programId/history': {
+      id: '/c/$programId/history'
+      path: '/history'
+      fullPath: '/c/$programId/history'
+      preLoaderRoute: typeof CProgramIdHistoryRouteImport
+      parentRoute: typeof CProgramIdRoute
+    }
   }
 }
 
 interface PProgramIdRouteRouteChildren {
   PProgramIdActivityRoute: typeof PProgramIdActivityRoute
   PProgramIdArtifactsRoute: typeof PProgramIdArtifactsRoute
+  PProgramIdBriefRoute: typeof PProgramIdBriefRoute
+  PProgramIdCustomerHealthRoute: typeof PProgramIdCustomerHealthRoute
   PProgramIdDependenciesRoute: typeof PProgramIdDependenciesRoute
+  PProgramIdFollowUpsRoute: typeof PProgramIdFollowUpsRoute
   PProgramIdLifecycleRoute: typeof PProgramIdLifecycleRoute
   PProgramIdProgramOverviewRoute: typeof PProgramIdProgramOverviewRoute
   PProgramIdRisksRoute: typeof PProgramIdRisksRoute
+  PProgramIdSearchRoute: typeof PProgramIdSearchRoute
   PProgramIdSprintBoardRoute: typeof PProgramIdSprintBoardRoute
   PProgramIdStakeholdersRoute: typeof PProgramIdStakeholdersRoute
   PProgramIdTeamTasksRoute: typeof PProgramIdTeamTasksRoute
@@ -280,10 +457,14 @@ interface PProgramIdRouteRouteChildren {
 const PProgramIdRouteRouteChildren: PProgramIdRouteRouteChildren = {
   PProgramIdActivityRoute: PProgramIdActivityRoute,
   PProgramIdArtifactsRoute: PProgramIdArtifactsRoute,
+  PProgramIdBriefRoute: PProgramIdBriefRoute,
+  PProgramIdCustomerHealthRoute: PProgramIdCustomerHealthRoute,
   PProgramIdDependenciesRoute: PProgramIdDependenciesRoute,
+  PProgramIdFollowUpsRoute: PProgramIdFollowUpsRoute,
   PProgramIdLifecycleRoute: PProgramIdLifecycleRoute,
   PProgramIdProgramOverviewRoute: PProgramIdProgramOverviewRoute,
   PProgramIdRisksRoute: PProgramIdRisksRoute,
+  PProgramIdSearchRoute: PProgramIdSearchRoute,
   PProgramIdSprintBoardRoute: PProgramIdSprintBoardRoute,
   PProgramIdStakeholdersRoute: PProgramIdStakeholdersRoute,
   PProgramIdTeamTasksRoute: PProgramIdTeamTasksRoute,
@@ -294,9 +475,26 @@ const PProgramIdRouteRouteWithChildren = PProgramIdRouteRoute._addFileChildren(
   PProgramIdRouteRouteChildren,
 )
 
+interface CProgramIdRouteChildren {
+  CProgramIdHistoryRoute: typeof CProgramIdHistoryRoute
+  CProgramIdIndexRoute: typeof CProgramIdIndexRoute
+}
+
+const CProgramIdRouteChildren: CProgramIdRouteChildren = {
+  CProgramIdHistoryRoute: CProgramIdHistoryRoute,
+  CProgramIdIndexRoute: CProgramIdIndexRoute,
+}
+
+const CProgramIdRouteWithChildren = CProgramIdRoute._addFileChildren(
+  CProgramIdRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LoginRoute: LoginRoute,
   PProgramIdRouteRoute: PProgramIdRouteRouteWithChildren,
+  CProgramIdRoute: CProgramIdRouteWithChildren,
+  CLoginRoute: CLoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

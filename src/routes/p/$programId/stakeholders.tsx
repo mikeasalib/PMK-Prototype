@@ -28,7 +28,7 @@ function Stakeholders() {
         subtitle="Who's who across VA and GovCIO, and what the acronyms mean when they show up in notes."
       />
 
-      <div className="px-6 pt-4">
+      <div className="px-4 pt-4 sm:px-6">
         <div
           className="inline-flex rounded-md text-[12px] font-medium"
           style={{ border: "1px solid #d5d5d0", backgroundColor: "#fff" }}

@@ -67,50 +67,75 @@ export async function assembleProgramModel(
   const { sourcesFor } = await import("./program.sources.server");
   const src = sourcesFor(program.id);
 
-  // ---- Linear work items, from the synced cache
+  // ---- Linear work items, read directly from Linear's API. Was a Supabase
+  //      mirror read, which could never succeed: no Supabase instance sits
+  //      behind this deployment, so every read failed and fell through to the
+  //      snapshot while the footer reported "not synced".
   let workItems: WorkItemRecord[] = [];
+  let liveIssuesLoaded = false;
   if (!src.linear) {
     sources.push({
       key: "linear",
       ok: false,
       message: "no Linear project configured for this program",
     });
-  } else
-    try {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data, error } = await supabaseAdmin
-        .from("linear_issues")
-        .select(
-          "source_id, identifier, title, state_name, state_type, priority, assignee, workstream, labels, url, due_date, source_created_at, synced_at",
-        )
-        .order("source_updated_at", { ascending: false });
-      if (error) throw new Error(error.message);
+  } else {
+    const { readLinearIssues, linearConfigured } = await import("./sources.direct.server");
+    if (!linearConfigured()) {
+      sources.push({ key: "linear", ok: false, message: "LINEAR_API_KEY not set" });
+    } else {
+      const read = await readLinearIssues(program.id);
+      if (read && read.rows.length > 0) {
+        const { classifyWorkstreamDetailed } = await import("./program.config");
+        workItems = read.rows.map((r) => {
+          const a = classifyWorkstreamDetailed(r.title, r.workstream, program);
+          return workItemFromLinear(r, bucketOf(r.state_type), a.workstream, a.basis);
+        });
+        liveIssuesLoaded = true;
+        sources.push({
+          key: "linear",
+          ok: true,
+          message: `${workItems.length} issues (live read ${read.readAt})`,
+        });
+      } else {
+        sources.push({ key: "linear", ok: false, message: "live read returned nothing" });
+      }
+    }
+  }
 
+  // Snapshot fallback for work items — mirrors sync.functions.ts's rule.
+  // Keeps every artifact renderable when no token is configured. The origin
+  // travels into the provenance footer, so a rollup built off a snapshot says
+  // so rather than presenting captured rows as a live read.
+  if (!liveIssuesLoaded) {
+    const { snapshotFor, snapshotFallbackAllowed } = await import("./snapshots");
+    const snap = snapshotFallbackAllowed() ? snapshotFor(program.id) : null;
+    if (snap && snap.linear_issues.length > 0) {
       const { classifyWorkstreamDetailed } = await import("./program.config");
-      workItems = (data ?? []).map((r) => {
+      workItems = snap.linear_issues.map((r) => {
         const a = classifyWorkstreamDetailed(r.title, r.workstream, program);
         return workItemFromLinear(r, bucketOf(r.state_type), a.workstream, a.basis);
       });
-      sources.push({ key: "linear", ok: true, message: `${workItems.length} issues` });
-    } catch (e) {
-      sources.push({ key: "linear", ok: false, message: (e as Error).message });
+      sources.push({
+        key: "linear:snapshot",
+        ok: true,
+        message: `${workItems.length} issues (captured ${snap.fetchedAt})`,
+      });
     }
+  }
 
   // ---- Linear project milestones. The real dated backbone; falls back to
   //      config only if Linear has none, and says which was used.
   let milestones = milestonesFromConfig(program, asOf);
   let milestoneOrigin = "config";
   try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin
-      .from("linear_milestones")
-      .select("source_id, name, target_date, progress, url, synced_at")
-      .order("target_date", { ascending: true });
-    if (error) throw new Error(error.message);
+    const { readLinearMilestones } = await import("./sources.direct.server");
+    const read = await readLinearMilestones(program.id);
+    const rows = read?.rows ?? [];
 
-    if (data?.length) {
+    if (rows.length) {
       const { milestonesFromLinear } = await import("./program-model.adapters");
-      const out = milestonesFromLinear(data, asOf);
+      const out = milestonesFromLinear(rows, asOf);
       if (out.milestones.length) {
         milestones = out.milestones;
         milestoneOrigin = "linear";
@@ -122,11 +147,30 @@ export async function assembleProgramModel(
         message: `${out.milestones.length} milestones${undated}`,
       });
     } else {
-      sources.push({
-        key: "linear:milestones",
-        ok: false,
-        message: "none synced — schedule falls back to config dates",
-      });
+      // Try the captured snapshot before giving up on real dates. Ventura
+      // genuinely has zero Linear milestones, so an empty result is accurate
+      // there and the config fallback is correct.
+      const { snapshotFor, snapshotFallbackAllowed } = await import("./snapshots");
+      const snap = snapshotFallbackAllowed() ? snapshotFor(program.id) : null;
+      if (snap && snap.linear_milestones.length > 0) {
+        const { milestonesFromLinear } = await import("./program-model.adapters");
+        const out = milestonesFromLinear(snap.linear_milestones, asOf);
+        if (out.milestones.length) {
+          milestones = out.milestones;
+          milestoneOrigin = "snapshot";
+        }
+        sources.push({
+          key: "linear:milestones",
+          ok: true,
+          message: `${out.milestones.length} milestones (captured ${snap.fetchedAt})`,
+        });
+      } else {
+        sources.push({
+          key: "linear:milestones",
+          ok: false,
+          message: "none available — schedule falls back to config dates",
+        });
+      }
     }
   } catch (e) {
     sources.push({

@@ -9,7 +9,7 @@ import {
   type StoredLinearIssue,
 } from "@/hooks/use-stored-data";
 import { relativeTime } from "@/hooks/use-program-data";
-import { PROGRAMS, pageTitle, workstreamOf } from "@/lib/program.config";
+import { PROGRAMS, pageTitle, upcomingMilestones, workstreamOf } from "@/lib/program.config";
 import { daysUntilLocal, shortDate } from "@/lib/local-date";
 import { useProgram } from "./route";
 
@@ -32,7 +32,7 @@ const daysUntil = daysUntilLocal;
 
 function WhatsImportant() {
   const program = useProgram();
-  const { linear, isLoading } = useStoredData();
+  const { linear, isLoading, origin } = useStoredData(program.id);
 
   const active = linear.filter((i) => bucketOf(i) === "in_progress");
   const blocked = linear.filter((i) => {
@@ -58,12 +58,18 @@ function WhatsImportant() {
     <AppLayout>
       <PageHeader
         title="What's important"
-        subtitle="The top hits of ongoing work — live from Linear, Notion, and Granola."
+        subtitle={
+          // Do not claim "live" when the rows came from a capture. The origin is
+          // known, so say which.
+          origin === "snapshot"
+            ? "The top hits of ongoing work — from a captured snapshot, not a live read."
+            : "The top hits of ongoing work — live from Linear, Notion, and Granola."
+        }
       />
 
       {/* Headline KPIs */}
       <div
-        className="grid grid-cols-4 gap-3 px-6 py-4"
+        className="grid grid-cols-2 gap-3 px-4 py-4 sm:px-6 md:grid-cols-4"
         style={{ borderBottom: "1px solid #dfe1e2", backgroundColor: "#f7f7f5" }}
       >
         <Kpi
@@ -87,7 +93,7 @@ function WhatsImportant() {
           Loading live data…
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 p-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 p-4 sm:p-6 lg:grid-cols-2">
           {/* Active work */}
           <Panel title={`Active right now (${active.length})`} accent="#005ea2">
             {active.length === 0 ? (
@@ -130,36 +136,16 @@ function WhatsImportant() {
           {/* Next milestones */}
           <Panel title="Next milestones" accent="#3a5a40">
             <ul className="space-y-2 text-[12px]">
-              {/* Was four hardcoded rows with a literal 2026-07-31 and VA
-                  wording ("Sprint 5 start", "Code freeze"), which rendered VA's
-                  schedule on every program. Now the program's own strip plus its
-                  own named dates, nearest first. */}
-              {[
-                ...program.sprintStrip.map((s) => ({
-                  label: s.start === s.end ? s.label : `${s.label} end`,
-                  date: s.end,
-                })),
-                ...program.namedMilestones.map((m) => ({ label: m.label, date: m.date })),
-              ]
-                .sort((a, b) => a.date.localeCompare(b.date))
-                // "Next" means upcoming. Taking the earliest four showed Ventura
-                // its July gates, both already passed, while hiding the Dec 1
-                // launch. Pad from the past only if there is nothing ahead, so
-                // the panel is never empty on a finished program.
-                .reduce<Array<{ label: string; date: string }>>((acc, m, _i, all) => {
-                  if (acc.length) return acc;
-                  const todayIso = new Date().toISOString().slice(0, 10);
-                  const ahead = all.filter((x) => x.date >= todayIso).slice(0, 4);
-                  return ahead.length ? ahead : all.slice(-4);
-                }, [])
-                .map((m) => (
-                  <MilestoneRow
-                    key={`${m.label}-${m.date}`}
-                    label={m.label}
-                    date={m.date}
-                    danger={m.date === program.keyDates.launch}
-                  />
-                ))}
+              {/* Shared helper — same upcoming-milestone logic as the Program
+                  Overview, from the program's own strip and named dates. */}
+              {upcomingMilestones(program, new Date().toISOString().slice(0, 10)).map((m) => (
+                <MilestoneRow
+                  key={`${m.label}-${m.date}`}
+                  label={m.label}
+                  date={m.date}
+                  danger={m.date === program.keyDates.launch}
+                />
+              ))}
             </ul>
           </Panel>
         </div>

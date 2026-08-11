@@ -7,7 +7,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 
-export type ArtifactKind = "rollup" | "project-plan" | "poam";
+export type ArtifactKind = "rollup" | "sprint-rollup" | "project-plan" | "poam";
 
 export interface ArtifactMeta {
   kind: ArtifactKind;
@@ -24,6 +24,14 @@ export const ARTIFACTS: ArtifactMeta[] = [
     description:
       "Where the program stands, what gates are coming, and the open risk register. Markdown, for pasting into Notion or an email.",
     filename: "weekly-rollup.md",
+    mime: "text/markdown",
+  },
+  {
+    kind: "sprint-rollup",
+    title: "Sprint status rollup",
+    description:
+      "Task-oriented, checkbox-driven view of the current sprint (or phase). Grouped by workstream, includes a waiting-on-external table and an in-flight watch list. Markdown, drops cleanly into Notion.",
+    filename: "sprint-rollup.md",
     mime: "text/markdown",
   },
   {
@@ -60,11 +68,17 @@ export interface GeneratedArtifact {
   rowCount?: number;
 }
 
+export interface GenerateArtifactInput {
+  kind: ArtifactKind;
+  programId: string;
+}
+
 export const generateArtifact = createServerFn({ method: "POST" })
-  .inputValidator((kind: ArtifactKind) => kind)
-  .handler(async ({ data: kind }): Promise<GeneratedArtifact> => {
+  .inputValidator((input: GenerateArtifactInput) => input)
+  .handler(async ({ data }): Promise<GeneratedArtifact> => {
+    const { kind, programId } = data;
     const { assembleProgramModel } = await import("./program-model.server");
-    const { model, gates, sources } = await assembleProgramModel();
+    const { model, gates, sources } = await assembleProgramModel(programId);
 
     const meta = ARTIFACTS.find((a) => a.kind === kind);
     if (!meta) throw new Error(`unknown artifact: ${kind}`);
@@ -85,6 +99,24 @@ export const generateArtifact = createServerFn({ method: "POST" })
     if (kind === "rollup") {
       const { renderWeeklyRollup } = await import("./artifacts/weekly-rollup");
       const md = renderWeeklyRollup(model, { asOf, gates });
+      return { ...base, data: Buffer.from(md, "utf8").toString("base64") };
+    }
+
+    if (kind === "sprint-rollup") {
+      const { renderSprintRollup } = await import("./artifacts/sprint-rollup");
+      const { programById } = await import("./program.config");
+      const { readNotionTasks } = await import("./sources.direct.server");
+      const { sourcesFor } = await import("./program.sources.server");
+      // Undefined when the program keeps no tracker, so the renderer omits the
+      // section entirely rather than printing an empty one that would imply a
+      // page exists and is clear.
+      const hasTracker = Boolean(sourcesFor(programId).notion?.taskTrackerPageId);
+      const tracker = hasTracker ? await readNotionTasks(programId) : null;
+      const md = renderSprintRollup(model, {
+        asOf,
+        program: programById(programId),
+        trackerTasks: hasTracker ? (tracker?.rows ?? []) : undefined,
+      });
       return { ...base, data: Buffer.from(md, "utf8").toString("base64") };
     }
 

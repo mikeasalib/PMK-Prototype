@@ -1,7 +1,6 @@
 import { createStart, createMiddleware } from "@tanstack/react-start";
 
 import { renderErrorPage } from "./lib/error-page";
-import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 
 const errorMiddleware = createMiddleware().server(async ({ next }) => {
   try {
@@ -19,6 +18,9 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
 });
 
 export const startInstance = createStart(() => ({
-  functionMiddleware: [attachSupabaseAuth],
+  // Supabase auth middleware removed with the mirror architecture. Nothing in
+  // this app authenticates through Supabase: the internal session and the
+  // client-portal session both live in localStorage, and source reads carry
+  // their own API tokens.
   requestMiddleware: [errorMiddleware],
 }));

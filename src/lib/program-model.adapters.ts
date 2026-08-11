@@ -7,6 +7,7 @@
 
 import { PROGRAM, type ProgramConfig } from "./program.config";
 import { LIFECYCLE, type LifecyclePhase } from "./va-data";
+import { recDeploymentPhases } from "./rec-deployment-lifecycle";
 import {
   derivedFrom,
   fromConfig,
@@ -51,9 +52,23 @@ export function derivePhaseState(
  * criteria and VA gates — as if they were its own. A program with no lifecycle
  * seed gets an empty list, and the renderers already mark that as unsourced.
  */
+// Ventura's phases are back-calculated from its Jul 13 go-live using the
+// playbook's target durations, so the pre-launch dates are approximate — actual
+// deployments always run longer. Launch onwards is anchored to the real date.
 const PHASES_BY_PROGRAM: Record<string, LifecyclePhase[]> = {
   va: LIFECYCLE,
+  ventura: recDeploymentPhases("2026-07-13"),
 };
+
+/**
+ * Raw lifecycle rows with startsOn/endsOn, for renderers that need to plot
+ * phases proportionally (Gantt / timeline views). Consumers wanting the
+ * derived-state / gate view should use phasesFromLifecycle instead — that one
+ * strips the raw dates and normalises to PhaseRecord.
+ */
+export function lifecyclePhasesFor(program: ProgramConfig): LifecyclePhase[] {
+  return PHASES_BY_PROGRAM[program.id] ?? [];
+}
 
 export function phasesFromLifecycle(
   program: ProgramConfig = PROGRAM,
@@ -175,13 +190,68 @@ export function looksBlocking(item: Pick<WorkItemRecord, "title" | "labels">): b
   return /\bblock(ed|er|ing)?\b/i.test(item.title);
 }
 
+/** The shape deriveHealth reads from an issue — bucket plus the raw signals. */
+export interface HealthSignalItem {
+  bucket: string;
+  title: string;
+  labels: string[];
+  /** Linear priority: 1 urgent, 2 high, 3 medium, 4 low, 0/none. */
+  priority: number | null;
+  /** YYYY-MM-DD, or null when the issue carries no due date. */
+  dueDate: string | null;
+}
+
+/**
+ * Health for one workstream, derived from real Linear signals rather than a
+ * hand-typed field.
+ *
+ * The burn-down used to read a health value transcribed by hand into
+ * workstream-updates.ts (dated, and absent entirely for any program without that
+ * seed — so every Ventura workstream showed a fake "On track"). This computes it
+ * from what the board actually says:
+ *
+ *   blocked   an open item is a blocker or is past its due date
+ *   at_risk   open urgent/high work is sitting untouched (none in progress), or
+ *             a workstream with several items has finished none
+ *   on_track  otherwise
+ *
+ * Returns null for a workstream with no work — "on track" would overstate an
+ * empty column, so the row shows a dash instead.
+ */
+export function deriveHealth(
+  items: HealthSignalItem[],
+  asOf: string = today(),
+): "on_track" | "at_risk" | "blocked" | null {
+  if (items.length === 0) return null;
+
+  const open = items.filter((i) => i.bucket !== "done" && i.bucket !== "canceled");
+  const anyBlockedOrOverdue = open.some(
+    (i) => looksBlocking(i) || (i.dueDate !== null && i.dueDate < asOf),
+  );
+  if (anyBlockedOrOverdue) return "blocked";
+
+  const openHighPri = open.filter((i) => i.priority === 1 || i.priority === 2);
+  const inProgress = open.filter((i) => i.bucket === "in_progress");
+  const done = items.filter((i) => i.bucket === "done");
+
+  // High-priority work that nobody has started, or a sizable workstream with
+  // nothing finished yet, is at risk without being outright blocked.
+  if (openHighPri.length > 0 && inProgress.length === 0) return "at_risk";
+  if (done.length === 0 && items.length >= 3 && open.length > 0) return "at_risk";
+
+  return "on_track";
+}
+
 /**
  * Gate readiness for every phase that has not closed yet, worst first. This is
  * the "what asteroid is coming at us" list.
  */
 export function upcomingGateReadiness(
   phases: PhaseRecord[],
-  workItems: WorkItemRecord[],
+  // Only the fields the blocker heuristic needs, so a route can pass Linear rows
+  // directly without first building full WorkItemRecords. WorkItemRecord[] still
+  // satisfies this structurally, so the server caller is unchanged.
+  workItems: Array<Pick<WorkItemRecord, "bucket" | "title" | "labels">>,
   opts: {
     asOf?: string;
     exitCriteriaMet?: Record<string, number>;
@@ -215,3 +285,109 @@ export function upcomingGateReadiness(
     })
     .sort((a, b) => b.pressure - a.pressure);
 }
+
+/**
+ * "Sitting untouched" — in-progress items whose last source update is older
+ * than the aging threshold. Answers the strategist's daily question of what
+ * is technically on the board but not actually moving.
+ *
+ * Signal is `source_updated_at` from Linear, not started_at — anyone editing
+ * the description, changing state, or leaving a comment resets the counter,
+ * which matches the intuition of "someone is still touching this." An issue
+ * with no updatedAt at all is excluded rather than counted as maximally
+ * stalled: absent metadata is not the same as absent activity.
+ *
+ * Buckets are chosen for a typical sprint cadence, not tuned per program.
+ * They are on-screen labels; a reader can compare across engagements.
+ */
+export type AgingSeverity = "aging" | "stalled" | "cold";
+export const AGING_THRESHOLD_DAYS = 7;
+
+export interface AgingCandidate {
+  identifier: string;
+  title: string;
+  /** Must be the normalised bucket, i.e. "in_progress" for a stalled item. */
+  bucket: string;
+  updatedAt: string | null;
+  assignee: string | null;
+  priority: number | null;
+  workstream: string;
+  url: string | null;
+}
+
+export interface StalledItem extends AgingCandidate {
+  daysSinceUpdate: number;
+  severity: AgingSeverity;
+}
+
+export function agingSeverity(days: number): AgingSeverity {
+  if (days >= 30) return "cold";
+  if (days >= 14) return "stalled";
+  return "aging";
+}
+
+/**
+ * Filter to in-progress items with an updatedAt older than the threshold,
+ * annotate with days-since and severity, sort oldest first. Ties break on
+ * higher priority (urgent/high) so a stale P1 outranks a stale P4.
+ */
+export function sittingUntouched(items: AgingCandidate[], asOf: string = today()): StalledItem[] {
+  const out: StalledItem[] = [];
+  for (const item of items) {
+    if (item.bucket !== "in_progress") continue;
+    if (!item.updatedAt) continue;
+    const days = daysBetween(item.updatedAt.slice(0, 10), asOf);
+    if (days < AGING_THRESHOLD_DAYS) continue;
+    out.push({ ...item, daysSinceUpdate: days, severity: agingSeverity(days) });
+  }
+  return out.sort((a, b) => {
+    if (b.daysSinceUpdate !== a.daysSinceUpdate) return b.daysSinceUpdate - a.daysSinceUpdate;
+    // Linear priority is 1 urgent, 2 high, 3 medium, 4 low, 0 none. A "0/none"
+    // sorts after 4 so unprioritised ties fall to the bottom.
+    const ap = a.priority && a.priority > 0 ? a.priority : 99;
+    const bp = b.priority && b.priority > 0 ? b.priority : 99;
+    return ap - bp;
+  });
+}
+
+/**
+ * Complement to "No recent updates": items that closed in the last N days.
+ * Answers "what got done this stretch," which reads differently from the
+ * burn-down completed count because that number spans the whole engagement.
+ *
+ * "Closed" means bucket is "done" or "canceled". Canceled items are included
+ * because knowing something was dropped is as useful as knowing something
+ * shipped — the strategist's question is "what left the board," not "what
+ * shipped." The bucket travels through so the panel can label them apart.
+ *
+ * Signal is source_updated_at, same as the aging function. Linear stamps
+ * updatedAt when the state changes to closed, so recentness matches when the
+ * change actually happened rather than when the ticket was opened.
+ */
+export const RECENTLY_CLOSED_WINDOW_DAYS = 14;
+
+export interface ClosedItem extends AgingCandidate {
+  /** Days between updatedAt (closure time in Linear) and asOf. Non-negative. */
+  daysSinceClosed: number;
+}
+
+export function recentlyClosed(
+  items: AgingCandidate[],
+  asOf: string = today(),
+  windowDays: number = RECENTLY_CLOSED_WINDOW_DAYS,
+): ClosedItem[] {
+  const out: ClosedItem[] = [];
+  for (const item of items) {
+    if (item.bucket !== "done" && item.bucket !== "canceled") continue;
+    if (!item.updatedAt) continue;
+    const days = daysBetween(item.updatedAt.slice(0, 10), asOf);
+    // A negative days-since would mean a future timestamp — drop rather than
+    // display "-2d closed", which reads like a bug.
+    if (days < 0 || days > windowDays) continue;
+    out.push({ ...item, daysSinceClosed: days });
+  }
+  // Freshest closures first — the strategist's eye should land on "today"
+  // before "last week."
+  return out.sort((a, b) => a.daysSinceClosed - b.daysSinceClosed);
+}
+

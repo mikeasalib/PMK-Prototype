@@ -64,7 +64,14 @@ export interface ProgramConfig {
   /** Which artifacts this program can produce. A POA&M is a federal compliance
    *  deliverable — offering one for a parks deployment would be nonsense, so
    *  applicability is per-program rather than global. */
-  artifacts: Array<"rollup" | "project-plan" | "poam">;
+  artifacts: Array<"rollup" | "sprint-rollup" | "project-plan" | "poam">;
+  /**
+   * How the program organises time on its overview. VA-style engagements run on
+   * fixed sprints against a launch date; rec deployments run on canonical phases
+   * (Discovery → Configuration → Launch → …) per the Rec Deployment Playbook.
+   * Same visual slot, different concept and data source.
+   */
+  timeAxis: "sprint" | "phase";
   contract: {
     /** Null when the engagement has no contract number (commercial SOW). */
     displayNumber: string | null;
@@ -100,6 +107,30 @@ export interface ProgramConfig {
   unknownWorkstreamColor: string;
   /** How to attribute an issue to a workstream when the source doesn't say. */
   classifier: WorkstreamClassifier;
+  /**
+   * Live dashboards this program embeds from Hex. The embed URL is authored per
+   * program because sentiment signal is per-engagement. Null means the program
+   * hasn't been wired to a Hex project yet; the page renders an honest
+   * "not configured" state rather than a blank iframe. Structured as an object
+   * so additional embeds (adoption, revenue, etc.) can be added without another
+   * top-level field.
+   */
+  hex: {
+    /**
+     * `embedUrl` is the plain-iframe fallback — Hex renders it using whatever
+     * Hex session the viewer's browser already has, and shows a Hex login
+     * screen if the viewer has none. `projectId` unlocks the signed-embed
+     * path, where the server mints a short-lived presigned URL with the
+     * workspace's HEX_API_KEY so viewers without their own Hex accounts can
+     * see the dashboard too. Either can be null — the page discloses which
+     * mode is active.
+     */
+    customerHealth: {
+      embedUrl: string | null;
+      projectLabel: string | null;
+      projectId: string | null;
+    };
+  };
 }
 
 /**
@@ -139,7 +170,8 @@ const VA: ProgramConfig = {
   domainLabel: "VA.gov modernization",
   navColor: "#1f3d2b",
   seal: { src: "/seal-va.png", alt: "Department of Veterans Affairs seal" },
-  artifacts: ["rollup", "project-plan", "poam"],
+  artifacts: ["rollup", "sprint-rollup", "project-plan", "poam"],
+  timeAxis: "sprint",
   contract: {
     displayNumber: "36C10G24D0048",
     fullNumber: "36C10G24D0048 / CLIN 0001",
@@ -234,6 +266,17 @@ const VA: ProgramConfig = {
     ],
     fallback: "Admin",
   },
+  hex: {
+    customerHealth: {
+      // Shared internal Kaizen dashboard — same project across programs. The
+      // "?embedded=true" query strips Hex's own chrome inside the iframe.
+      embedUrl:
+        "https://app.hex.tech/019a7b11-1a43-7884-a5ff-2ec695b681ce/app/Customer-Health-Dashboard-032cHK1fjszRp7QJIy2EGz/latest?embedded=true",
+      projectLabel: "Kaizen Customer Health Dashboard",
+      // Last URL segment of the app path; used by the signed-embed API.
+      projectId: "032cHK1fjszRp7QJIy2EGz",
+    },
+  },
 };
 
 /**
@@ -257,7 +300,8 @@ const VENTURA: ProgramConfig = {
   seal: { src: "/seal-ventura.png", alt: "County of Ventura Parks logo" },
   // No POA&M. It is a federal compliance artifact and has no meaning for a
   // county parks reservation system.
-  artifacts: ["rollup", "project-plan"],
+  artifacts: ["rollup", "sprint-rollup", "project-plan"],
+  timeAxis: "phase",
   contract: {
     // Commercial SOW rather than a federal contract vehicle. AE Will Harrison,
     // closed December 2025, kickoff Jan 6 2026.
@@ -395,6 +439,15 @@ const VENTURA: ProgramConfig = {
     ],
     fallback: "Admin",
   },
+  hex: {
+    customerHealth: {
+      // Shared internal Kaizen dashboard — same project across programs.
+      embedUrl:
+        "https://app.hex.tech/019a7b11-1a43-7884-a5ff-2ec695b681ce/app/Customer-Health-Dashboard-032cHK1fjszRp7QJIy2EGz/latest?embedded=true",
+      projectLabel: "Kaizen Customer Health Dashboard",
+      projectId: "032cHK1fjszRp7QJIy2EGz",
+    },
+  },
 };
 
 /**
@@ -428,7 +481,7 @@ export const PROGRAM: ProgramConfig = PROGRAMS[DEFAULT_PROGRAM_ID];
 
 /** Is this artifact offered for this program? */
 export function artifactApplies(
-  kind: "rollup" | "project-plan" | "poam",
+  kind: "rollup" | "sprint-rollup" | "project-plan" | "poam",
   program: ProgramConfig = PROGRAM,
 ): boolean {
   return program.artifacts.includes(kind);
@@ -555,4 +608,31 @@ export function classifyWorkstreamDetailed(
 /** Page title for a route: "Sprint board — VA Program Intel". */
 export function pageTitle(page: string, program: ProgramConfig): string {
   return `${page} — ${program.appName}`;
+}
+
+/**
+ * The program's own upcoming milestones — the sprint strip plus named key dates,
+ * soonest first. Single source for both the What's Important panel and the
+ * Program Overview "Next milestones", so neither hardcodes labels like "Sprint 5
+ * start" or "Code freeze" that only make sense for VA.
+ *
+ * Dedupes by date with the named milestone winning, because a launch date that
+ * is also the last sprint's end should read as "Public launch", not twice. Falls
+ * back to the most recent past milestones if nothing is ahead, so a finished
+ * program never shows an empty schedule.
+ */
+export function upcomingMilestones(
+  program: ProgramConfig,
+  todayIso: string,
+  limit = 4,
+): Array<{ label: string; date: string }> {
+  const byDate = new Map<string, { label: string; date: string }>();
+  for (const s of program.sprintStrip) {
+    byDate.set(s.end, { label: s.start === s.end ? s.label : `${s.label} end`, date: s.end });
+  }
+  for (const m of program.namedMilestones) byDate.set(m.date, { label: m.label, date: m.date });
+
+  const all = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+  const ahead = all.filter((m) => m.date >= todayIso);
+  return (ahead.length ? ahead : all.slice(-limit)).slice(0, limit);
 }
