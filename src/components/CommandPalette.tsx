@@ -41,13 +41,13 @@ export function CommandPalette() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label="Search (Command K)"
-        title="Search — ⌘K"
+        aria-label="Search or ask Dust (Command K)"
+        title="Search or @ Dust — ⌘K"
         className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition-colors hover:bg-neutral-100"
         style={{ color: "#565c65", border: "1px solid #dfe1e2" }}
       >
         <SearchIcon size={15} />
-        <span className="hidden sm:inline">Search</span>
+        <span className="hidden whitespace-nowrap sm:inline">Search or @ Dust</span>
         <kbd
           className="hidden rounded px-1 text-xs sm:inline"
           style={{ backgroundColor: "#f0f0ec", color: "#8a8a80" }}
@@ -77,6 +77,51 @@ function matchesWordStart(haystack: string, query: string): boolean {
     .some((word) => word.startsWith(q));
 }
 
+/** A question routed to Dust rather than to the local index. */
+function isDustQuery(q: string): boolean {
+  return q.trimStart().startsWith("@");
+}
+
+/**
+ * The @ mode, disclosed rather than silently dead.
+ *
+ * The trigger advertises "@ Dust", so typing @ has to answer for itself. Dust
+ * is not wired to this app yet — there is no connector, no key, no endpoint —
+ * and returning "no matches" would read as though the question had been asked
+ * and had no answer. It says what it is instead, and hands the question over
+ * to Dust in a new tab so the affordance is still worth something today.
+ */
+function DustNotConnected({ question }: { question: string }) {
+  const trimmed = question.trim();
+  return (
+    <div className="px-3 py-5 text-sm">
+      <div className="font-medium" style={{ color: "#1b1b1b" }}>
+        Dust is not connected to this workspace yet
+      </div>
+      <p className="mt-1.5 leading-relaxed" style={{ color: "#565c65" }}>
+        Asking Dust from here needs a connector and an API key. Until that
+        lands, this does not query anything — so it is not going to answer and
+        pretend otherwise.
+      </p>
+      {trimmed ? (
+        <a
+          href={`https://dust.tt/?q=${encodeURIComponent(trimmed)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 inline-block font-medium hover:underline"
+          style={{ color: "#3a5a40" }}
+        >
+          Ask Dust directly: “{trimmed}”
+        </a>
+      ) : (
+        <p className="mt-3" style={{ color: "#8a8a80" }}>
+          Type a question after the @.
+        </p>
+      )}
+    </div>
+  );
+}
+
 type Hit = {
   id: string;
   group: string;
@@ -104,6 +149,8 @@ function PaletteModal({ onClose }: { onClose: () => void }) {
   const hits: Hit[] = useMemo(() => {
     const query = q.trim().toLowerCase();
     if (!query) return [];
+    // @ routes to Dust, not to the local index.
+    if (isDustQuery(q)) return [];
     const out: Hit[] = [];
 
     // Tickets, follow-ups and milestones reuse the same engine the /search page
@@ -216,7 +263,7 @@ function PaletteModal({ onClose }: { onClose: () => void }) {
             ref={inputRef}
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Tickets, follow-ups, people, glossary…"
+            placeholder="Search tickets, people, glossary — or @ Dust to ask"
             className="flex-1 bg-transparent text-sm outline-none"
             style={{ color: "#1b1b1b" }}
           />
@@ -234,8 +281,11 @@ function PaletteModal({ onClose }: { onClose: () => void }) {
         <div className="max-h-[55vh] overflow-y-auto p-2">
           {!q.trim() ? (
             <div className="px-2 py-6 text-center text-sm" style={{ color: "#8a8a80" }}>
-              Type to look up a ticket, follow-up, person, or acronym.
+              Type to look up a ticket, follow-up, person, or acronym — or start
+              with <span style={{ color: "#1b1b1b" }}>@</span> to ask Dust.
             </div>
+          ) : isDustQuery(q) ? (
+            <DustNotConnected question={q.replace(/^@\s*/, "")} />
           ) : grouped.length === 0 ? (
             <div className="px-2 py-6 text-center text-sm" style={{ color: "#8a8a80" }}>
               No matches for “{q.trim()}”.
