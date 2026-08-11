@@ -76,6 +76,21 @@ export function clearSourceCache(): void {
 
 /** True when a Linear token is configured. Callers use this to decide whether
  *  a null result means "not configured" or "call failed". */
+/**
+ * Last error from a live Linear read, for the UI to report.
+ *
+ * readLinearIssues used to swallow its exception and return null, so a rejected
+ * token and an absent one were indistinguishable downstream — the footer told
+ * the user to set LINEAR_API_KEY while the key was set and being 401'd. Module
+ * scope is fine: this is a diagnostic about the process's own credentials, not
+ * per-request state.
+ */
+let lastLinearError: string | null = null;
+
+export function linearLastError(): string | null {
+  return lastLinearError;
+}
+
 export function linearConfigured(): boolean {
   return Boolean(process.env.LINEAR_API_KEY);
 }
@@ -148,8 +163,21 @@ async function linearGraphql<T>(query: string, variables: Record<string, unknown
     body: JSON.stringify({ query, variables }),
   });
   if (!res.ok) {
+    // Pull the human message out rather than pasting the envelope. This used to
+    // append 200 characters of raw JSON, which ended up rendered verbatim in the
+    // sidebar footer.
     const body = await res.text().catch(() => "");
-    throw new Error(`Linear HTTP ${res.status}${body ? ` — ${body.slice(0, 200)}` : ""}`);
+    let detail = "";
+    try {
+      const parsed = JSON.parse(body) as {
+        errors?: Array<{ extensions?: { userPresentableMessage?: string }; message?: string }>;
+      };
+      const first = parsed.errors?.[0];
+      detail = first?.extensions?.userPresentableMessage ?? first?.message ?? "";
+    } catch {
+      detail = body.slice(0, 120);
+    }
+    throw new Error(`HTTP ${res.status}${detail ? ` — ${detail}` : ""}`);
   }
   const json = (await res.json()) as { data?: T; errors?: Array<{ message: string }> };
   if (json.errors?.length) throw new Error(`Linear: ${json.errors[0].message}`);
@@ -173,6 +201,7 @@ export async function readLinearIssues(
 
   try {
     const readAt = new Date().toISOString();
+    lastLinearError = null;
     const rows: DirectLinearIssue[] = [];
     let after: string | undefined;
     do {
@@ -213,7 +242,8 @@ export async function readLinearIssues(
     const out = { rows, readAt };
     store(cacheKey, out);
     return out;
-  } catch {
+  } catch (err) {
+    lastLinearError = err instanceof Error ? err.message : String(err);
     return null;
   }
 }

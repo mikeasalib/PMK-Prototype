@@ -17,7 +17,7 @@ const SOURCES = [
 export function DataSourcesFooter() {
   const program = useProgram();
   const { lastSyncedAt, sources } = useProgramData(program.id);
-  const { origin, capturedAt, capturedFrom, linear } = useStoredData(program.id);
+  const { origin, capturedAt, capturedFrom, linear, liveError } = useStoredData(program.id);
   const statusFor = (k: string) => sources.find((s) => s.key === k);
 
   return (
@@ -77,9 +77,17 @@ export function DataSourcesFooter() {
           style={{ backgroundColor: "rgba(138,90,0,0.22)", color: "#f2d9a8" }}
           title={capturedFrom ?? undefined}
         >
+          {/* Name the actual reason. This said "Set LINEAR_API_KEY" regardless,
+              which was wrong and actively misleading when the key was set and
+              Linear was rejecting it — the fix for a 401 is a new token, not a
+              variable that is already there. */}
           <strong>Captured snapshot, not a live read.</strong> Taken{" "}
-          {capturedAt ? relativeTime(capturedAt) : "unknown"}. Set{" "}
-          <code>LINEAR_API_KEY</code> for a live read.
+          {capturedAt ? relativeTime(capturedAt) : "unknown"}.{" "}
+          {liveError
+            ? liveError.includes("not set")
+              ? "LINEAR_API_KEY is not set."
+              : `Linear refused the live read — ${liveError}`
+            : "Set LINEAR_API_KEY for a live read."}
         </div>
       ) : null}
       {origin === "live" ? (

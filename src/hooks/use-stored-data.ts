@@ -25,6 +25,7 @@ export function useStoredData(programId: string) {
     origin: data?.origin ?? "empty",
     capturedAt: data?.capturedAt ?? null,
     capturedFrom: data?.capturedFrom ?? null,
+    liveError: data?.liveError ?? null,
   };
 }
 

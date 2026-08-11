@@ -45,11 +45,11 @@ const GROUPS: Record<TabGroupKey, { label: string; tabs: TabDef[] }> = {
     ],
   },
   plan: {
-    label: "Plan",
+    label: "Command centre",
     tabs: [
       {
         to: "/p/$programId/program-overview",
-        label: "Command centre",
+        label: "Overview",
         hint: "Where the program stands right now.",
       },
       {

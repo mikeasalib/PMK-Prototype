@@ -146,6 +146,9 @@ export const getNotionTasks = createServerFn({ method: "GET" })
   });
 
 export interface StoredData {
+  /** Set when a live read was attempted and failed, naming the reason. Null when
+   *  the read succeeded or was never attempted. */
+  liveError?: string | null;
   linear: StoredLinearIssue[];
   notion: StoredNotionPage[];
   /** Where these rows came from. The UI must not present a snapshot as live. */
@@ -164,7 +167,9 @@ export const getStoredData = createServerFn({ method: "GET" })
     // never succeed — there is no Supabase instance behind this app, so every
     // "live" read failed and silently fell back, which is why setting
     // NOTION_API_KEY changed nothing.
-    const { readLinearIssues, linearConfigured } = await import("./sources.direct.server");
+    const { readLinearIssues, linearConfigured, linearLastError } = await import(
+      "./sources.direct.server"
+    );
     const live = await readLinearIssues(programId);
     if (live && live.rows.length > 0) {
       return {
@@ -188,7 +193,7 @@ export const getStoredData = createServerFn({ method: "GET" })
         origin: "empty",
         capturedAt: null,
         capturedFrom: linearConfigured()
-          ? "Linear read failed and snapshot fallback is off"
+          ? `Linear read failed (${linearLastError() ?? "unknown"}) and snapshot fallback is off`
           : "LINEAR_API_KEY not set and snapshot fallback is off",
       };
     }
@@ -198,5 +203,9 @@ export const getStoredData = createServerFn({ method: "GET" })
       origin: "snapshot",
       capturedAt: snap.fetchedAt,
       capturedFrom: snap.source,
+      // Why the live read did not win. A rejected token and an absent one need
+      // different fixes, and the footer was advising the second while the first
+      // was true.
+      liveError: linearConfigured() ? linearLastError() : "LINEAR_API_KEY not set",
     };
   });

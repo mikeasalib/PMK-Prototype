@@ -56,7 +56,7 @@ import { useNavPrefs } from "@/hooks/use-nav-prefs";
  * The leading "/p/$programId" is a literal route id, not a template string.
  */
 const NAV = [
-  { to: "/p/$programId/program-overview", label: "Plan", icon: LayoutDashboard },
+  { to: "/p/$programId/program-overview", label: "Command centre", icon: LayoutDashboard },
   {
     to: "/p/$programId/team-tasks",
     label: "Work",
