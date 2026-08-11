@@ -20,6 +20,7 @@ import { seedFor } from "@/lib/program-seed";
 import {
   phasesFromLifecycle,
   upcomingGateReadiness,
+  upcomingSprintGates,
   deriveHealth,
   sittingUntouched,
   recentlyClosed,
@@ -27,6 +28,7 @@ import {
   RECENTLY_CLOSED_WINDOW_DAYS,
   type StalledItem,
   type ClosedItem,
+  type SprintGate,
 } from "@/lib/program-model.adapters";
 import type { GateReadiness, PhaseRecord } from "@/lib/program-model";
 import { useFollowUps } from "@/hooks/use-follow-ups";
@@ -113,11 +115,17 @@ function Overview() {
   // config; the panels below handle that by hiding themselves.
   const phases = phasesFromLifecycle(program, todayIso);
   const currentPhase = phases.find((p) => p.state === "in_progress") ?? null;
-  const gates = upcomingGateReadiness(
-    phases,
-    linear.map((i) => ({ bucket: bucketOf(i), title: i.title, labels: i.labels ?? [] })),
-    { asOf: todayIso, program },
-  );
+  const blockerInputs = linear.map((i) => ({
+    bucket: bucketOf(i),
+    title: i.title,
+    labels: i.labels ?? [],
+  }));
+  const gates = upcomingGateReadiness(phases, blockerInputs, { asOf: todayIso, program });
+  // Sprint gates when the program's plan states one per sprint; phase gates
+  // otherwise. VA has both — the sprint gates are the plan of record and are
+  // concrete, so they win. Ventura has only phase exit criteria, from the
+  // playbook, and keeps using those.
+  const sprintGates = upcomingSprintGates(program, blockerInputs, todayIso);
 
   // Aging candidates share a shape between the two panels — build once.
   const agingCandidates = linear.map((i) => ({
@@ -207,7 +215,11 @@ function Overview() {
       {/* What's at risk — gate readiness, worst first. The "asteroid coming at
           us" signal from the readout: already computed for the rollup, now on
           the command centre so it is visible during the day. */}
-      {!isLoading && gates.length > 0 ? (
+      {!isLoading && sprintGates.length > 0 ? (
+        <div className="px-4 pt-4 sm:px-6">
+          <SprintGatePanel gates={sprintGates} />
+        </div>
+      ) : !isLoading && gates.length > 0 ? (
         <div className="px-4 pt-4 sm:px-6">
           <GateReadinessPanel gates={gates} />
         </div>
@@ -552,6 +564,74 @@ function pressureBand(p: number): { label: string; color: string } {
  * near, under-met, and blocked rises to the top. Blockers attach only to the
  * phase actually running; future gates carry none, and a footnote says why.
  */
+/**
+ * Gates as the plan states them, scored only on what is measurable.
+ *
+ * The phase panel this replaces on sprint-axis programs scored readiness partly
+ * on exit criteria met, which no source populated — the value was a hardcoded
+ * zero, so every row printed "not tracked yet" beside a percentage that was one
+ * third driven by that constant. Here the gate is the plan's own sentence, and
+ * the only computed inputs are days remaining and open blockers. A reader judges
+ * readiness against the sentence rather than trusting a number nobody can
+ * verify.
+ */
+function SprintGatePanel({ gates }: { gates: SprintGate[] }) {
+  const top = gates.slice(0, 4);
+  return (
+    <section
+      className="rounded-md p-4"
+      style={{ backgroundColor: "#fff", border: "1px solid #e5e5e2" }}
+    >
+      <h2
+        className="mb-3 text-sm font-semibold"
+        style={{ color: "#3a5a40", fontFamily: "Public Sans, system-ui, sans-serif" }}
+      >
+        Gates to advance
+      </h2>
+      <div className="space-y-3">
+        {top.map((g) => {
+          const band = pressureBand(g.pressure);
+          return (
+            <div key={g.key} className="flex flex-col gap-1 md:flex-row md:items-start md:gap-3">
+              <div className="shrink-0 md:w-24">
+                <span className="text-xs font-semibold" style={{ color: "#1b1b1b" }}>
+                  {g.label}
+                </span>
+                {g.isCurrent ? (
+                  <span className="ml-1.5 text-xs" style={{ color: "#8a8a80" }}>
+                    now
+                  </span>
+                ) : null}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs" style={{ color: "#1b1b1b" }}>
+                  {g.gate}
+                </div>
+                {g.focus ? (
+                  <div className="mt-0.5 text-xs" style={{ color: "#8a8a80" }}>
+                    {g.focus}
+                  </div>
+                ) : null}
+              </div>
+              <div className="shrink-0 text-xs md:w-40 md:text-right" style={{ color: "#565c65" }}>
+                <span style={{ color: band.color, fontWeight: 600 }}>
+                  {g.daysRemaining >= 0 ? `${g.daysRemaining}d left` : `${-g.daysRemaining}d past`}
+                </span>
+                {g.blockingWorkItems > 0 ? ` · ${g.blockingWorkItems} blocking` : ""}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-2 text-xs" style={{ color: "#8a8a80" }}>
+        Gates as written in the delivery plan. Days-left and blocker counts are
+        read from Linear; whether a gate is met is a judgement the plan does not
+        track, so this does not claim to score it.
+      </div>
+    </section>
+  );
+}
+
 function GateReadinessPanel({ gates }: { gates: GateReadiness[] }) {
   return (
     <section
