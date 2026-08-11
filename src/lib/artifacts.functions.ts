@@ -135,3 +135,70 @@ export const generateArtifact = createServerFn({ method: "POST" })
       rowCount: out.rowCount,
     };
   });
+
+/**
+ * What the sources look like before you generate anything.
+ *
+ * Provenance used to appear only after a document had already been written and
+ * downloaded — you learned it had three unsourced sections once it was in your
+ * Downloads folder, which is the wrong order for something that goes to a
+ * customer. This is the same assembly, reported rather than rendered: no bytes
+ * are produced and nothing is written.
+ */
+export interface SourceReadiness {
+  asOf: string;
+  sources: Array<{ key: string; ok: boolean; message: string }>;
+  /** Sections the model knows it has no source for. */
+  unsourced: string[];
+  freshestSourceAt: string | null;
+  counts: { workItems: number; risks: number; milestones: number; phases: number };
+  /** Which artifacts this program declares itself able to produce. */
+  applicable: ArtifactKind[];
+}
+
+export const getSourceReadiness = createServerFn({ method: "GET" })
+  .inputValidator((programId: string) => programId)
+  .handler(async ({ data: programId }): Promise<SourceReadiness> => {
+    const { assembleProgramModel } = await import("./program-model.server");
+    const { programById } = await import("./program.config");
+    const { model, sources } = await assembleProgramModel(programId);
+    const program = programById(programId);
+    return {
+      asOf: new Date().toISOString().slice(0, 10),
+      sources,
+      unsourced: model.meta.unsourced,
+      freshestSourceAt: model.meta.freshestSourceAt,
+      counts: {
+        workItems: model.workItems.length,
+        risks: model.risks.length,
+        milestones: model.milestones.length,
+        phases: model.phases.length,
+      },
+      applicable: program.artifacts as ArtifactKind[],
+    };
+  });
+
+/**
+ * Generate without downloading, for preview.
+ *
+ * Markdown artifacts return their text so the page can show the actual document
+ * before it lands on disk. Binary ones (.docx, .xlsx) return null text — there
+ * is no honest way to render OOXML inline, and faking a preview of a document
+ * you cannot actually display would be worse than saying so.
+ */
+export interface ArtifactPreview {
+  artifact: GeneratedArtifact;
+  /** Decoded document text, or null when the format is binary. */
+  text: string | null;
+}
+
+export const previewArtifact = createServerFn({ method: "POST" })
+  .inputValidator((input: GenerateArtifactInput) => input)
+  .handler(async ({ data }): Promise<ArtifactPreview> => {
+    const artifact = await generateArtifact({ data });
+    const isText = artifact.mime === "text/markdown";
+    return {
+      artifact,
+      text: isText ? Buffer.from(artifact.data, "base64").toString("utf8") : null,
+    };
+  });
