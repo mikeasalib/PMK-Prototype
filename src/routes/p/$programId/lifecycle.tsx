@@ -33,12 +33,33 @@ function LifecyclePage() {
   const program = useProgram();
   const seed = seedFor(program.id);
   const total = seed.lifecycle.length;
-  const done = seed.lifecycle.filter((p) => p.status === "complete").length;
-  const active = seed.lifecycle.filter((p) => p.status === "in_progress").length;
+  const rawPhases = lifecyclePhasesFor(program);
+  const iso = todayIso();
+
+  // Status is derived from the phase window, never read from the stored
+  // `status` literal on the seed. That literal said Phase 2 was in progress
+  // through August — it was authored in July and nobody moved it — so the KPI
+  // strip (which derives) and the phase cards (which did not) named different
+  // active phases on the same screen. va-data's own comment warns about exactly
+  // this: storing state means someone has to remember to move it.
+  const statusOf = (id: string): PhaseStatus => {
+    const raw = rawPhases.find((ph) => ph.id === id);
+    if (!raw) return "upcoming";
+    const st = derivePhaseState(raw, iso);
+    return st === "complete" ? "complete" : st === "in_progress" ? "in_progress" : "upcoming";
+  };
+  const done = seed.lifecycle.filter((p) => statusOf(p.id) === "complete").length;
   const pctDone = Math.round((done / total) * 100);
 
+  // Derived from the same phase array the timeline plots, so the strip cannot
+  // disagree with the chart directly beneath it.
+  const activePhase = rawPhases.find((ph) => derivePhaseState(ph, iso) === "in_progress") ?? null;
+  const lastPhase = rawPhases.length ? rawPhases[rawPhases.length - 1] : null;
+  const activeSprint =
+    program.sprintStrip.find((sw) => sw.start <= iso && iso <= sw.end) ?? null;
+
   const [openPhases, setOpenPhases] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(seed.lifecycle.map((p) => [p.id, p.status === "in_progress"])),
+    Object.fromEntries(seed.lifecycle.map((p) => [p.id, statusOf(p.id) === "in_progress"])),
   );
   const allOpen = seed.lifecycle.every((p) => openPhases[p.id]);
   const togglePhase = (id: string) => setOpenPhases((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -58,21 +79,30 @@ function LifecyclePage() {
         className="grid grid-cols-2 gap-3 px-4 py-4 sm:px-6 md:grid-cols-4"
         style={{ borderBottom: "1px solid #dfe1e2", backgroundColor: "#f8f8f6" }}
       >
+        {/* Derived, not typed. These four were hardcoded VA strings — "Phase 2 ·
+            Foundations", "S4 – S5", "Sep 28 – Oct 23 · code freeze" — which
+            printed on Ventura too, and went stale the moment the sprint strip
+            was corrected against the delivery plan: there is no Sprint 4 any
+            more and the freeze is not September. */}
         <Kpi label="Phases complete" value={`${done} / ${total}`} sub={`${pctDone}% of program`} />
         <Kpi
           label="Active phase"
-          value={active > 0 ? "Phase 2 · Foundations" : "—"}
-          sub="S4 – S5"
+          value={activePhase ? activePhase.name.replace(/^Phase \d+ · /, "") : "—"}
+          sub={activePhase ? `${activePhase.window} · ${activePhase.sprints}` : "none in progress"}
         />
         <Kpi
-          label="October deliverable"
-          value="Phase 5 · UAT / PRR"
-          sub="Sep 28 – Oct 23 · code freeze"
+          label="Current sprint"
+          value={activeSprint ? activeSprint.label : "—"}
+          sub={
+            activeSprint
+              ? (activeSprint.focus ?? `${shortDate(activeSprint.start)} – ${shortDate(activeSprint.end)}`)
+              : "outside the strip"
+          }
         />
         <Kpi
           label="Launch deadline"
           value={program.keyDates.launchLabel}
-          sub="Phase 6 · ORR & launch"
+          sub={lastPhase ? lastPhase.name.replace(/^Phase \d+ · /, "") : ""}
         />
       </div>
 
@@ -94,7 +124,7 @@ function LifecyclePage() {
           style={{ border: "1px solid #dfe1e2" }}
         >
           {seed.lifecycle.map((p) => {
-            const s = STATUS_STYLE[p.status];
+            const s = STATUS_STYLE[statusOf(p.id)];
             return (
               <a
                 key={p.id}
@@ -138,7 +168,7 @@ function LifecyclePage() {
           </button>
         </div>
         {seed.lifecycle.map((p) => {
-          const s = STATUS_STYLE[p.status];
+          const s = STATUS_STYLE[statusOf(p.id)];
           const isOpen = !!openPhases[p.id];
           return (
             <section
@@ -305,6 +335,26 @@ function LifecyclePage() {
  * covered by any phase) is silently omitted rather than glued to an edge,
  * because a tick at 100% would read as "same day as launch" and lie.
  */
+/** Reserved height at the bottom of the plot for milestone keys + month axis. */
+const AXIS_BAND = 56;
+
+/**
+ * A milestone label short enough to sit on a tick without colliding.
+ *
+ * "Sprint 5 end" becomes "S5", "Public launch" becomes "Launch". Anything else
+ * falls back to its first word. The full label and date are on the tick's
+ * tooltip and spelled out on the phase cards below, so nothing is lost —
+ * previously these printed in full and overlapped each other at any zoom.
+ */
+function shortMilestoneKey(label: string): string {
+  const sprint = label.match(/sprint\s*(\d+)/i);
+  if (sprint) return `S${sprint[1]}`;
+  if (/launch/i.test(label)) return "Launch";
+  if (/uat/i.test(label)) return "UAT";
+  if (/production|hardening/i.test(label)) return "Prod";
+  return label.split(/[\s·]+/)[0];
+}
+
 type ProgramLike = ReturnType<typeof useProgram>;
 function LifecycleTimeline({ program }: { program: ProgramLike }) {
   const phases = lifecyclePhasesFor(program);
@@ -346,15 +396,24 @@ function LifecycleTimeline({ program }: { program: ProgramLike }) {
         </span>
       </div>
 
-      <div className="relative" style={{ height: 24 + 34 * phases.length + 40 }}>
+      {/* AXIS_BAND is reserved height at the bottom for the milestone ticks and
+          the month labels. They previously sat at negative `bottom` offsets, so
+          they rendered outside this container and collided with each other and
+          with the legend below. */}
+      <div
+        className="relative"
+        style={{ height: 24 + 34 * phases.length + AXIS_BAND }}
+      >
         {/* Month gridlines. Faint verticals so the eye can measure spans
             without a full ruler. */}
         {monthTicks.map((t) => (
           <div
             key={`gl-${t.iso}`}
-            className="absolute top-0 bottom-10"
+            className="absolute top-0"
+            // Gridlines stop at the axis band rather than running through it.
             style={{
               left: `${pct(t.iso)}%`,
+              bottom: AXIS_BAND,
               width: 1,
               backgroundColor: "#f0f0ec",
             }}
@@ -423,46 +482,45 @@ function LifecycleTimeline({ program }: { program: ProgramLike }) {
           </>
         ) : null}
 
-        {/* Milestone ticks along the bottom. Labels stack vertically-offset to
-            avoid overlap when two milestones are close in time. */}
-        {milestones.map((m, i) => (
+        {/* Milestone ticks. Labels are the short key only — "Sprint 5 end ·
+            Aug 14" beside "Sprint 6 end · Aug 28" two weeks later overlapped no
+            matter how they were staggered, and a two-row stagger only defers
+            the collision. Full label and date live on the tooltip, and the
+            phase cards below carry the same dates in full. */}
+        {milestones.map((m) => (
           <div
             key={`ms-${m.date}-${m.label}`}
             className="absolute"
-            style={{ left: `${pct(m.date)}%`, bottom: 0 }}
+            style={{ left: `${pct(m.date)}%`, bottom: AXIS_BAND - 24 }}
+            title={`${m.label} · ${shortDate(m.date)}`}
           >
             <div
               style={{
                 width: 2,
-                height: 24,
+                height: 22,
                 backgroundColor: "#3a5a40",
                 position: "absolute",
                 left: -1,
-                bottom: 16,
+                bottom: 0,
               }}
             />
             <div
               className="absolute whitespace-nowrap text-xs font-medium"
-              style={{
-                color: "#3a5a40",
-                bottom: -2 + (i % 2 === 0 ? 0 : 12),
-                left: 4,
-              }}
-              title={`${m.label} · ${m.date}`}
+              style={{ color: "#3a5a40", bottom: -14, transform: "translateX(-50%)" }}
             >
-              {m.label} · {shortDate(m.date)}
+              {shortMilestoneKey(m.label)}
             </div>
           </div>
         ))}
 
-        {/* Bottom axis: month labels aligned to the tick lines. */}
+        {/* Month axis, on its own row beneath the milestone keys. */}
         {monthTicks.map((t) => (
           <div
             key={`ml-${t.iso}`}
             className="absolute text-xs"
             style={{
               left: `${pct(t.iso)}%`,
-              bottom: -18,
+              bottom: 0,
               color: "#8a8a80",
               transform: "translateX(-50%)",
               whiteSpace: "nowrap",
@@ -473,7 +531,7 @@ function LifecycleTimeline({ program }: { program: ProgramLike }) {
         ))}
       </div>
 
-      <div className="mt-2 flex items-center gap-4 text-xs" style={{ color: "#8a8a80" }}>
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs" style={{ color: "#8a8a80" }}>
         <span className="inline-flex items-center gap-1">
           <span className="inline-block h-2 w-2 rounded" style={{ backgroundColor: STATUS_STYLE.complete.bar }} /> complete
         </span>

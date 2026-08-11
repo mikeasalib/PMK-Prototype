@@ -1,5 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
+import { UrgencyDot } from "@/components/va-ui";
 import {
   useStoredData,
   bucketOf,
@@ -95,11 +96,14 @@ function WhatsImportant() {
             {active.length === 0 ? (
               <Empty text="Nothing currently marked In Progress in Linear." />
             ) : (
-              <ul className="divide-y" style={{ borderColor: "#eee" }}>
-                {active.map((i) => (
-                  <IssueRow key={i.id} issue={i} />
-                ))}
-              </ul>
+              <>
+                <ul className="divide-y" style={{ borderColor: "#f0f0ec" }}>
+                  {active.slice(0, NOW_LIST_CAP).map((i) => (
+                    <IssueRow key={i.id} issue={i} />
+                  ))}
+                </ul>
+                <MoreLink count={active.length - NOW_LIST_CAP} programId={program.id} />
+              </>
             )}
           </Panel>
 
@@ -108,11 +112,14 @@ function WhatsImportant() {
             {urgent.length === 0 ? (
               <Empty text="No open Urgent or High priority issues." />
             ) : (
-              <ul className="divide-y" style={{ borderColor: "#eee" }}>
-                {urgent.slice(0, 8).map((i) => (
-                  <IssueRow key={i.id} issue={i} showPriority />
-                ))}
-              </ul>
+              <>
+                <ul className="divide-y" style={{ borderColor: "#f0f0ec" }}>
+                  {urgent.slice(0, NOW_LIST_CAP).map((i) => (
+                    <IssueRow key={i.id} issue={i} showPriority />
+                  ))}
+                </ul>
+                <MoreLink count={urgent.length - NOW_LIST_CAP} programId={program.id} />
+              </>
             )}
           </Panel>
 
@@ -121,11 +128,14 @@ function WhatsImportant() {
             {blocked.length === 0 ? (
               <Empty text="No issues currently labeled or titled as blockers." />
             ) : (
-              <ul className="divide-y" style={{ borderColor: "#eee" }}>
-                {blocked.map((i) => (
-                  <IssueRow key={i.id} issue={i} />
-                ))}
-              </ul>
+              <>
+                <ul className="divide-y" style={{ borderColor: "#f0f0ec" }}>
+                  {blocked.slice(0, NOW_LIST_CAP).map((i) => (
+                    <IssueRow key={i.id} issue={i} />
+                  ))}
+                </ul>
+                <MoreLink count={blocked.length - NOW_LIST_CAP} programId={program.id} />
+              </>
             )}
           </Panel>
 
@@ -210,53 +220,59 @@ function Empty({ text }: { text: string }) {
   );
 }
 
+/**
+ * One line, not two.
+ *
+ * Was a two-line block carrying a coloured workstream badge, a priority pill, an
+ * assignee and a timestamp. On a landing page whose job is "what should I look
+ * at", that is four attributes competing with the title. Title leads; the rest
+ * is one muted line's worth of context, and urgency is the single accent.
+ */
+/**
+ * Rows per panel on the landing page.
+ *
+ * Five, because this page answers "what should I look at" and Work answers
+ * "show me everything". Sixteen in-progress rows and nineteen high-priority
+ * rows — which overlap heavily, an urgent in-progress ticket appearing in both —
+ * made the landing page a third inventory of the same board.
+ */
+const NOW_LIST_CAP = 5;
+
+/** "+N more" through to Work, where the full list lives behind a scope. */
+function MoreLink({ count, programId }: { count: number; programId: string }) {
+  if (count <= 0) return null;
+  return (
+    <Link
+      to="/p/$programId/team-tasks"
+      params={{ programId }}
+      className="mt-2 inline-block text-xs font-medium"
+      style={{ color: "#3a5a40" }}
+    >
+      +{count} more in Work →
+    </Link>
+  );
+}
+
 function IssueRow({ issue, showPriority }: { issue: StoredLinearIssue; showPriority?: boolean }) {
   const program = useProgram();
   const ws = inferWorkstream(issue, program);
-  const wsColor = workstreamOf(ws, program).color;
   return (
-    <li className="py-2">
-      <div className="flex items-baseline gap-2">
+    <li className="flex items-start gap-2 py-1.5">
+      <UrgencyDot priority={issue.priority} />
+      <div className="min-w-0 flex-1">
         <a
           href={issue.url ?? "#"}
           target="_blank"
           rel="noreferrer"
-          className="font-mono text-xs underline"
-          style={{ color: "#565c65" }}
+          className="text-[13px] font-medium hover:underline"
+          style={{ color: "#1b1b1b" }}
+          title={`${issue.identifier} · ${ws} · ${issue.state_name ?? ""}`}
         >
-          {issue.identifier}
+          {issue.title}
         </a>
-        <span className="text-[13px] font-medium">{issue.title}</span>
-      </div>
-      <div
-        className="mt-1 flex flex-wrap items-center gap-2 text-xs"
-        style={{ color: "#565c65" }}
-      >
-        <span
-          className="rounded px-1.5 py-0.5 font-semibold"
-          style={{
-            color: wsColor,
-            backgroundColor: `${wsColor}14`,
-            border: `1px solid ${wsColor}33`,
-          }}
-        >
-          {ws}
-        </span>
-        <span>{issue.assignee ?? "unassigned"}</span>
-        <span>· {issue.state_name ?? "—"}</span>
-        {showPriority ? (
-          <span
-            className="rounded px-1 py-0.5 font-semibold"
-            style={{
-              color: priorityColor(issue.priority),
-              backgroundColor: `${priorityColor(issue.priority)}14`,
-              border: `1px solid ${priorityColor(issue.priority)}44`,
-            }}
-          >
-            {priorityLabel(issue.priority)}
-          </span>
-        ) : null}
-        <span className="ml-auto">{relativeTime(issue.source_updated_at)}</span>
+        <div className="text-xs" style={{ color: "#8a8a80" }}>
+          {[issue.identifier, ws, issue.assignee ?? "unassigned"].join(" · ")}
+        </div>
       </div>
     </li>
   );
