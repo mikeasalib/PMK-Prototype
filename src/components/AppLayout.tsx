@@ -1,7 +1,6 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import {
-  Star,
   ListChecks,
   LayoutDashboard,
   LayoutGrid,
@@ -21,6 +20,7 @@ import {
   SlidersHorizontal,
   Check,
   Menu,
+  type LucideIcon,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { DataSourcesFooter } from "./DataSourcesFooter";
@@ -43,6 +43,10 @@ import { useNavPrefs } from "@/hooks/use-nav-prefs";
  * reached through a tab strip on the page itself, because those groups are the
  * same dataset cut differently rather than separate places to go.
  *
+ * "Now" left too: it had become a KPI strip plus three teasers that all linked
+ * to Work, whose default scope is the union of its two main lists. Its strip
+ * moved to the command centre and /p/$programId now redirects there.
+ *
  * Two things left the nav entirely: the activity feed, which is ambient (nobody
  * sets out to visit an activity feed, they glance at one) and is now a drawer;
  * and Stakeholders & Glossary, whose ampersand was the tell that two unrelated
@@ -52,7 +56,7 @@ import { useNavPrefs } from "@/hooks/use-nav-prefs";
  * The leading "/p/$programId" is a literal route id, not a template string.
  */
 const NAV = [
-  { to: "/p/$programId", label: "Now", icon: Star },
+  { to: "/p/$programId/program-overview", label: "Plan", icon: LayoutDashboard },
   {
     to: "/p/$programId/team-tasks",
     label: "Work",
@@ -61,7 +65,6 @@ const NAV = [
     // things caught between calls that never became a Linear issue.
     children: [{ to: "/p/$programId/follow-ups", label: "Follow-ups", icon: ListTodo }],
   },
-  { to: "/p/$programId/program-overview", label: "Plan", icon: LayoutDashboard },
   { to: "/p/$programId/risks", label: "Risks", icon: AlertTriangle },
   { to: "/p/$programId/brief", label: "Brief", icon: Sparkles },
   { to: "/p/$programId/customer-health", label: "Customer health", icon: HeartPulse },
@@ -82,7 +85,7 @@ const NAV_HOVER = "rgba(255,255,255,0.07)";
 interface NavLeaf {
   to: string;
   label: string;
-  icon: typeof Star;
+  icon: LucideIcon;
 }
 
 /** One nav link, at top level or indented as a subnav child. Extracted so the
@@ -90,15 +93,13 @@ interface NavLeaf {
 function renderNavLink(n: NavLeaf, indented: boolean, programId: string, pathname: string) {
   const Icon = n.icon;
   const href = n.to.replace("$programId", programId);
-  // The index route is a prefix of every sibling, so it is only "active" on an
-  // exact match — otherwise it would highlight everywhere. A grouped item also
-  // stays active while you are on one of its tab siblings, so "Work" does not
-  // go dark the moment you switch from the person view to the board.
+  // A grouped item stays active while you are on one of its tab siblings, so
+  // "Work" does not go dark the moment you switch from the person view to the
+  // board. The old exact-match branch for the bare "/p/$programId" index route
+  // is gone with the route's nav entry — nothing points at it any more.
   const siblings = (TAB_SIBLINGS[n.to] ?? []).map((t) => t.replace("$programId", programId));
   const active =
-    n.to === "/p/$programId"
-      ? pathname === href
-      : pathname.startsWith(href) || siblings.some((sib) => pathname.startsWith(sib));
+    pathname.startsWith(href) || siblings.some((sib) => pathname.startsWith(sib));
   return (
     <Link
       to={n.to}

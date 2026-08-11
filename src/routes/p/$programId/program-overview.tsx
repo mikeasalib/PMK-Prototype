@@ -4,7 +4,7 @@ import { AppLayout, PageHeader } from "@/components/AppLayout";
 import { SectionTabs } from "@/components/SectionTabs";
 import { WsPip } from "@/components/va-ui";
 import type { WorkstreamKey } from "@/lib/va-data";
-import { useStoredData, bucketOf } from "@/hooks/use-stored-data";
+import { useStoredData, bucketOf, isHighPriority } from "@/hooks/use-stored-data";
 import { HEALTH_COLOR, HEALTH_LABEL } from "@/lib/workstream-updates";
 import {
   PROGRAMS,
@@ -70,6 +70,12 @@ function Overview() {
   const todo = linear.filter((i) => bucketOf(i) === "todo").length;
   const backlog = linear.filter((i) => bucketOf(i) === "backlog").length;
   const pctDone = total ? Math.round((done / total) * 100) : 0;
+  // Top-line counts, moved here when the "Now" landing page was retired. That
+  // page had become a KPI strip plus three five-row teasers whose every payoff
+  // was a link to Work, whose default scope is already the union of its two
+  // main panels. The strip was the one thing it had that this page lacked.
+  const highPriorityOpen = linear.filter(isHighPriority).length;
+  const daysToLaunch = Math.max(0, daysFromNow(program.keyDates.launch));
 
   const todayIso = now.slice(0, 10);
 
@@ -161,6 +167,27 @@ function Overview() {
           .join(" · ")}
       />
       <SectionTabs group="plan" />
+
+      {/* Headline counts */}
+      <div
+        className="grid grid-cols-2 gap-3 px-4 py-4 sm:px-6 md:grid-cols-4"
+        style={{ borderBottom: "1px solid #dfe1e2", backgroundColor: "#f7f7f5" }}
+      >
+        <Kpi
+          label="Days to launch"
+          value={String(daysToLaunch)}
+          sub={program.keyDates.launchLabel}
+          danger={daysToLaunch < 120}
+        />
+        <Kpi label="In progress" value={String(inProgress)} sub={`of ${total} tracked`} />
+        <Kpi label="Completed" value={String(done)} sub="issues closed" />
+        <Kpi
+          label="High priority open"
+          value={String(highPriorityOpen)}
+          sub="Urgent + High"
+          danger={highPriorityOpen > 5}
+        />
+      </div>
 
       {/* Milestone strip */}
       <div className="px-4 pt-5 sm:px-6">
@@ -575,6 +602,52 @@ function pressureBand(p: number): { label: string; color: string } {
  * readiness against the sentence rather than trusting a number nobody can
  * verify.
  */
+/**
+ * A headline count tile.
+ *
+ * Moved from the retired "Now" page. Its left border was #005ea2 blue on the
+ * normal path — the last of the blue accents that were neutralised across the
+ * app, so it is grey here. Red is kept for the danger case, which is the only
+ * thing on the tile worth an accent.
+ */
+function Kpi({
+  label,
+  value,
+  sub,
+  danger,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  danger?: boolean;
+}) {
+  return (
+    <div
+      className="rounded-md bg-white px-3 py-2"
+      style={{
+        border: "1px solid #e5e5e2",
+        borderLeft: `3px solid ${danger ? "#b3261e" : "#565c65"}`,
+      }}
+    >
+      <div className="text-xs uppercase tracking-wide" style={{ color: "#565c65" }}>
+        {label}
+      </div>
+      <div
+        className="text-2xl font-bold"
+        style={{
+          fontFamily: "Public Sans, system-ui, sans-serif",
+          color: danger ? "#b3261e" : "#3a5a40",
+        }}
+      >
+        {value}
+      </div>
+      <div className="text-xs" style={{ color: "#565c65" }}>
+        {sub}
+      </div>
+    </div>
+  );
+}
+
 function SprintGatePanel({ gates }: { gates: SprintGate[] }) {
   const top = gates.slice(0, 4);
   return (
