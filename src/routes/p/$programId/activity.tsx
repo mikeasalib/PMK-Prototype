@@ -171,7 +171,7 @@ function ActivityFeed() {
                               target="_blank"
                               rel="noreferrer"
                               className="underline"
-                              style={{ color: "#005ea2" }}
+                              style={{ color: "#565c65" }}
                             >
                               {e.title}
                             </a>

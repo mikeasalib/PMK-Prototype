@@ -20,17 +20,34 @@ export const Route = createFileRoute("/p/$programId/risks")({
   component: RisksPage,
 });
 
+/**
+ * Colour only at the top of the scale.
+ *
+ * Severity is the thing that is actually wrong on this page, so it keeps the
+ * accent — but only where it means something. Low and medium going neutral is
+ * what lets critical and high read as alarming; when all four levels carried a
+ * distinct colour, none of them did. Same rule as the urgency dot on the work
+ * views.
+ */
 const SEV_COLOR: Record<RiskSeverity, string> = {
-  low: "#565c65",
-  medium: "#1a6fa8",
-  high: "#8a5a00",
+  low: "#8a8a80",
+  medium: "#8a8a80",
+  high: "#d98324",
   critical: "#b3261e",
 };
 
+/**
+ * Status is a label, not an alarm.
+ *
+ * It was red / amber / green, which put a second competing traffic light on
+ * every row and made an *open* low-severity risk shout as loudly as a critical
+ * one. Neutral throughout: the word already says which state it is, and
+ * severity is what ranks the row.
+ */
 const STATUS_COLOR: Record<RiskStatus, string> = {
-  open: "#b3261e",
-  mitigating: "#8a5a00",
-  resolved: "#3b7a2e",
+  open: "#565c65",
+  mitigating: "#565c65",
+  resolved: "#8a8a80",
 };
 
 function daysBetween(a: string, b: string) {
@@ -77,10 +94,14 @@ function RisksPage() {
         className="grid grid-cols-2 gap-3 px-4 py-4 sm:px-6 md:grid-cols-4"
         style={{ borderBottom: "1px solid #dfe1e2", backgroundColor: "#f7f7f5" }}
       >
-        <Kpi label="Open" value={openTotal} color="#b3261e" />
-        <Kpi label="Opened this week" value={openedThisWeek} color="#8a5a00" />
-        <Kpi label="Closed this week" value={closedThisWeek} color="#3b7a2e" />
-        <Kpi label="Net this week" value={openedThisWeek - closedThisWeek} color="#3a5a40" />
+        {/* One accent, on the count that means something. Opened / closed /
+            net are arithmetic, not alarms — colouring each of them a different
+            hue put a four-way traffic light above a table that already ranks
+            itself by severity. */}
+        <Kpi label="Open" value={openTotal} color={openTotal > 0 ? "#b3261e" : "#565c65"} />
+        <Kpi label="Opened this week" value={openedThisWeek} color="#1b1b1b" />
+        <Kpi label="Closed this week" value={closedThisWeek} color="#1b1b1b" />
+        <Kpi label="Net this week" value={openedThisWeek - closedThisWeek} color="#1b1b1b" />
       </div>
 
       <div
@@ -147,7 +168,7 @@ function RisksPage() {
             ))}
           </select>
         </Filter>
-        <span className="ml-auto text-xs" style={{ color: "#666" }}>
+        <span className="ml-auto text-xs" style={{ color: "#565c65" }}>
           {rows.length} of {seed.risks.length}
         </span>
       </div>
@@ -158,7 +179,7 @@ function RisksPage() {
           <thead style={{ backgroundColor: "#f7f7f5" }}>
             <tr
               className="text-left uppercase tracking-wide"
-              style={{ color: "#666", fontSize: 12 }}
+              style={{ color: "#565c65", fontSize: 12 }}
             >
               <th className="px-3 py-2 font-medium">ID</th>
               <th className="px-3 py-2 font-medium">Risk</th>
@@ -184,12 +205,12 @@ function RisksPage() {
                     <WsTag ws={r.ws} />
                   </td>
                   <td className="px-3 py-2">{r.owner}</td>
-                  <td className="px-3 py-2 font-mono" style={{ color: "#666" }}>
+                  <td className="px-3 py-2 font-mono" style={{ color: "#565c65" }}>
                     {r.opened}
                   </td>
                   <td
                     className="px-3 py-2 font-mono"
-                    style={{ color: aging ? "#b3261e" : "#666", fontWeight: aging ? 700 : 400 }}
+                    style={{ color: aging ? "#b3261e" : "#565c65", fontWeight: aging ? 700 : 400 }}
                     title={aging ? "Aging — open >5 days" : undefined}
                   >
                     {age}d{aging ? " ⚠" : ""}
@@ -200,10 +221,10 @@ function RisksPage() {
                   <td className="px-3 py-2">
                     <Pill color={STATUS_COLOR[r.status]} label={r.status} />
                   </td>
-                  <td className="px-3 py-2 font-mono" style={{ color: "#005ea2" }}>
+                  <td className="px-3 py-2 font-mono" style={{ color: "#565c65" }}>
                     {r.linkedTicket ?? "—"}
                   </td>
-                  <td className="px-3 py-2" style={{ color: "#333" }}>
+                  <td className="px-3 py-2" style={{ color: "#1b1b1b" }}>
                     {r.nextAction}
                   </td>
                 </tr>
@@ -223,7 +244,7 @@ function Kpi({ label, value, color }: { label: string; value: number; color: str
       className="rounded-md bg-white px-3 py-2"
       style={{ border: "1px solid #e5e5e2", borderLeft: `3px solid ${color}` }}
     >
-      <div className="text-xs uppercase tracking-wide" style={{ color: "#666" }}>
+      <div className="text-xs uppercase tracking-wide" style={{ color: "#565c65" }}>
         {label}
       </div>
       <div
@@ -239,7 +260,7 @@ function Kpi({ label, value, color }: { label: string; value: number; color: str
 function Filter({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex items-center gap-1.5">
-      <span className="text-xs uppercase tracking-wide" style={{ color: "#666" }}>
+      <span className="text-xs uppercase tracking-wide" style={{ color: "#565c65" }}>
         {label}
       </span>
       {children}

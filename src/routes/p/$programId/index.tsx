@@ -222,7 +222,7 @@ function IssueRow({ issue, showPriority }: { issue: StoredLinearIssue; showPrior
           target="_blank"
           rel="noreferrer"
           className="font-mono text-xs underline"
-          style={{ color: "#005ea2" }}
+          style={{ color: "#565c65" }}
         >
           {issue.identifier}
         </a>

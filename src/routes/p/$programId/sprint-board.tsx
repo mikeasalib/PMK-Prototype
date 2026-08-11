@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
 import { SectionTabs } from "@/components/SectionTabs";
+import { UrgencyDot } from "@/components/va-ui";
 import type { WorkstreamKey } from "@/lib/va-data";
 import {
   useStoredData,
@@ -32,6 +33,10 @@ const COLUMNS: { key: LinearBucket; label: string; color: string }[] = [
   { key: "done", label: "Done", color: "#2e8540" },
 ];
 
+/** Cards per column before a "show more". Eight fills a screen without
+ *  scrolling past the other columns. */
+const COLUMN_CAP = 8;
+
 function SprintBoard() {
   const program = useProgram();
   // Per-program. Was module-level.
@@ -39,6 +44,8 @@ function SprintBoard() {
   const seed = seedFor(program.id);
   const { linear, isLoading } = useStoredData(program.id);
   const [ws, setWs] = useState<WorkstreamKey | "all">("all");
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const expandColumn = (key: string) => setExpanded((prev) => ({ ...prev, [key]: true }));
 
   const filtered = useMemo(
     () => linear.filter((i) => ws === "all" || inferWorkstream(i, program) === ws),
@@ -138,29 +145,44 @@ function SprintBoard() {
         <div className="grid grid-cols-1 gap-3 p-4 sm:p-6 md:grid-cols-2 lg:grid-cols-4">
           {COLUMNS.map((col) => {
             const items = filtered.filter((t) => bucketOf(t) === col.key);
+            // Columns are capped rather than filtered: a board's columns are
+            // the point of a board, so none of them disappears — but Backlog
+            // and Done carried 17 and 21 cards, which is what made this page
+            // 13.6 screens tall.
+            const cap = expanded[col.key] ? items.length : COLUMN_CAP;
+            const shown = items.slice(0, cap);
+            const hidden = items.length - shown.length;
             return (
               <div
                 key={col.key}
                 className="rounded-md p-2"
-                style={{ backgroundColor: "#f7f7f5", border: "1px solid #e5e5e2", minHeight: 300 }}
+                style={{ backgroundColor: "#f7f7f5", border: "1px solid #e5e5e2" }}
               >
+                {/* Header is neutral. Four column colours plus a card border
+                    plus a priority badge was four accents competing on one
+                    screen; the column label already says which column it is. */}
                 <div
                   className="mb-2 flex items-center justify-between px-1 text-xs font-semibold uppercase tracking-wide"
-                  style={{ color: col.color }}
+                  style={{ color: "#565c65" }}
                 >
                   <span>{col.label}</span>
-                  <span
-                    className="rounded px-1.5"
-                    style={{ backgroundColor: `${col.color}14`, color: col.color }}
-                  >
-                    {items.length}
-                  </span>
+                  <span>{items.length}</span>
                 </div>
-                <div className="space-y-2">
-                  {items.map((t) => (
+                <div className="space-y-1.5">
+                  {shown.map((t) => (
                     <IssueCard key={t.id} issue={t} />
                   ))}
                 </div>
+                {hidden > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => expandColumn(col.key)}
+                    className="mt-2 w-full rounded px-2 py-1.5 text-xs font-medium"
+                    style={{ border: "1px solid #dfe1e2", backgroundColor: "#fff", color: "#3a5a40" }}
+                  >
+                    Show {hidden} more
+                  </button>
+                ) : null}
               </div>
             );
           })}
@@ -170,51 +192,45 @@ function SprintBoard() {
   );
 }
 
+/**
+ * One card, two lines.
+ *
+ * Was five lines carrying three coloured tokens — a workstream border, a
+ * workstream badge, and a priority badge at every level — which made 64 cards
+ * measure 13.6 screens and made none of the colour mean anything. The
+ * workstream badge duplicated the border it sat next to (and workstream has a
+ * whole tab of its own); the priority badge became a dot for urgent and high
+ * only; the relative timestamp moved onto the title's tooltip.
+ */
 function IssueCard({ issue }: { issue: StoredLinearIssue }) {
   const program = useProgram();
   const ws = inferWorkstream(issue, program) as WorkstreamKey;
   const color = workstreamOf(ws, program).color;
   return (
     <div
-      className="rounded bg-white p-2"
+      className="rounded bg-white px-2 py-1.5"
       style={{ border: "1px solid #e5e5e2", borderLeft: `3px solid ${color}` }}
+      title={`${ws} · ${priorityLabel(issue.priority)} · updated ${relativeTime(issue.source_updated_at)}`}
     >
-      <div className="flex items-center justify-between text-xs" style={{ color: "#565c65" }}>
-        <a
-          href={issue.url ?? "#"}
-          target="_blank"
-          rel="noreferrer"
-          className="font-mono underline"
-          style={{ color: "#005ea2" }}
-        >
-          {issue.identifier}
-        </a>
-        <span
-          className="rounded px-1 py-0.5 font-semibold uppercase"
-          style={{ color, backgroundColor: `${color}14`, border: `1px solid ${color}44` }}
-        >
-          {ws}
-        </span>
-      </div>
-      <div className="mt-1 text-xs font-medium leading-snug">{issue.title}</div>
-      <div
-        className="mt-1 flex items-center justify-between text-xs"
-        style={{ color: "#565c65" }}
-      >
-        <span>{issue.assignee ?? "unassigned"}</span>
-        <span
-          className="rounded px-1 py-0.5 font-semibold uppercase"
-          style={{
-            color: priorityColor(issue.priority),
-            backgroundColor: `${priorityColor(issue.priority)}14`,
-            border: `1px solid ${priorityColor(issue.priority)}44`,
-          }}
-        >
-          {priorityLabel(issue.priority)}
-        </span>
-      </div>
-      <div className="mt-1 text-xs" style={{ color: "#8a9099" }}>
-        {relativeTime(issue.source_updated_at)}
+      <div className="flex items-start gap-1.5">
+        <UrgencyDot priority={issue.priority} />
+        <div className="min-w-0 flex-1">
+          <div className="text-xs font-medium leading-snug" style={{ color: "#1b1b1b" }}>
+            {issue.title}
+          </div>
+          <div className="mt-0.5 flex items-baseline gap-2 text-xs" style={{ color: "#8a8a80" }}>
+            <a
+              href={issue.url ?? "#"}
+              target="_blank"
+              rel="noreferrer"
+              className="font-mono hover:underline"
+              style={{ color: "#8a8a80" }}
+            >
+              {issue.identifier}
+            </a>
+            <span className="min-w-0 truncate">{issue.assignee ?? "unassigned"}</span>
+          </div>
+        </div>
       </div>
     </div>
   );

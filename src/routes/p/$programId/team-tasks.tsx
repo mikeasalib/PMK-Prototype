@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
 import { SectionTabs } from "@/components/SectionTabs";
+import { UrgencyDot } from "@/components/va-ui";
 import { PROGRAMS, pageTitle } from "@/lib/program.config";
 import { useProgram } from "./route";
 import { useNotionTasks } from "@/hooks/use-notion-tasks";
@@ -363,19 +364,6 @@ function FilterChip({
   );
 }
 
-/** Urgent and high only. Everything else renders nothing, which is the point. */
-function UrgencyDot({ priority }: { priority: number | null }) {
-  if (priority !== 1 && priority !== 2) return <span className="w-2 shrink-0" aria-hidden />;
-  const urgent = priority === 1;
-  return (
-    <span
-      className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-      style={{ backgroundColor: urgent ? "#b3261e" : "#d98324" }}
-      title={urgent ? "Urgent" : "High priority"}
-      aria-label={urgent ? "Urgent" : "High priority"}
-    />
-  );
-}
 
 function NotionTrackerSection({ programId }: { programId: string }) {
   const { isLoading, open, done, bySection, readAt, status } = useNotionTasks(programId);
