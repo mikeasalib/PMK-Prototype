@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
+import { SectionTabs } from "@/components/SectionTabs";
 import { WsTag } from "@/components/va-ui";
 import type { WorkstreamKey } from "@/lib/va-data";
 import {
@@ -79,6 +80,7 @@ function Dependencies() {
         title="Dependency map"
         subtitle="Open Linear work grouped by workstream. Blockers pinned below."
       />
+      <SectionTabs group="work" />
       <div
         className="flex flex-wrap items-center gap-3 px-6 py-3"
         style={{ borderBottom: "1px solid #dfe1e2", backgroundColor: "#f0f0f0" }}

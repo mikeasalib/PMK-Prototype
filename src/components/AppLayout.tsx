@@ -26,34 +26,54 @@ import { useEffect, useState } from "react";
 import { DataSourcesFooter } from "./DataSourcesFooter";
 import { ProgramSwitcher } from "./ProgramSwitcher";
 import { RefreshButton } from "./RefreshButton";
+import { CommandPalette } from "./CommandPalette";
+import { ActivityDrawer } from "./ActivityDrawer";
 import { PROGRAMS } from "@/lib/program.config";
 import { useProgram } from "@/routes/p/$programId/route";
 import { useNavPrefs } from "@/hooks/use-nav-prefs";
 
 // Every destination is program-scoped. The leading "/p/$programId" is a literal
 // route id, not a template string — TanStack fills the param from `params`.
+/**
+ * Sidebar destinations.
+ *
+ * Deliberately short. This was thirteen equal-weight rows, which means no
+ * hierarchy at all — a user scans all thirteen every time because none of them
+ * outranks the others. Three collapsed into "Work" and two into "Plan", both
+ * reached through a tab strip on the page itself, because those groups are the
+ * same dataset cut differently rather than separate places to go.
+ *
+ * Two things left the nav entirely: the activity feed, which is ambient (nobody
+ * sets out to visit an activity feed, they glance at one) and is now a drawer;
+ * and Stakeholders & Glossary, whose ampersand was the tell that two unrelated
+ * things were sharing a slot neither had earned. Both are reachable from the
+ * header. Their routes still resolve — URLs are addresses people share.
+ *
+ * The leading "/p/$programId" is a literal route id, not a template string.
+ */
 const NAV = [
-  { to: "/p/$programId/search", label: "Search", icon: Search },
-  { to: "/p/$programId/program-overview", label: "Command centre", icon: LayoutDashboard },
-  { to: "/p/$programId/brief", label: "Brief", icon: Sparkles },
-  { to: "/p/$programId/customer-health", label: "Customer health", icon: HeartPulse },
-  { to: "/p/$programId", label: "What's important", icon: Star },
+  { to: "/p/$programId", label: "Now", icon: Star },
   {
     to: "/p/$programId/team-tasks",
-    label: "Team tasks",
+    label: "Work",
     icon: ListChecks,
-    // Follow-ups are the sub-issue companion to team tasks: the discrete things
-    // caught between calls that never become a Linear issue, so they nest here.
+    // Follow-ups are the sub-issue companion to the work views: the discrete
+    // things caught between calls that never became a Linear issue.
     children: [{ to: "/p/$programId/follow-ups", label: "Follow-ups", icon: ListTodo }],
   },
-  { to: "/p/$programId/sprint-board", label: "Sprint board", icon: LayoutGrid },
-  { to: "/p/$programId/dependencies", label: "Dependency map", icon: Share2 },
-  { to: "/p/$programId/activity", label: "Activity feed", icon: Activity },
-  { to: "/p/$programId/lifecycle", label: "Lifecycle plan", icon: GitBranch },
-  { to: "/p/$programId/risks", label: "Risks & blockers", icon: AlertTriangle },
-  { to: "/p/$programId/stakeholders", label: "Stakeholders & Glossary", icon: Users },
+  { to: "/p/$programId/program-overview", label: "Plan", icon: LayoutDashboard },
+  { to: "/p/$programId/risks", label: "Risks", icon: AlertTriangle },
+  { to: "/p/$programId/brief", label: "Brief", icon: Sparkles },
+  { to: "/p/$programId/customer-health", label: "Customer health", icon: HeartPulse },
   { to: "/p/$programId/artifacts", label: "Artifacts", icon: FileOutput },
 ] as const;
+
+/** Routes that live under a nav item's tab strip rather than their own row, so
+ *  the parent still highlights while you are on them. */
+const TAB_SIBLINGS: Record<string, string[]> = {
+  "/p/$programId/team-tasks": ["/p/$programId/sprint-board", "/p/$programId/dependencies"],
+  "/p/$programId/program-overview": ["/p/$programId/lifecycle"],
+};
 
 const NAV_BG_FALLBACK = "#1f3d2b";
 const NAV_ACTIVE = "rgba(255,255,255,0.13)";
@@ -71,8 +91,14 @@ function renderNavLink(n: NavLeaf, indented: boolean, programId: string, pathnam
   const Icon = n.icon;
   const href = n.to.replace("$programId", programId);
   // The index route is a prefix of every sibling, so it is only "active" on an
-  // exact match — otherwise it would highlight everywhere.
-  const active = n.to === "/p/$programId" ? pathname === href : pathname.startsWith(href);
+  // exact match — otherwise it would highlight everywhere. A grouped item also
+  // stays active while you are on one of its tab siblings, so "Work" does not
+  // go dark the moment you switch from the person view to the board.
+  const siblings = (TAB_SIBLINGS[n.to] ?? []).map((t) => t.replace("$programId", programId));
+  const active =
+    n.to === "/p/$programId"
+      ? pathname === href
+      : pathname.startsWith(href) || siblings.some((sib) => pathname.startsWith(sib));
   return (
     <Link
       to={n.to}
@@ -360,6 +386,10 @@ export function PageHeader({
         </div>
         <div className="flex shrink-0 items-center gap-3 sm:pt-1">
           {actions}
+          {/* Lookup and activity live in the header, not the nav: both are
+              things you reach for mid-task rather than navigate to. */}
+          <CommandPalette />
+          <ActivityDrawer />
           <RefreshButton />
           {/* The account control sits in the far corner, the way it does on the
               customer site — so Refresh moves left of it rather than being the

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
+import { SectionTabs } from "@/components/SectionTabs";
 import { WsTag } from "@/components/va-ui";
 import { type LifecyclePhase, type PhaseStatus, type WorkstreamKey } from "@/lib/va-data";
 import { PROGRAMS, pageTitle, upcomingMilestones, workstreamOf } from "@/lib/program.config";
@@ -50,6 +51,7 @@ function LifecyclePage() {
         title="Lifecycle plan"
         subtitle="End-to-end delivery blocks — from discovery through the October deliverable to the November 11, 2026 launch."
       />
+      <SectionTabs group="plan" />
 
       {/* KPI strip */}
       <div

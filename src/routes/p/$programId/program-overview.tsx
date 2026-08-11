@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Check } from "lucide-react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
+import { SectionTabs } from "@/components/SectionTabs";
 import { WsPip } from "@/components/va-ui";
 import type { WorkstreamKey } from "@/lib/va-data";
 import { useStoredData, bucketOf } from "@/hooks/use-stored-data";
@@ -151,6 +152,7 @@ function Overview() {
           .filter(Boolean)
           .join(" · ")}
       />
+      <SectionTabs group="plan" />
 
       {/* Milestone strip */}
       <div className="px-4 pt-5 sm:px-6">

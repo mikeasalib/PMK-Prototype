@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
+import { SectionTabs } from "@/components/SectionTabs";
 import type { WorkstreamKey } from "@/lib/va-data";
 import {
   useStoredData,
@@ -50,6 +51,7 @@ function SprintBoard() {
         title="Sprint board"
         subtitle="Live Linear board for the DEP project — grouped by state."
       />
+      <SectionTabs group="work" />
       <div
         className="flex flex-wrap items-center gap-2 px-6 py-3"
         style={{ borderBottom: "1px solid #dfe1e2", backgroundColor: "#f0f0f0" }}

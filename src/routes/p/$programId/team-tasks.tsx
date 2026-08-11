@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
+import { SectionTabs } from "@/components/SectionTabs";
 import { PROGRAMS, pageTitle } from "@/lib/program.config";
 import { useProgram } from "./route";
 import { useNotionTasks } from "@/hooks/use-notion-tasks";
@@ -159,6 +160,7 @@ function TeamTasks() {
             : "Live from Linear · assignees, statuses, and priorities update on sync"
         }
       />
+      <SectionTabs group="work" />
       <div className="px-4 py-5 space-y-6 sm:px-6">
         {/* Notion tracker tasks. First on the page because on the VA program
             they outnumber the Linear board roughly two to one: 42 open
