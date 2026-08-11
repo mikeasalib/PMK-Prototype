@@ -58,7 +58,7 @@ function FollowUps() {
       <div className="px-4 pb-10 pt-2 sm:px-6">
         {/* The read-only exception, stated plainly. */}
         <div
-          className="mb-5 rounded-md p-3 text-[12px]"
+          className="mb-5 rounded-md p-3 text-xs"
           style={{ backgroundColor: "#f7f7f5", border: "1px solid #e5e5e2", color: "#565c65" }}
         >
           These are <strong>proposed</strong> from your calls and issues — each shows where it came
@@ -76,7 +76,7 @@ function FollowUps() {
             {groups.map((g) => (
               <section key={g.key} className="mb-6">
                 <h2
-                  className="mb-2 text-[11px] font-semibold uppercase tracking-wide"
+                  className="mb-2 text-xs font-semibold uppercase tracking-wide"
                   style={{ color: "#8a8a80" }}
                 >
                   {g.label} · {g.items.length}
@@ -161,12 +161,12 @@ function Row({
           {item.title}
         </div>
         {item.detail ? (
-          <div className="mt-0.5 text-[12px]" style={{ color: "#565c65" }}>
+          <div className="mt-0.5 text-xs" style={{ color: "#565c65" }}>
             {item.detail}
           </div>
         ) : null}
         <div
-          className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]"
+          className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs"
           style={{ color: "#8a8a80" }}
         >
           {item.owner ? <span>{item.owner}</span> : null}
@@ -289,7 +289,7 @@ function Collapsible({
       <button
         type="button"
         onClick={onToggle}
-        className="text-[11px] font-semibold uppercase tracking-wide"
+        className="text-xs font-semibold uppercase tracking-wide"
         style={{ color: "#8a8a80" }}
       >
         {open ? "▾" : "▸"} {label}

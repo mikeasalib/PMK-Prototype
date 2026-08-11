@@ -16,7 +16,7 @@ export function WsTag({ ws }: { ws: WorkstreamKey }) {
   const w = workstreamOf(ws, useProgram());
   return (
     <span
-      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide"
+      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide"
       style={{
         backgroundColor: `${w.color}14`,
         color: w.color,

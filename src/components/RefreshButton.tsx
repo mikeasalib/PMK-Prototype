@@ -27,7 +27,7 @@ export function RefreshButton() {
   return (
     <div className="flex items-center gap-3">
       <span
-        className="text-[11px]"
+        className="text-xs"
         style={{ color: "#565c65" }}
         title={lastSyncedAt ? absoluteTime(lastSyncedAt) : undefined}
       >

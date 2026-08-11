@@ -9,6 +9,8 @@ import {
   inferWorkstream,
   priorityLabel,
   priorityColor,
+  isBlocked,
+  isOpen,
   type StoredLinearIssue,
 } from "@/hooks/use-stored-data";
 import { relativeTime } from "@/hooks/use-program-data";
@@ -59,17 +61,10 @@ function Dependencies() {
 
   const blockers = useMemo(
     () =>
-      linear.filter((i) => {
-        const b = bucketOf(i);
-        if (b === "done" || b === "canceled") return false;
-        const t = i.title.toLowerCase();
-        return (
-          t.includes("blocked") ||
-          t.includes("blocker") ||
-          (i.labels ?? []).some((l) => /block/i.test(l)) ||
-          i.priority === 1
-        );
-      }),
+      // Blocked-or-urgent. Kept as two named predicates rather than one fused
+      // condition so "blocked" means the same thing here as on the landing
+      // page; the urgent arm is this page's own addition, stated as such.
+      linear.filter((i) => isBlocked(i) || (isOpen(i) && i.priority === 1)),
     [linear],
   );
 
@@ -89,7 +84,7 @@ function Dependencies() {
         style={{ borderBottom: "1px solid #dfe1e2", backgroundColor: "#f0f0f0" }}
       >
         <span
-          className="text-[11px] font-semibold uppercase tracking-wide"
+          className="text-xs font-semibold uppercase tracking-wide"
           style={{ color: "#3a5a40" }}
         >
           Workstream
@@ -97,7 +92,7 @@ function Dependencies() {
         <select
           value={ws}
           onChange={(e) => setWs(e.target.value as WorkstreamKey | "all")}
-          className="rounded border px-2 py-1 text-[12px]"
+          className="rounded border px-2 py-1 text-xs"
           style={{ borderColor: "#a9aeb1" }}
         >
           <option value="all">All workstreams</option>
@@ -108,7 +103,7 @@ function Dependencies() {
           ))}
         </select>
         <span
-          className="text-[11px] font-semibold uppercase tracking-wide"
+          className="text-xs font-semibold uppercase tracking-wide"
           style={{ color: "#3a5a40" }}
         >
           Assignee
@@ -116,7 +111,7 @@ function Dependencies() {
         <select
           value={owner}
           onChange={(e) => setOwner(e.target.value)}
-          className="rounded border px-2 py-1 text-[12px]"
+          className="rounded border px-2 py-1 text-xs"
           style={{ borderColor: "#a9aeb1" }}
         >
           <option value="all">All</option>
@@ -126,7 +121,7 @@ function Dependencies() {
             </option>
           ))}
         </select>
-        <span className="ml-auto text-[11px]" style={{ color: "#565c65" }}>
+        <span className="ml-auto text-xs" style={{ color: "#565c65" }}>
           {open.length} open issues
         </span>
       </div>
@@ -157,12 +152,12 @@ function Dependencies() {
               <h2 className="text-sm font-semibold" style={{ color: "#b3261e" }}>
                 Blockers &amp; urgent · {blockers.length}
               </h2>
-              <span className="text-[11px]" style={{ color: "#565c65" }}>
+              <span className="text-xs" style={{ color: "#565c65" }}>
                 Titles/labels containing "block" or priority = Urgent
               </span>
             </div>
             {blockers.length === 0 ? (
-              <div className="p-4 text-center text-[12px]" style={{ color: "#565c65" }}>
+              <div className="p-4 text-center text-xs" style={{ color: "#565c65" }}>
                 No blockers currently flagged in Linear.
               </div>
             ) : (
@@ -194,7 +189,7 @@ function Dependencies() {
               <h2 className="text-sm font-semibold" style={{ color: "#3a5a40" }}>
                 Cross-workstream dependencies · {seed.crossDeps.length}
               </h2>
-              <span className="text-[11px]" style={{ color: "#565c65" }}>
+              <span className="text-xs" style={{ color: "#565c65" }}>
                 From Mon 7/13 cross-functional sync
               </span>
             </div>
@@ -203,13 +198,13 @@ function Dependencies() {
                 <li key={d.id} className="px-5 py-3">
                   <div className="flex items-baseline justify-between gap-3">
                     <div className="text-[13px] font-medium" style={{ color: "#1b1b1b" }}>
-                      <span className="mr-2 font-mono text-[11px]" style={{ color: "#565c65" }}>
+                      <span className="mr-2 font-mono text-xs" style={{ color: "#565c65" }}>
                         {d.from} → {d.to}
                       </span>
                       {d.title}
                     </div>
                     <span
-                      className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase"
+                      className="rounded px-1.5 py-0.5 text-xs font-semibold uppercase"
                       style={{
                         color: HEALTH_COLOR[d.severity],
                         backgroundColor: `${HEALTH_COLOR[d.severity]}14`,
@@ -219,11 +214,11 @@ function Dependencies() {
                       {HEALTH_LABEL[d.severity]}
                     </span>
                   </div>
-                  <div className="mt-1 text-[12px]" style={{ color: "#3d3d3d" }}>
+                  <div className="mt-1 text-xs" style={{ color: "#3d3d3d" }}>
                     {d.detail}
                   </div>
                   <div
-                    className="mt-1 flex flex-wrap gap-3 text-[11px]"
+                    className="mt-1 flex flex-wrap gap-3 text-xs"
                     style={{ color: "#565c65" }}
                   >
                     <span>Owner: {d.owner}</span>
@@ -254,7 +249,7 @@ function Dependencies() {
                   >
                     {workstreamOf(g.ws, program).label}
                   </h2>
-                  <span className="text-[11px]" style={{ color: "#565c65" }}>
+                  <span className="text-xs" style={{ color: "#565c65" }}>
                     {g.items.length} open
                   </span>
                 </div>
@@ -288,7 +283,7 @@ function IssueRow({ issue }: { issue: StoredLinearIssue }) {
           href={issue.url ?? "#"}
           target="_blank"
           rel="noreferrer"
-          className="font-mono text-[11px] underline"
+          className="font-mono text-xs underline"
           style={{ color: "#005ea2" }}
         >
           {issue.identifier}
@@ -296,7 +291,7 @@ function IssueRow({ issue }: { issue: StoredLinearIssue }) {
         <span className="text-[13px] font-medium">{issue.title}</span>
       </div>
       <div
-        className="mt-1 flex flex-wrap items-center gap-2 text-[11px]"
+        className="mt-1 flex flex-wrap items-center gap-2 text-xs"
         style={{ color: "#565c65" }}
       >
         <WsTag ws={ws} />

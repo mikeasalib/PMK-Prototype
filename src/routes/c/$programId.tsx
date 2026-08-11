@@ -89,7 +89,7 @@ function ClientPortalLayout() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#f7f7f5", color: "#1b1b1b" }}>
       <div
-        className="flex items-center justify-between border-b px-4 py-2 text-[12px] md:px-8"
+        className="flex items-center justify-between border-b px-4 py-2 text-xs md:px-8"
         style={{ backgroundColor: "#ffffff", borderColor: "#e5e5e2", color: "#565c65" }}
       >
         <div className="truncate">

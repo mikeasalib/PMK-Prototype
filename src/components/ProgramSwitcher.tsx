@@ -99,7 +99,7 @@ export function ProgramSwitcher() {
               <div className="text-[13px] font-semibold" style={{ color: "#1b1b1b" }}>
                 {user.name} — {user.role}
               </div>
-              <div className="text-[11px]" style={{ color: "#8a8a80" }}>
+              <div className="text-xs" style={{ color: "#8a8a80" }}>
                 Signed in via {user.provider === "okta" ? "Okta" : "static demo"}
               </div>
             </div>
@@ -185,7 +185,7 @@ function Seal({ program }: { program: ProgramConfig }) {
   return (
     <span
       aria-hidden="true"
-      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-[9px] font-semibold text-white"
+      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-xs font-semibold text-white"
       style={{ backgroundColor: program.navColor }}
     >
       {initials}

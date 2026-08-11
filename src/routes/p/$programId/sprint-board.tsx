@@ -55,7 +55,7 @@ function SprintBoard() {
         style={{ borderBottom: "1px solid #dfe1e2", backgroundColor: "#f0f0f0" }}
       >
         <span
-          className="text-[11px] uppercase tracking-wide font-semibold"
+          className="text-xs uppercase tracking-wide font-semibold"
           style={{ color: "#3a5a40" }}
         >
           Workstream
@@ -67,7 +67,7 @@ function SprintBoard() {
             <button
               key={k}
               onClick={() => setWs(k)}
-              className="rounded px-2 py-1 text-[11px] font-semibold"
+              className="rounded px-2 py-1 text-xs font-semibold"
               style={{
                 border: `1px solid ${active ? color : "#dfe1e2"}`,
                 backgroundColor: active ? color : "#fff",
@@ -78,7 +78,7 @@ function SprintBoard() {
             </button>
           );
         })}
-        <span className="ml-auto text-[11px]" style={{ color: "#565c65" }}>
+        <span className="ml-auto text-xs" style={{ color: "#565c65" }}>
           {filtered.length} issues
         </span>
       </div>
@@ -103,12 +103,12 @@ function SprintBoard() {
                   >
                     {u.ws} · {u.name}
                   </div>
-                  <div className="text-[11px]" style={{ color: "#565c65" }}>
+                  <div className="text-xs" style={{ color: "#565c65" }}>
                     Lead: {u.owner} · from Mon 7/13 sync
                   </div>
                 </div>
                 <span
-                  className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase"
+                  className="rounded px-1.5 py-0.5 text-xs font-semibold uppercase"
                   style={{
                     color: HEALTH_COLOR[u.health],
                     backgroundColor: `${HEALTH_COLOR[u.health]}14`,
@@ -118,7 +118,7 @@ function SprintBoard() {
                   {HEALTH_LABEL[u.health]}
                 </span>
               </div>
-              <div className="mt-2 text-[12px]">{u.headline}</div>
+              <div className="mt-2 text-xs">{u.headline}</div>
               <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
                 <UpdateList title="In progress" color="#1a6fa8" items={u.progress} />
                 <UpdateList title="Risks" color="#b3261e" items={u.risks} />
@@ -143,7 +143,7 @@ function SprintBoard() {
                 style={{ backgroundColor: "#f7f7f5", border: "1px solid #e5e5e2", minHeight: 300 }}
               >
                 <div
-                  className="mb-2 flex items-center justify-between px-1 text-[11px] font-semibold uppercase tracking-wide"
+                  className="mb-2 flex items-center justify-between px-1 text-xs font-semibold uppercase tracking-wide"
                   style={{ color: col.color }}
                 >
                   <span>{col.label}</span>
@@ -177,7 +177,7 @@ function IssueCard({ issue }: { issue: StoredLinearIssue }) {
       className="rounded bg-white p-2"
       style={{ border: "1px solid #e5e5e2", borderLeft: `3px solid ${color}` }}
     >
-      <div className="flex items-center justify-between text-[10px]" style={{ color: "#565c65" }}>
+      <div className="flex items-center justify-between text-xs" style={{ color: "#565c65" }}>
         <a
           href={issue.url ?? "#"}
           target="_blank"
@@ -194,9 +194,9 @@ function IssueCard({ issue }: { issue: StoredLinearIssue }) {
           {ws}
         </span>
       </div>
-      <div className="mt-1 text-[12px] font-medium leading-snug">{issue.title}</div>
+      <div className="mt-1 text-xs font-medium leading-snug">{issue.title}</div>
       <div
-        className="mt-1 flex items-center justify-between text-[10px]"
+        className="mt-1 flex items-center justify-between text-xs"
         style={{ color: "#565c65" }}
       >
         <span>{issue.assignee ?? "unassigned"}</span>
@@ -211,7 +211,7 @@ function IssueCard({ issue }: { issue: StoredLinearIssue }) {
           {priorityLabel(issue.priority)}
         </span>
       </div>
-      <div className="mt-1 text-[10px]" style={{ color: "#8a9099" }}>
+      <div className="mt-1 text-xs" style={{ color: "#8a9099" }}>
         {relativeTime(issue.source_updated_at)}
       </div>
     </div>
@@ -222,10 +222,10 @@ function UpdateList({ title, color, items }: { title: string; color: string; ite
   if (!items.length) return <div />;
   return (
     <div>
-      <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color }}>
+      <div className="text-xs font-semibold uppercase tracking-wide" style={{ color }}>
         {title}
       </div>
-      <ul className="mt-0.5 list-disc pl-4 text-[11px]" style={{ color: "#3d3d3d" }}>
+      <ul className="mt-0.5 list-disc pl-4 text-xs" style={{ color: "#3d3d3d" }}>
         {items.map((i, idx) => (
           <li key={idx}>{i}</li>
         ))}

@@ -181,7 +181,7 @@ function TeamTasks() {
           >
             Right this second
           </div>
-          <div className="mt-1 text-[12px]" style={{ color: "#565c65" }}>
+          <div className="mt-1 text-xs" style={{ color: "#565c65" }}>
             Anything currently In Progress or marked Urgent in Linear.
           </div>
           {isLoading ? (
@@ -204,7 +204,7 @@ function TeamTasks() {
                     style={{ padding: "6px 0", borderBottom: "1px solid #f0f0f0" }}
                   >
                     <span
-                      className="text-[11px] font-mono"
+                      className="text-xs font-mono"
                       style={{ color: "#565c65", minWidth: 70 }}
                     >
                       {t.identifier}
@@ -218,7 +218,7 @@ function TeamTasks() {
                       {t.title}
                     </a>
                     <span
-                      className="text-[11px] font-semibold"
+                      className="text-xs font-semibold"
                       style={{
                         color: pr.color,
                         backgroundColor: pr.bg,
@@ -229,7 +229,7 @@ function TeamTasks() {
                       {priorityLabel(t.priority)}
                     </span>
                     <span
-                      className="text-[11px] font-semibold"
+                      className="text-xs font-semibold"
                       style={{
                         color: st.color,
                         backgroundColor: st.bg,
@@ -240,7 +240,7 @@ function TeamTasks() {
                       {BUCKET_LABEL[t._bucket]}
                     </span>
                     <span
-                      className="text-[11px] font-semibold"
+                      className="text-xs font-semibold"
                       style={{ color: "#565c65", minWidth: 80 }}
                     >
                       {t._owner}
@@ -272,7 +272,7 @@ function TeamTasks() {
                 <div className="text-[13px] font-semibold" style={{ color: "#1b1b1b" }}>
                   {p}
                 </div>
-                <div className="mt-1 text-[11px]" style={{ color: "#565c65" }}>
+                <div className="mt-1 text-xs" style={{ color: "#565c65" }}>
                   {c.open} open · {c.done} done
                 </div>
               </button>
@@ -281,7 +281,7 @@ function TeamTasks() {
         </section>
 
         {/* Filters */}
-        <div className="flex items-center gap-3 text-[12px]" style={{ color: "#565c65" }}>
+        <div className="flex items-center gap-3 text-xs" style={{ color: "#565c65" }}>
           <span>Showing:</span>
           <button
             onClick={() => setFilter("All")}
@@ -327,7 +327,7 @@ function TeamTasks() {
                       width: 78,
                       color: "#565c65",
                       fontWeight: 600,
-                      fontSize: 11,
+                      fontSize: 12,
                       textTransform: "uppercase",
                     }}
                   >
@@ -339,7 +339,7 @@ function TeamTasks() {
                       textAlign: "left",
                       color: "#565c65",
                       fontWeight: 600,
-                      fontSize: 11,
+                      fontSize: 12,
                       textTransform: "uppercase",
                     }}
                   >
@@ -351,7 +351,7 @@ function TeamTasks() {
                       textAlign: "left",
                       color: "#565c65",
                       fontWeight: 600,
-                      fontSize: 11,
+                      fontSize: 12,
                       textTransform: "uppercase",
                     }}
                   >
@@ -363,7 +363,7 @@ function TeamTasks() {
                       textAlign: "left",
                       color: "#565c65",
                       fontWeight: 600,
-                      fontSize: 11,
+                      fontSize: 12,
                       textTransform: "uppercase",
                     }}
                   >
@@ -375,7 +375,7 @@ function TeamTasks() {
                       textAlign: "left",
                       color: "#565c65",
                       fontWeight: 600,
-                      fontSize: 11,
+                      fontSize: 12,
                       textTransform: "uppercase",
                     }}
                   >
@@ -387,7 +387,7 @@ function TeamTasks() {
                       textAlign: "left",
                       color: "#565c65",
                       fontWeight: 600,
-                      fontSize: 11,
+                      fontSize: 12,
                       textTransform: "uppercase",
                     }}
                   >
@@ -402,7 +402,7 @@ function TeamTasks() {
                   return (
                     <tr key={t.id} style={{ borderBottom: "1px solid #f0f0f0" }}>
                       <td
-                        className="font-mono text-[11px]"
+                        className="font-mono text-xs"
                         style={{ padding: "8px 10px", color: "#565c65" }}
                       >
                         <a
@@ -417,7 +417,7 @@ function TeamTasks() {
                       <td style={{ padding: "8px 10px", color: "#1b1b1b" }}>{t.title}</td>
                       <td style={{ padding: "8px 10px" }}>
                         <span
-                          className="text-[11px] font-semibold"
+                          className="text-xs font-semibold"
                           style={{
                             color: pr.color,
                             backgroundColor: pr.bg,
@@ -430,7 +430,7 @@ function TeamTasks() {
                       </td>
                       <td style={{ padding: "8px 10px" }}>
                         <span
-                          className="text-[11px] font-semibold"
+                          className="text-xs font-semibold"
                           style={{
                             color: st.color,
                             backgroundColor: st.bg,
@@ -442,7 +442,7 @@ function TeamTasks() {
                         </span>
                       </td>
                       <td style={{ padding: "8px 10px", color: "#1b1b1b" }}>{t._owner}</td>
-                      <td className="text-[11px]" style={{ padding: "8px 10px", color: "#565c65" }}>
+                      <td className="text-xs" style={{ padding: "8px 10px", color: "#565c65" }}>
                         {/* The stored column is null unless the source itself
                             said a workstream — neither board does — so fall back
                             to the program's classifier, which is what every other
@@ -458,7 +458,7 @@ function TeamTasks() {
           )}
         </section>
 
-        <p className="text-[11px]" style={{ color: "#888" }}>
+        <p className="text-xs" style={{ color: "#888" }}>
           Two sources of truth, on purpose. Tickets live in Linear; the checkbox
           tracker lives in Notion. Edit either at source and hit Refresh — nothing
           typed here is written back.
@@ -502,7 +502,7 @@ function NotionTrackerSection({ programId }: { programId: string }) {
           >
             Notion tracker{status === "ok" ? ` — ${open.length} open` : ""}
           </div>
-          <div className="mt-1 text-[12px]" style={{ color: "#565c65" }}>
+          <div className="mt-1 text-xs" style={{ color: "#565c65" }}>
             Hand-maintained checkboxes that never became Linear tickets.
             {status === "ok" && readAt ? ` Read ${relativeTime(readAt)}.` : ""}
           </div>
@@ -511,7 +511,7 @@ function NotionTrackerSection({ programId }: { programId: string }) {
           <button
             type="button"
             onClick={() => setShowDone((v) => !v)}
-            className="rounded px-2 py-1 text-[11px] font-semibold uppercase tracking-wide"
+            className="rounded px-2 py-1 text-xs font-semibold uppercase tracking-wide"
             style={{ border: "1px solid #dfe1e2", backgroundColor: "#fff", color: "#3a5a40" }}
           >
             {showDone ? "Hide" : "Show"} {done.length} done
@@ -546,7 +546,7 @@ function NotionTrackerSection({ programId }: { programId: string }) {
             return (
               <div key={group.section}>
                 <div
-                  className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide"
+                  className="mb-1.5 text-xs font-semibold uppercase tracking-wide"
                   style={{ color: "#565c65" }}
                 >
                   {tidySection(group.section)} · {group.open.length} open
@@ -564,7 +564,7 @@ function NotionTrackerSection({ programId }: { programId: string }) {
                       >
                         <span
                           aria-hidden
-                          className="mt-0.5 shrink-0 font-mono text-[11px]"
+                          className="mt-0.5 shrink-0 font-mono text-xs"
                           style={{ color: t.checked ? "#2e8540" : "#8a8a80" }}
                         >
                           {t.checked ? "\u2713" : "\u25a2"}
@@ -588,7 +588,7 @@ function NotionTrackerSection({ programId }: { programId: string }) {
                           </a>
                           {refs.length ? (
                             <span
-                              className="ml-2 font-mono text-[10px]"
+                              className="ml-2 font-mono text-xs"
                               style={{ color: "#4a3fb5" }}
                             >
                               {refs.join(" ")}
@@ -600,7 +600,7 @@ function NotionTrackerSection({ programId }: { programId: string }) {
                               underneath is scannable at the same density. */}
                           {sum.detail && !t.checked ? (
                             <div
-                              className="mt-0.5 text-[11px] leading-snug"
+                              className="mt-0.5 text-xs leading-snug"
                               style={{ color: "#6b7280" }}
                             >
                               {sum.detail}

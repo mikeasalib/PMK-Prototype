@@ -91,7 +91,7 @@ function RisksPage() {
           <select
             value={ws}
             onChange={(e) => setWs(e.target.value as WorkstreamKey | "all")}
-            className="rounded border px-2 py-1 text-[12px]"
+            className="rounded border px-2 py-1 text-xs"
             style={{ borderColor: "#d5d5d0" }}
           >
             <option value="all">All</option>
@@ -106,7 +106,7 @@ function RisksPage() {
           <select
             value={owner}
             onChange={(e) => setOwner(e.target.value)}
-            className="rounded border px-2 py-1 text-[12px]"
+            className="rounded border px-2 py-1 text-xs"
             style={{ borderColor: "#d5d5d0" }}
           >
             <option value="all">All</option>
@@ -121,7 +121,7 @@ function RisksPage() {
           <select
             value={sev}
             onChange={(e) => setSev(e.target.value as RiskSeverity | "all")}
-            className="rounded border px-2 py-1 text-[12px]"
+            className="rounded border px-2 py-1 text-xs"
             style={{ borderColor: "#d5d5d0" }}
           >
             <option value="all">All</option>
@@ -136,7 +136,7 @@ function RisksPage() {
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as RiskStatus | "all")}
-            className="rounded border px-2 py-1 text-[12px]"
+            className="rounded border px-2 py-1 text-xs"
             style={{ borderColor: "#d5d5d0" }}
           >
             <option value="all">All</option>
@@ -147,18 +147,18 @@ function RisksPage() {
             ))}
           </select>
         </Filter>
-        <span className="ml-auto text-[11px]" style={{ color: "#666" }}>
+        <span className="ml-auto text-xs" style={{ color: "#666" }}>
           {rows.length} of {seed.risks.length}
         </span>
       </div>
 
       <div className="p-6">
         <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] text-[12px]" style={{ border: "1px solid #e5e5e2" }}>
+        <table className="w-full min-w-[720px] text-xs" style={{ border: "1px solid #e5e5e2" }}>
           <thead style={{ backgroundColor: "#f7f7f5" }}>
             <tr
               className="text-left uppercase tracking-wide"
-              style={{ color: "#666", fontSize: 10 }}
+              style={{ color: "#666", fontSize: 12 }}
             >
               <th className="px-3 py-2 font-medium">ID</th>
               <th className="px-3 py-2 font-medium">Risk</th>
@@ -223,7 +223,7 @@ function Kpi({ label, value, color }: { label: string; value: number; color: str
       className="rounded-md bg-white px-3 py-2"
       style={{ border: "1px solid #e5e5e2", borderLeft: `3px solid ${color}` }}
     >
-      <div className="text-[10px] uppercase tracking-wide" style={{ color: "#666" }}>
+      <div className="text-xs uppercase tracking-wide" style={{ color: "#666" }}>
         {label}
       </div>
       <div
@@ -239,7 +239,7 @@ function Kpi({ label, value, color }: { label: string; value: number; color: str
 function Filter({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex items-center gap-1.5">
-      <span className="text-[11px] uppercase tracking-wide" style={{ color: "#666" }}>
+      <span className="text-xs uppercase tracking-wide" style={{ color: "#666" }}>
         {label}
       </span>
       {children}
@@ -250,7 +250,7 @@ function Filter({ label, children }: { label: string; children: React.ReactNode 
 function Pill({ color, label }: { color: string; label: string }) {
   return (
     <span
-      className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase"
+      className="rounded px-1.5 py-0.5 text-xs font-semibold uppercase"
       style={{ color, backgroundColor: `${color}14`, border: `1px solid ${color}44` }}
     >
       {label}

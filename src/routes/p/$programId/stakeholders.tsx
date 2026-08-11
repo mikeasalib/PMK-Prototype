@@ -30,7 +30,7 @@ function Stakeholders() {
 
       <div className="px-4 pt-4 sm:px-6">
         <div
-          className="inline-flex rounded-md text-[12px] font-medium"
+          className="inline-flex rounded-md text-xs font-medium"
           style={{ border: "1px solid #d5d5d0", backgroundColor: "#fff" }}
         >
           {(
@@ -89,7 +89,7 @@ function PeoplePanel() {
             <h2 className="text-[13px] font-semibold" style={{ color: org.color }}>
               {org.name}
             </h2>
-            <span className="ml-auto text-[11px]" style={{ color: "#666" }}>
+            <span className="ml-auto text-xs" style={{ color: "#666" }}>
               {org.contacts.length} contacts
             </span>
           </div>
@@ -98,13 +98,13 @@ function PeoplePanel() {
               <li key={c.name} className="flex items-start justify-between gap-2 px-3 py-2">
                 <div>
                   <div className="text-[13px] font-medium">{c.name}</div>
-                  <div className="text-[11px]" style={{ color: "#666" }}>
+                  <div className="text-xs" style={{ color: "#666" }}>
                     {c.role}
                   </div>
                 </div>
                 {c.ws ? (
                   <span
-                    className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                    className="rounded px-1.5 py-0.5 text-xs font-semibold"
                     style={{
                       backgroundColor: "#f0eef7",
                       color: "#4a3fb5",
@@ -160,7 +160,7 @@ function GlossaryPanel() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search acronym or meaning…"
-          className="w-64 rounded-md px-2.5 py-1.5 text-[12px] outline-none focus:ring-2"
+          className="w-64 rounded-md px-2.5 py-1.5 text-xs outline-none focus:ring-2"
           style={{
             border: "1px solid #d5d5d0",
             backgroundColor: "#fff",
@@ -169,7 +169,7 @@ function GlossaryPanel() {
         <button
           type="button"
           onClick={() => setActiveCat("all")}
-          className="rounded px-2 py-1 text-[11px] font-medium"
+          className="rounded px-2 py-1 text-xs font-medium"
           style={{
             border: "1px solid #d5d5d0",
             backgroundColor: activeCat === "all" ? "#2e5d3a" : "#fff",
@@ -186,7 +186,7 @@ function GlossaryPanel() {
               key={c.key}
               type="button"
               onClick={() => setActiveCat(c.key)}
-              className="rounded px-2 py-1 text-[11px] font-medium"
+              className="rounded px-2 py-1 text-xs font-medium"
               style={{
                 border: `1px solid ${c.color}55`,
                 backgroundColor: active ? c.color : `${c.color}12`,
@@ -201,7 +201,7 @@ function GlossaryPanel() {
             attribution unconditionally would credit VA's Notion page for an
             empty glossary. */}
         {seed.glossarySource ? (
-          <span className="ml-auto text-[11px]" style={{ color: "#666" }}>
+          <span className="ml-auto text-xs" style={{ color: "#666" }}>
             Source:{" "}
             <a
               href={seed.glossarySource.url}
@@ -257,11 +257,11 @@ function GlossaryPanel() {
                     <h2 className="text-[13px] font-semibold" style={{ color: c.color }}>
                       {c.key}
                     </h2>
-                    <span className="ml-auto text-[11px]" style={{ color: "#666" }}>
+                    <span className="ml-auto text-xs" style={{ color: "#666" }}>
                       {entries.length}
                     </span>
                   </div>
-                  <p className="px-3 pb-1.5 pt-1.5 text-[11px]" style={{ color: "#666" }}>
+                  <p className="px-3 pb-1.5 pt-1.5 text-xs" style={{ color: "#666" }}>
                     {c.blurb}
                   </p>
                   <ul className="divide-y" style={{ borderColor: "#eee" }}>
@@ -269,7 +269,7 @@ function GlossaryPanel() {
                       <li key={`${e.category}-${e.term}`} className="px-3 py-2">
                         <div className="flex flex-wrap items-baseline gap-2">
                           <span
-                            className="rounded px-1.5 py-0.5 font-mono text-[11px] font-semibold"
+                            className="rounded px-1.5 py-0.5 font-mono text-xs font-semibold"
                             style={{
                               backgroundColor: `${c.color}14`,
                               color: c.color,
@@ -279,13 +279,13 @@ function GlossaryPanel() {
                             {e.term}
                           </span>
                           {e.lead ? (
-                            <span className="text-[11px]" style={{ color: "#333" }}>
+                            <span className="text-xs" style={{ color: "#333" }}>
                               Lead: <span style={{ fontWeight: 600 }}>{e.lead}</span>
                             </span>
                           ) : null}
                           {e.unconfirmed ? (
                             <span
-                              className="rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide"
+                              className="rounded px-1 py-0.5 text-xs font-bold uppercase tracking-wide"
                               style={{
                                 backgroundColor: "#fff4e0",
                                 color: "#8a5a00",
@@ -296,7 +296,7 @@ function GlossaryPanel() {
                             </span>
                           ) : null}
                         </div>
-                        <div className="mt-1 text-[12px] leading-snug" style={{ color: "#333" }}>
+                        <div className="mt-1 text-xs leading-snug" style={{ color: "#333" }}>
                           {e.meaning.replace(/\s*\(unconfirmed\)\s*/i, " ").trim()}
                         </div>
                       </li>

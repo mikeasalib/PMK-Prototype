@@ -70,7 +70,7 @@ function Brief() {
 
       <div className="px-4 pb-10 pt-2 sm:px-6">
         <div
-          className="mb-5 rounded-md p-3 text-[12px]"
+          className="mb-5 rounded-md p-3 text-xs"
           style={{ backgroundColor: "#f7f7f5", border: "1px solid #e5e5e2", color: "#565c65" }}
         >
           Reads Linear, Notion risk register, and lifecycle phases at generation
@@ -118,7 +118,7 @@ function RenderResult({ result }: { result: BriefResult }) {
       {result.watchList.length > 0 ? (
         <div className="mt-5">
           <h3
-            className="mb-2 text-[11px] font-semibold uppercase tracking-wide"
+            className="mb-2 text-xs font-semibold uppercase tracking-wide"
             style={{ color: "#565c65" }}
           >
             Worth watching
@@ -133,7 +133,7 @@ function RenderResult({ result }: { result: BriefResult }) {
           </ul>
         </div>
       ) : null}
-      <div className="mt-5 text-[10px]" style={{ color: "#8a8a80" }}>
+      <div className="mt-5 text-xs" style={{ color: "#8a8a80" }}>
         Generated {new Date(result.generatedAt).toLocaleString()} · model {result.model}. Draft —
         review before sending. Citations reference the identifiers this program uses
         in Linear / Notion.
@@ -166,7 +166,7 @@ function NotOk({ result }: { result: Extract<BriefResult, { ok: false }> }) {
       <p className="mt-2 text-[13px]">{messages[result.reason]}</p>
       {result.detail ? (
         <div
-          className="mt-3 rounded p-2 font-mono text-[11px]"
+          className="mt-3 rounded p-2 font-mono text-xs"
           style={{ backgroundColor: "#f7f0e0", color: "#5a4a00" }}
         >
           {result.detail}

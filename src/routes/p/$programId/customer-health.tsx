@@ -189,23 +189,23 @@ function NotConfigured() {
         <p className="mt-2 text-[13px] leading-relaxed text-neutral-600">
           Customer-health sentiment is meant to render as a live Hex embed. This
           program hasn't been wired to one — set{" "}
-          <code className="rounded bg-neutral-200 px-1.5 py-0.5 text-[12px] text-neutral-800">
+          <code className="rounded bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-800">
             hex.customerHealth
           </code>{" "}
           on the program in{" "}
-          <code className="rounded bg-neutral-200 px-1.5 py-0.5 text-[12px] text-neutral-800">
+          <code className="rounded bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-800">
             src/lib/program.config.ts
           </code>{" "}
           with either an{" "}
-          <code className="rounded bg-neutral-200 px-1.5 py-0.5 text-[12px] text-neutral-800">
+          <code className="rounded bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-800">
             embedUrl
           </code>{" "}
           (session-auth fallback) or a{" "}
-          <code className="rounded bg-neutral-200 px-1.5 py-0.5 text-[12px] text-neutral-800">
+          <code className="rounded bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-800">
             projectId
           </code>{" "}
           plus{" "}
-          <code className="rounded bg-neutral-200 px-1.5 py-0.5 text-[12px] text-neutral-800">
+          <code className="rounded bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-800">
             HEX_API_KEY
           </code>{" "}
           for signed embeds.

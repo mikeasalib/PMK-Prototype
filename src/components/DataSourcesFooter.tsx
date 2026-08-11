@@ -22,10 +22,10 @@ export function DataSourcesFooter() {
 
   return (
     <div
-      className="px-4 py-3 text-[11px]"
+      className="px-4 py-3 text-xs"
       style={{ borderTop: "1px solid rgba(255,255,255,0.15)", color: "#a9aeb1" }}
     >
-      <div className="mb-2 text-[10px] uppercase tracking-wide" style={{ color: "#8a9099" }}>
+      <div className="mb-2 text-xs uppercase tracking-wide" style={{ color: "#8a9099" }}>
         Data sources
       </div>
       <ul className="space-y-1">
@@ -73,7 +73,7 @@ export function DataSourcesFooter() {
       </div>
       {origin === "snapshot" ? (
         <div
-          className="mt-2 rounded px-2 py-1.5 text-[10px] leading-snug"
+          className="mt-2 rounded px-2 py-1.5 text-xs leading-snug"
           style={{ backgroundColor: "rgba(138,90,0,0.22)", color: "#f2d9a8" }}
           title={capturedFrom ?? undefined}
         >
@@ -84,7 +84,7 @@ export function DataSourcesFooter() {
       ) : null}
       {origin === "live" ? (
         <div
-          className="mt-2 rounded px-2 py-1.5 text-[10px] leading-snug"
+          className="mt-2 rounded px-2 py-1.5 text-xs leading-snug"
           style={{ backgroundColor: "rgba(46,133,64,0.20)", color: "#c8e6c9" }}
           title={capturedFrom ?? undefined}
         >

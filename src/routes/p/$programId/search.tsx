@@ -101,7 +101,7 @@ function Search() {
             <button
               type="button"
               onClick={() => setQuery("")}
-              className="text-[12px] font-medium"
+              className="text-xs font-medium"
               style={{ color: "#565c65" }}
             >
               Clear
@@ -123,7 +123,7 @@ function Search() {
                     className="flex flex-col gap-1 py-1.5 text-[13px] md:flex-row md:items-center md:gap-3"
                   >
                     <span
-                      className="shrink-0 font-mono text-[11px] md:w-16"
+                      className="shrink-0 font-mono text-xs md:w-16"
                       style={{ color: "#565c65" }}
                     >
                       {h.identifier}
@@ -148,14 +148,14 @@ function Search() {
                         competing with the title for a narrow column. */}
                     <div className="flex items-center gap-3 md:contents">
                       <span
-                        className="min-w-0 truncate text-[11px] md:w-24 md:shrink-0 md:text-right"
+                        className="min-w-0 truncate text-xs md:w-24 md:shrink-0 md:text-right"
                         style={{ color: "#565c65" }}
                         title={h.assignee ?? "Unassigned"}
                       >
                         {h.assignee ?? "—"}
                       </span>
                       <span
-                        className="shrink-0 text-[10px] uppercase tracking-wide md:w-24 md:text-right"
+                        className="shrink-0 text-xs uppercase tracking-wide md:w-24 md:text-right"
                         style={{ color: "#565c65" }}
                       >
                         {h.state ?? "—"}
@@ -180,7 +180,7 @@ function Search() {
                       </div>
                       {h.detail ? (
                         <div
-                          className="mt-0.5 truncate text-[11px]"
+                          className="mt-0.5 truncate text-xs"
                           style={{ color: "#565c65" }}
                         >
                           {h.detail}
@@ -189,13 +189,13 @@ function Search() {
                     </div>
                     <div className="flex items-center gap-3 md:contents">
                       <span
-                        className="min-w-0 truncate text-[11px] md:w-24 md:shrink-0 md:text-right"
+                        className="min-w-0 truncate text-xs md:w-24 md:shrink-0 md:text-right"
                         style={{ color: "#565c65" }}
                       >
                         {h.owner ?? "—"}
                       </span>
                       <span
-                        className="shrink-0 text-[10px] uppercase tracking-wide md:w-16 md:text-right"
+                        className="shrink-0 text-xs uppercase tracking-wide md:w-16 md:text-right"
                         style={{ color: h.status === "done" ? "#1f5c2f" : "#565c65" }}
                       >
                         {h.status}
@@ -204,7 +204,7 @@ function Search() {
                     <Link
                       to="/p/$programId/follow-ups"
                       params={{ programId: program.id }}
-                      className="text-[11px] font-medium"
+                      className="text-xs font-medium"
                       style={{ color: "#3a5a40" }}
                     >
                       open
@@ -236,7 +236,7 @@ function Search() {
                       )}
                     </div>
                     <span
-                      className="shrink-0 text-[11px] md:w-32 md:text-right"
+                      className="shrink-0 text-xs md:w-32 md:text-right"
                       style={{ color: "#565c65" }}
                     >
                       {m.targetDate ? shortDate(m.targetDate) : "no target"}
@@ -248,7 +248,7 @@ function Search() {
           </div>
         )}
 
-        <div className="mt-8 text-[10px] leading-relaxed" style={{ color: "#8a8a80" }}>
+        <div className="mt-8 text-xs leading-relaxed" style={{ color: "#8a8a80" }}>
           Program-scoped. Case-insensitive substring match on identifier, title,
           assignee, labels, and state (Linear); title, detail, owner, source
           (follow-ups); name (milestones). The Notion risk register and Granola
@@ -267,7 +267,7 @@ function ResultGroup({ label, children }: { label: string; children: React.React
       style={{ border: "1px solid #e5e5e2" }}
     >
       <h2
-        className="mb-2 text-[11px] font-semibold uppercase tracking-wide"
+        className="mb-2 text-xs font-semibold uppercase tracking-wide"
         style={{ color: "#565c65" }}
       >
         {label}
@@ -280,7 +280,7 @@ function ResultGroup({ label, children }: { label: string; children: React.React
 function MatchedBadge({ label }: { label: string }) {
   return (
     <span
-      className="w-20 shrink-0 rounded px-1.5 py-0.5 text-center text-[9px] font-semibold uppercase tracking-wide"
+      className="w-20 shrink-0 rounded px-1.5 py-0.5 text-center text-xs font-semibold uppercase tracking-wide"
       style={{ backgroundColor: "#f0f0ec", color: "#565c65" }}
       title={`Matched on ${label}`}
     >

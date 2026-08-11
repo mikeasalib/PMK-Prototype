@@ -44,7 +44,10 @@ function download(a: GeneratedArtifact) {
   el.href = url;
   el.download = a.filename;
   el.click();
-  URL.revokeObjectURL(url);
+  // Revoke on the next tick, not synchronously. Some browsers have not yet
+  // begun reading the blob when click() returns, and revoking underneath them
+  // produced an empty or failed download.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 function Artifacts() {
@@ -59,7 +62,16 @@ function Artifacts() {
       const out = await run({ data: { kind, programId: program.id } });
       setLast((p) => ({ ...p, [kind]: out }));
       download(out);
-      toast.success(`${out.filename} generated`);
+      // A green toast on a document with unsourced sections tells the user the
+      // opposite of what the document says about itself.
+      const gaps = out.unsourced.length + (out.emptyColumns?.length ?? 0);
+      if (gaps > 0) {
+        toast.warning(`${out.filename} generated with ${gaps} unsourced section${gaps === 1 ? "" : "s"}`, {
+          description: "Review the gaps listed below before sending.",
+        });
+      } else {
+        toast.success(`${out.filename} generated`);
+      }
     } catch (e) {
       toast.error(`Could not generate: ${(e as Error).message}`);
     } finally {
@@ -76,10 +88,10 @@ function Artifacts() {
 
       <div className="px-4 pb-10 pt-2 sm:px-6">
         <div
-          className="mb-5 rounded-md p-3 text-[12px]"
+          className="mb-5 rounded-md p-3 text-xs"
           style={{ backgroundColor: "#f7f7f5", border: "1px solid #e5e5e2", color: "#565c65" }}
         >
-          Facts are read from Linear, Notion, and Granola at generation time and never stored here.
+          Facts are read from Linear and Notion at generation time and never stored here.
           Anything without a wired source is marked in the output as a gap rather than left blank,
           so a reader can tell the difference between <em>zero</em> and <em>unknown</em>.
         </div>
@@ -108,7 +120,7 @@ function Artifacts() {
                     </div>
                     <div className="min-w-0">
                       <div className="text-[14px] font-semibold">{a.title}</div>
-                      <p className="mt-0.5 text-[12.5px]" style={{ color: "#565c65" }}>
+                      <p className="mt-0.5 text-xs" style={{ color: "#565c65" }}>
                         {a.description}
                       </p>
                     </div>
@@ -131,7 +143,7 @@ function Artifacts() {
 
                 {done ? (
                   <div
-                    className="mt-3 space-y-1 rounded p-2.5 text-[11.5px]"
+                    className="mt-3 space-y-1 rounded p-2.5 text-xs"
                     style={{ backgroundColor: "#f8f8f6", color: "#565c65" }}
                   >
                     <div>

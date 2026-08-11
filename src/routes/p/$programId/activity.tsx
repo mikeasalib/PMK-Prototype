@@ -93,7 +93,7 @@ function ActivityFeed() {
         className="flex flex-wrap items-center gap-3 px-6 py-3"
         style={{ borderBottom: "1px solid #e5e5e2" }}
       >
-        <span className="text-[11px] uppercase tracking-wide" style={{ color: "#666" }}>
+        <span className="text-xs uppercase tracking-wide" style={{ color: "#666" }}>
           Source
         </span>
         {(["all", "linear", "notion"] as const).map((k) => {
@@ -103,7 +103,7 @@ function ActivityFeed() {
             <button
               key={k}
               onClick={() => setKind(k)}
-              className="rounded px-2 py-1 text-[11px] font-semibold"
+              className="rounded px-2 py-1 text-xs font-semibold"
               style={{
                 border: `1px solid ${active ? c : "#dfe1e2"}`,
                 backgroundColor: active ? c : "#fff",
@@ -114,7 +114,7 @@ function ActivityFeed() {
             </button>
           );
         })}
-        <span className="ml-auto text-[11px]" style={{ color: "#666" }}>
+        <span className="ml-auto text-xs" style={{ color: "#666" }}>
           {filtered.length} events
         </span>
       </div>
@@ -128,7 +128,7 @@ function ActivityFeed() {
           {grouped.map(([date, items]) => (
             <section key={date}>
               <div
-                className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-wide"
+                className="mb-2 font-mono text-xs font-semibold uppercase tracking-wide"
                 style={{ color: "#3a5a40" }}
               >
                 {date}
@@ -143,7 +143,7 @@ function ActivityFeed() {
                       style={{ borderTop: i === 0 ? undefined : "1px solid #eee" }}
                     >
                       <span
-                        className="mt-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase"
+                        className="mt-0.5 rounded px-1.5 py-0.5 text-xs font-semibold uppercase"
                         style={{
                           color: k.color,
                           backgroundColor: `${k.color}14`,
@@ -180,7 +180,7 @@ function ActivityFeed() {
                           )}
                         </div>
                         {e.detail ? (
-                          <div className="text-[11px]" style={{ color: "#565c65" }}>
+                          <div className="text-xs" style={{ color: "#565c65" }}>
                             {e.detail} · {relativeTime(e.ts)}
                           </div>
                         ) : null}

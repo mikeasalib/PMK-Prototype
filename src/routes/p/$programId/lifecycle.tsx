@@ -97,7 +97,7 @@ function LifecyclePage() {
               <a
                 key={p.id}
                 href={`#${p.id}`}
-                className="flex-1 px-3 py-2 text-[11px]"
+                className="flex-1 px-3 py-2 text-xs"
                 style={{
                   backgroundColor: s.bg,
                   color: s.fg,
@@ -105,7 +105,7 @@ function LifecyclePage() {
                   textDecoration: "none",
                 }}
               >
-                <div className="font-mono" style={{ fontSize: 10, opacity: 0.75 }}>
+                <div className="font-mono" style={{ fontSize: 12, opacity: 0.75 }}>
                   {p.id} · {p.sprints}
                 </div>
                 <div
@@ -114,7 +114,7 @@ function LifecyclePage() {
                 >
                   {p.name.replace(/^Phase \d+ · /, "")}
                 </div>
-                <div className="mt-0.5" style={{ fontSize: 10 }}>
+                <div className="mt-0.5" style={{ fontSize: 12 }}>
                   {p.window}
                 </div>
               </a>
@@ -125,7 +125,7 @@ function LifecyclePage() {
 
       {/* Phase cards */}
       <div className="p-4 space-y-4 sm:p-6">
-        <div className="flex items-center justify-end gap-2 text-[11px]">
+        <div className="flex items-center justify-end gap-2 text-xs">
           <button
             type="button"
             onClick={() => setAll(!allOpen)}
@@ -159,7 +159,7 @@ function LifecyclePage() {
               >
                 <span
                   aria-hidden
-                  className="font-mono text-[12px]"
+                  className="font-mono text-xs"
                   style={{ color: "#565c65", width: 12, display: "inline-block" }}
                 >
                   {isOpen ? "▾" : "▸"}
@@ -171,17 +171,17 @@ function LifecyclePage() {
                   {p.name}
                 </h2>
                 <span
-                  className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                  className="rounded px-2 py-0.5 text-xs font-semibold uppercase tracking-wide"
                   style={{ backgroundColor: s.bg, color: s.fg }}
                 >
                   {s.label}
                 </span>
-                <span className="font-mono text-[11px]" style={{ color: "#565c65" }}>
+                <span className="font-mono text-xs" style={{ color: "#565c65" }}>
                   {p.window} · {p.sprints}
                 </span>
                 {p.milestone ? (
                   <span
-                    className="ml-auto rounded px-2 py-0.5 text-[11px] font-semibold"
+                    className="ml-auto rounded px-2 py-0.5 text-xs font-semibold"
                     style={{ backgroundColor: "#3a5a40", color: "#ffbe2e" }}
                   >
                     {p.milestone}
@@ -198,7 +198,7 @@ function LifecyclePage() {
                   <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
                       <h3
-                        className="mb-2 text-[11px] font-semibold uppercase tracking-wide"
+                        className="mb-2 text-xs font-semibold uppercase tracking-wide"
                         style={{ color: "#565c65" }}
                       >
                         Big blocks
@@ -224,13 +224,13 @@ function LifecyclePage() {
                                   {b.title}
                                 </span>
                                 <span
-                                  className="ml-auto rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase"
+                                  className="ml-auto rounded px-1.5 py-0.5 text-xs font-semibold uppercase"
                                   style={{ backgroundColor: bs.bg, color: bs.fg }}
                                 >
                                   {bs.label}
                                 </span>
                               </div>
-                              <p className="mt-1 text-[12px]" style={{ color: "#3a3a3a" }}>
+                              <p className="mt-1 text-xs" style={{ color: "#3a3a3a" }}>
                                 {b.detail}
                               </p>
                             </li>
@@ -242,7 +242,7 @@ function LifecyclePage() {
                     <div className="space-y-4">
                       <div>
                         <h3
-                          className="mb-2 text-[11px] font-semibold uppercase tracking-wide"
+                          className="mb-2 text-xs font-semibold uppercase tracking-wide"
                           style={{ color: "#565c65" }}
                         >
                           Exit criteria
@@ -258,7 +258,7 @@ function LifecyclePage() {
                       </div>
                       <div>
                         <h3
-                          className="mb-2 text-[11px] font-semibold uppercase tracking-wide"
+                          className="mb-2 text-xs font-semibold uppercase tracking-wide"
                           style={{ color: "#565c65" }}
                         >
                           Gates
@@ -267,7 +267,7 @@ function LifecyclePage() {
                           {p.gates.map((g, i) => (
                             <span
                               key={i}
-                              className="rounded px-2 py-0.5 text-[11px]"
+                              className="rounded px-2 py-0.5 text-xs"
                               style={{
                                 backgroundColor: "#f0f0f0",
                                 color: "#333",
@@ -339,7 +339,7 @@ function LifecycleTimeline({ program }: { program: ProgramLike }) {
         >
           Timeline · {shortDate(windowStart)} – {shortDate(windowEnd)}
         </h2>
-        <span className="text-[11px]" style={{ color: "#565c65" }}>
+        <span className="text-xs" style={{ color: "#565c65" }}>
           Bars sized to phase duration · milestones as ticks · today line
         </span>
       </div>
@@ -384,7 +384,7 @@ function LifecycleTimeline({ program }: { program: ProgramLike }) {
               title={`${p.name} · ${p.window}`}
             >
               <div
-                className="truncate px-2 py-1 text-[11px] font-semibold"
+                className="truncate px-2 py-1 text-xs font-semibold"
                 style={{ color: "#ffffff" }}
               >
                 {p.name.replace(/^Phase \d+ · /, "")}
@@ -408,7 +408,7 @@ function LifecycleTimeline({ program }: { program: ProgramLike }) {
               }}
             />
             <div
-              className="absolute rounded px-1.5 py-0.5 text-[10px] font-semibold"
+              className="absolute rounded px-1.5 py-0.5 text-xs font-semibold"
               style={{
                 left: `calc(${pct(iso)}% - 20px)`,
                 top: 4,
@@ -440,7 +440,7 @@ function LifecycleTimeline({ program }: { program: ProgramLike }) {
               }}
             />
             <div
-              className="absolute whitespace-nowrap text-[10px] font-medium"
+              className="absolute whitespace-nowrap text-xs font-medium"
               style={{
                 color: "#3a5a40",
                 bottom: -2 + (i % 2 === 0 ? 0 : 12),
@@ -457,7 +457,7 @@ function LifecycleTimeline({ program }: { program: ProgramLike }) {
         {monthTicks.map((t) => (
           <div
             key={`ml-${t.iso}`}
-            className="absolute text-[10px]"
+            className="absolute text-xs"
             style={{
               left: `${pct(t.iso)}%`,
               bottom: -18,
@@ -471,7 +471,7 @@ function LifecycleTimeline({ program }: { program: ProgramLike }) {
         ))}
       </div>
 
-      <div className="mt-2 flex items-center gap-4 text-[10px]" style={{ color: "#8a8a80" }}>
+      <div className="mt-2 flex items-center gap-4 text-xs" style={{ color: "#8a8a80" }}>
         <span className="inline-flex items-center gap-1">
           <span className="inline-block h-2 w-2 rounded" style={{ backgroundColor: STATUS_STYLE.complete.bar }} /> complete
         </span>
@@ -531,7 +531,7 @@ function Kpi({ label, value, sub }: { label: string; value: string; sub: string 
   return (
     <div className="rounded-md bg-white p-3" style={{ border: "1px solid #dfe1e2" }}>
       <div
-        className="text-[10px] font-semibold uppercase tracking-wide"
+        className="text-xs font-semibold uppercase tracking-wide"
         style={{ color: "#565c65" }}
       >
         {label}
@@ -542,7 +542,7 @@ function Kpi({ label, value, sub }: { label: string; value: string; sub: string 
       >
         {value}
       </div>
-      <div className="mt-0.5 text-[11px]" style={{ color: "#565c65" }}>
+      <div className="mt-0.5 text-xs" style={{ color: "#565c65" }}>
         {sub}
       </div>
     </div>

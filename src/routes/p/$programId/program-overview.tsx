@@ -164,14 +164,14 @@ function Overview() {
             return (
               <div
                 key={s.key}
-                className="min-w-[116px] flex-1 px-3 py-2 text-[11px]"
+                className="min-w-[116px] flex-1 px-3 py-2 text-xs"
                 style={{
                   backgroundColor: isActive ? "#fff5c2" : past ? "#ecf3ec" : "#eef2f7",
                   color: "#3a5a40",
                   borderRight: "1px solid #dfe1e2",
                 }}
               >
-                <div className="font-mono text-[10px]" style={{ opacity: 0.65 }}>
+                <div className="font-mono text-xs" style={{ opacity: 0.65 }}>
                   {s.key}
                 </div>
                 <div
@@ -180,7 +180,7 @@ function Overview() {
                 >
                   {s.label}
                 </div>
-                <div className="text-[10px]" style={{ color: "#565c65" }}>
+                <div className="text-xs" style={{ color: "#565c65" }}>
                   {s.start.slice(5)} – {s.end.slice(5)}
                 </div>
               </div>
@@ -236,7 +236,7 @@ function Overview() {
                   ? `Current phase — ${currentPhase?.name ?? "post-launch"}`
                   : `Current sprint — ${activeSprint.label}`}
               </h2>
-              <span className="text-[11px]" style={{ color: "#565c65" }}>
+              <span className="text-xs" style={{ color: "#565c65" }}>
                 {usesPhases
                   ? currentPhase
                     ? currentPhase.window
@@ -323,50 +323,33 @@ function Overview() {
               >
                 Workstream burn-down
               </h2>
-              <span className="text-[11px]" style={{ color: "#565c65" }}>
-                Health derived from live Linear signals
-                {seed.workstreamUpdatesSource
-                  ? ` · progress notes ${seed.workstreamUpdatesSource.date}`
-                  : ""}
+              <span className="text-xs" style={{ color: "#565c65" }}>
+                Health and completion derived from Linear
               </span>
             </div>
             <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] text-[12px]">
+            <table className="w-full min-w-[520px] text-xs">
               <thead>
                 <tr
                   className="text-left uppercase tracking-wide"
-                  style={{ color: "#565c65", fontSize: 10 }}
+                  style={{ color: "#565c65", fontSize: 12 }}
                 >
                   <th className="px-2 py-1 font-medium">Workstream</th>
                   <th className="px-2 py-1 font-medium">Health</th>
-                  <th className="px-2 py-1 font-medium">Done</th>
-                  <th className="px-2 py-1 font-medium">In Prog</th>
-                  <th className="px-2 py-1 font-medium leading-tight">
-                    <div>Todo +</div>
-                    <div>Backlog</div>
-                  </th>
                   <th className="px-2 py-1 font-medium">Total</th>
-                  <th className="px-2 py-1 font-medium">Signals</th>
-                  <th className="px-2 py-1 font-medium">Burn-down</th>
+                  <th className="px-2 py-1 font-medium">Complete</th>
                 </tr>
               </thead>
               <tbody>
                 {wsRows.map((r) => {
-                  const update = seed.workstreamUpdates.find((u) => u.ws === r.ws);
-                  const progressCount = update?.progress.length ?? 0;
-                  const openCount = (update?.risks.length ?? 0) + (update?.nextSteps.length ?? 0);
-                  const linearRatio = r.total ? r.done / r.total : 0;
-                  const hasSignals = progressCount + openCount > 0;
-                  const signalRatio = hasSignals ? progressCount / (progressCount + openCount) : 0;
-                  // Blend real completion with logged program-truth signals only
-                  // when there are signals; otherwise pure Linear completion, so a
-                  // program without hand-logged notes is not silently scaled down.
-                  const blended =
-                    r.total === 0
-                      ? 0
-                      : hasSignals
-                        ? Math.round((linearRatio * 0.6 + signalRatio * 0.4) * 100)
-                        : Math.round(linearRatio * 100);
+                  // Plain ticket completion. This was a blend of Linear
+                  // completion (60%) and hand-logged progress-vs-risk signals
+                  // (40%), which needed a formula footnote to read at all — and
+                  // a number nobody can defend in a stakeholder meeting without
+                  // reciting its weighting is not a number worth showing. The
+                  // signals it blended in are on the Risks page, where they
+                  // stand on their own.
+                  const pctComplete = r.total ? Math.round((r.done / r.total) * 100) : 0;
                   const color = workstreamOf(r.ws, program).color;
                   return (
                     <tr key={r.ws} style={{ borderTop: "1px solid #eee" }}>
@@ -380,7 +363,7 @@ function Overview() {
                         <div className="flex flex-wrap items-center gap-1.5">
                           {r.health ? (
                             <span
-                              className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase"
+                              className="rounded px-1.5 py-0.5 text-xs font-semibold uppercase"
                               style={{
                                 color: HEALTH_COLOR[r.health],
                                 backgroundColor: `${HEALTH_COLOR[r.health]}14`,
@@ -399,7 +382,7 @@ function Overview() {
                               those guesses, and the row says so. */}
                           {r.inferredPct >= 50 ? (
                             <span
-                              className="rounded px-1 py-0.5 text-[9px] font-medium"
+                              className="rounded px-1 py-0.5 text-xs font-medium"
                               style={{
                                 color: "#8a5a00",
                                 backgroundColor: "#f2e6cf",
@@ -412,17 +395,15 @@ function Overview() {
                           ) : null}
                         </div>
                       </td>
-                      <td className="px-2 py-2 font-mono">{r.done}</td>
-                      <td className="px-2 py-2 font-mono">{r.inProgress}</td>
-                      <td className="px-2 py-2 font-mono">{r.todo + r.backlog}</td>
-                      <td className="px-2 py-2 font-mono">{r.total}</td>
-                      <td className="px-2 py-2 font-mono text-[11px]">
-                        <span title="Progress items logged" style={{ color: "#2e8540" }}>
-                          {progressCount}▲
-                        </span>{" "}
-                        <span title="Open risks + next steps" style={{ color: "#b3261e" }}>
-                          {openCount}●
-                        </span>
+                      {/* Total carries the per-bucket detail on hover rather
+                          than as four separate columns. The split matters when
+                          you are already asking about one workstream; as a
+                          standing column it was width nobody read. */}
+                      <td
+                        className="px-2 py-2 font-mono"
+                        title={`${r.done} done · ${r.inProgress} in progress · ${r.todo + r.backlog} todo or backlog`}
+                      >
+                        {r.total}
                       </td>
                       <td className="px-2 py-2">
                         <div className="flex items-center gap-2">
@@ -432,10 +413,12 @@ function Overview() {
                           >
                             <div
                               className="h-1.5 rounded-full"
-                              style={{ width: `${blended}%`, backgroundColor: color }}
+                              style={{ width: `${pctComplete}%`, backgroundColor: color }}
                             />
                           </div>
-                          <span style={{ color: "#565c65" }}>{blended}%</span>
+                          <span style={{ color: "#565c65" }}>
+                            {r.done}/{r.total}
+                          </span>
                         </div>
                       </td>
                     </tr>
@@ -444,9 +427,9 @@ function Overview() {
               </tbody>
             </table>
             </div>
-            <div className="mt-2 text-[10px]" style={{ color: "#565c65" }}>
-              Burn-down blends Linear ticket completion (60%) with logged program progress vs open
-              risks/next-steps (40%). Signals: ▲ progress items logged · ● open risks + next steps.
+            <div className="mt-2 text-xs" style={{ color: "#565c65" }}>
+              Complete is closed tickets over total tickets. Hover a total for the
+              done / in-progress / remaining split.
             </div>
           </section>
 
@@ -519,7 +502,7 @@ function PhaseProgress({
         </div>
       </div>
       {currentPhase ? (
-        <ul className="mt-4 space-y-1 text-[12px]">
+        <ul className="mt-4 space-y-1 text-xs">
           {currentPhase.exitCriteria.slice(0, 4).map((c) => (
             <li key={c} className="flex items-start gap-2" style={{ color: "#3d3d3d" }}>
               <span aria-hidden style={{ color: "#a0a099" }}>
@@ -529,7 +512,7 @@ function PhaseProgress({
             </li>
           ))}
           {currentPhase.exitCriteria.length > 4 ? (
-            <li className="text-[11px]" style={{ color: "#8a8a80" }}>
+            <li className="text-xs" style={{ color: "#8a8a80" }}>
               +{currentPhase.exitCriteria.length - 4} more exit criteria
             </li>
           ) : null}
@@ -574,7 +557,7 @@ function GateReadinessPanel({ gates }: { gates: GateReadiness[] }) {
               key={g.phaseId}
               className="flex flex-col gap-1.5 md:flex-row md:items-center md:gap-3"
             >
-              <div className="truncate text-[12px] md:w-40 md:shrink-0" title={g.phaseName}>
+              <div className="truncate text-xs md:w-40 md:shrink-0" title={g.phaseName}>
                 {g.phaseName}
               </div>
               <div
@@ -590,12 +573,12 @@ function GateReadinessPanel({ gates }: { gates: GateReadiness[] }) {
                   return to their own fixed columns via md:contents. */}
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 md:contents">
               <div
-                className="shrink-0 text-[11px] font-semibold md:w-24 md:text-right"
+                className="shrink-0 text-xs font-semibold md:w-24 md:text-right"
                 style={{ color: band.color }}
               >
                 {band.label}
               </div>
-              <div className="text-[11px] md:w-52 md:shrink-0" style={{ color: "#565c65" }}>
+              <div className="text-xs md:w-52 md:shrink-0" style={{ color: "#565c65" }}>
                 {g.daysRemaining >= 0 ? `${g.daysRemaining}d out` : `${-g.daysRemaining}d overdue`}
                 {/* Exit criteria are not individually tracked in any source yet,
                     so exitCriteriaMet is always 0. Labelled a placeholder in
@@ -614,7 +597,7 @@ function GateReadinessPanel({ gates }: { gates: GateReadiness[] }) {
           );
         })}
       </div>
-      <div className="mt-2 text-[10px]" style={{ color: "#8a8a80" }}>
+      <div className="mt-2 text-xs" style={{ color: "#8a8a80" }}>
         Pressure = time remaining × unmet exit criteria × open blockers. Blockers count against the
         phase now running; exit criteria are not individually tracked yet, so "0 met" reads as "not
         yet demonstrable," not "none done."
@@ -660,14 +643,14 @@ function SittingUntouchedPanel({
         <Link
           to="/p/$programId/sprint-board"
           params={{ programId: program.id }}
-          className="text-[11px] font-medium"
+          className="text-xs font-medium"
           style={{ color: "#3a5a40" }}
         >
           Sprint board →
         </Link>
       </div>
       {items.length === 0 ? (
-        <div className="text-[12px]" style={{ color: "#565c65" }}>
+        <div className="text-xs" style={{ color: "#565c65" }}>
           Every in-progress item has been updated in the last {AGING_THRESHOLD_DAYS} days.
         </div>
       ) : (
@@ -677,17 +660,17 @@ function SittingUntouchedPanel({
             return (
               <div
                 key={i.identifier}
-                className="flex flex-col gap-1 text-[12px] md:flex-row md:items-center md:gap-3"
+                className="flex flex-col gap-1 text-xs md:flex-row md:items-center md:gap-3"
               >
                 {/* Below md the fixed columns (id + chip + workstream +
                     assignee) summed past the available width and the title
                     flexed to zero. Meta wraps onto its own line instead. */}
                 <div className="flex items-center gap-2 md:contents">
-                  <div className="w-16 shrink-0 font-mono text-[11px]" style={{ color: "#565c65" }}>
+                  <div className="w-16 shrink-0 font-mono text-xs" style={{ color: "#565c65" }}>
                     {i.identifier}
                   </div>
                   <div
-                    className="w-16 shrink-0 rounded px-1.5 py-0.5 text-center text-[10px] font-semibold"
+                    className="w-16 shrink-0 rounded px-1.5 py-0.5 text-center text-xs font-semibold"
                     style={{ backgroundColor: band.bg, color: band.fg }}
                     title={`${i.daysSinceUpdate} days since Linear last saw a change on this issue (${i.severity})`}
                   >
@@ -709,7 +692,7 @@ function SittingUntouchedPanel({
                     i.title
                   )}
                 </div>
-                <div className="flex items-center gap-3 text-[10px] md:contents">
+                <div className="flex items-center gap-3 text-xs md:contents">
                   <div
                     className="shrink-0 md:w-16 md:text-right"
                     style={{ color: "#565c65" }}
@@ -728,13 +711,13 @@ function SittingUntouchedPanel({
             );
           })}
           {items.length > top.length ? (
-            <div className="pt-1 text-[10px]" style={{ color: "#8a8a80" }}>
+            <div className="pt-1 text-xs" style={{ color: "#8a8a80" }}>
               +{items.length - top.length} more — see sprint board.
             </div>
           ) : null}
         </div>
       )}
-      <div className="mt-2 text-[10px]" style={{ color: "#8a8a80" }}>
+      <div className="mt-2 text-xs" style={{ color: "#8a8a80" }}>
         Days since Linear last saw a change on the issue — any field, any
         comment. Not opened_at: an item created months ago but nudged this
         week does not count as stale.
@@ -780,14 +763,14 @@ function RecentlyClosedPanel({
         <Link
           to="/p/$programId/activity"
           params={{ programId: program.id }}
-          className="text-[11px] font-medium"
+          className="text-xs font-medium"
           style={{ color: "#3a5a40" }}
         >
           Activity feed →
         </Link>
       </div>
       {items.length === 0 ? (
-        <div className="text-[12px]" style={{ color: "#565c65" }}>
+        <div className="text-xs" style={{ color: "#565c65" }}>
           Nothing closed in the last {RECENTLY_CLOSED_WINDOW_DAYS} days.
         </div>
       ) : (
@@ -797,14 +780,14 @@ function RecentlyClosedPanel({
             return (
               <div
                 key={i.identifier}
-                className="flex flex-col gap-1 text-[12px] md:flex-row md:items-center md:gap-3"
+                className="flex flex-col gap-1 text-xs md:flex-row md:items-center md:gap-3"
               >
                 <div className="flex items-center gap-2 md:contents">
-                <div className="w-16 shrink-0 font-mono text-[11px]" style={{ color: "#565c65" }}>
+                <div className="w-16 shrink-0 font-mono text-xs" style={{ color: "#565c65" }}>
                   {i.identifier}
                 </div>
                 <div
-                  className="w-16 shrink-0 rounded px-1.5 py-0.5 text-center text-[10px] font-semibold"
+                  className="w-16 shrink-0 rounded px-1.5 py-0.5 text-center text-xs font-semibold"
                   style={
                     dropped
                       ? { backgroundColor: "#eee", color: "#565c65" }
@@ -834,7 +817,7 @@ function RecentlyClosedPanel({
                     i.title
                   )}
                 </div>
-                <div className="flex items-center gap-3 text-[10px] md:contents">
+                <div className="flex items-center gap-3 text-xs md:contents">
                   <div
                     className="shrink-0 md:w-16 md:text-right"
                     style={{ color: "#565c65" }}
@@ -853,13 +836,13 @@ function RecentlyClosedPanel({
             );
           })}
           {items.length > top.length ? (
-            <div className="pt-1 text-[10px]" style={{ color: "#8a8a80" }}>
+            <div className="pt-1 text-xs" style={{ color: "#8a8a80" }}>
               +{items.length - top.length} more — see activity feed.
             </div>
           ) : null}
         </div>
       )}
-      <div className="mt-2 text-[10px]" style={{ color: "#8a8a80" }}>
+      <div className="mt-2 text-xs" style={{ color: "#8a8a80" }}>
         "Closed" is the Linear state change to done or canceled within the last{" "}
         {RECENTLY_CLOSED_WINDOW_DAYS} days. Canceled items are shown as "dropped" —
         a scope decision worth seeing, not a shipped win.
@@ -897,7 +880,7 @@ function NotionTrackerSummary({ program }: { program: ProgramConfig }) {
         <Link
           to="/p/$programId/team-tasks"
           params={{ programId: program.id }}
-          className="text-[11px] font-medium"
+          className="text-xs font-medium"
           style={{ color: "#3a5a40" }}
         >
           Team tasks →
@@ -905,17 +888,17 @@ function NotionTrackerSummary({ program }: { program: ProgramConfig }) {
       </div>
 
       {isLoading ? (
-        <div className="text-[12px]" style={{ color: "#565c65" }}>
+        <div className="text-xs" style={{ color: "#565c65" }}>
           Reading the tracker…
         </div>
       ) : status !== "ok" ? (
-        <div className="text-[12px]" style={{ color: "#8a5a00" }}>
+        <div className="text-xs" style={{ color: "#8a5a00" }}>
           {status === "no-token"
             ? "NOTION_API_KEY is not set, so the hand-maintained tracker is not being read. Open counts on this page reflect Linear only."
             : "Could not read the tracker page \u2014 usually it has not been shared with the Notion integration. Open counts on this page reflect Linear only."}
         </div>
       ) : open.length === 0 ? (
-        <div className="text-[12px]" style={{ color: "#565c65" }}>
+        <div className="text-xs" style={{ color: "#565c65" }}>
           Every checkbox on the tracker is ticked.
         </div>
       ) : (
@@ -923,7 +906,7 @@ function NotionTrackerSummary({ program }: { program: ProgramConfig }) {
           {bySection
             .filter((g) => g.open.length > 0)
             .map((g) => (
-              <div key={g.section} className="flex items-baseline gap-3 text-[12px]">
+              <div key={g.section} className="flex items-baseline gap-3 text-xs">
                 <div
                   className="w-10 shrink-0 text-right font-semibold"
                   style={{ color: "#1b1b1b" }}
@@ -935,7 +918,7 @@ function NotionTrackerSummary({ program }: { program: ProgramConfig }) {
                 </div>
               </div>
             ))}
-          <div className="pt-1 text-[10px]" style={{ color: "#8a8a80" }}>
+          <div className="pt-1 text-xs" style={{ color: "#8a8a80" }}>
             Checkbox tasks from the sprint tracker page. Separate from the Linear
             board — most of these never became tickets, which is why counts here
             and on the sprint board do not add up to the same total.
@@ -981,7 +964,7 @@ function FollowUpsSummary({ program }: { program: ProgramConfig }) {
         <Link
           to="/p/$programId/follow-ups"
           params={{ programId: program.id }}
-          className="text-[11px] underline"
+          className="text-xs underline"
           style={{ color: "#2e5d3a" }}
         >
           View all →
@@ -989,17 +972,17 @@ function FollowUpsSummary({ program }: { program: ProgramConfig }) {
       </div>
 
       {!hydrated ? (
-        <div className="text-[12px]" style={{ color: "#8a8a80" }}>
+        <div className="text-xs" style={{ color: "#8a8a80" }}>
           Loading…
         </div>
       ) : open.length === 0 ? (
-        <div className="text-[12px]" style={{ color: "#565c65" }}>
+        <div className="text-xs" style={{ color: "#565c65" }}>
           Nothing open — all follow-ups are done or dismissed.
         </div>
       ) : (
         <>
           <div
-            className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px]"
+            className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs"
             style={{ color: "#565c65" }}
           >
             {weOwe ? (
@@ -1030,7 +1013,7 @@ function FollowUpsSummary({ program }: { program: ProgramConfig }) {
                 >
                   <Check size={11} strokeWidth={3} style={{ opacity: 0 }} />
                 </button>
-                <span className="min-w-0 flex-1 text-[12px]" style={{ color: "#1b1b1b" }}>
+                <span className="min-w-0 flex-1 text-xs" style={{ color: "#1b1b1b" }}>
                   {item.title}
                   {item.owner ? <span style={{ color: "#8a8a80" }}> · {item.owner}</span> : null}
                 </span>
@@ -1038,7 +1021,7 @@ function FollowUpsSummary({ program }: { program: ProgramConfig }) {
             ))}
           </ul>
           {open.length > top.length ? (
-            <div className="mt-2 text-[11px]" style={{ color: "#8a8a80" }}>
+            <div className="mt-2 text-xs" style={{ color: "#8a8a80" }}>
               +{open.length - top.length} more
             </div>
           ) : null}
@@ -1090,7 +1073,7 @@ function Milestone({
       className="rounded-md bg-white p-3"
       style={{ border: `1px solid ${danger ? "#b3261e55" : "#e5e5e2"}` }}
     >
-      <div className="text-[11px] uppercase tracking-wide" style={{ color: "#565c65" }}>
+      <div className="text-xs uppercase tracking-wide" style={{ color: "#565c65" }}>
         {label}
       </div>
       <div
@@ -1098,11 +1081,11 @@ function Milestone({
         style={{ color: danger ? "#b3261e" : "#1a1a1a" }}
       >
         {Math.max(0, days)}
-        <span className="ml-1 text-[11px] font-normal" style={{ color: "#565c65" }}>
+        <span className="ml-1 text-xs font-normal" style={{ color: "#565c65" }}>
           days
         </span>
       </div>
-      <div className="text-[11px]" style={{ color: "#565c65" }}>
+      <div className="text-xs" style={{ color: "#565c65" }}>
         {(() => {
           const [y, m, d] = date.split("-").map(Number);
           return new Date(y, m - 1, d).toLocaleDateString(undefined, {

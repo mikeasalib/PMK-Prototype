@@ -15,7 +15,7 @@ import {
   HeartPulse,
   Search,
   Sparkles,
-  HelpCircle,
+  ArrowUp,
   Eye,
   EyeOff,
   SlidersHorizontal,
@@ -215,7 +215,7 @@ export function AppLayout({ children }: { children?: ReactNode }) {
           >
             {program.name}
           </div>
-          <div className="mt-1 text-[11px]" style={{ color: "rgba(255,255,255,0.6)" }}>
+          <div className="mt-1 text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>
             {program.org}
           </div>
         </div>
@@ -252,7 +252,7 @@ export function AppLayout({ children }: { children?: ReactNode }) {
           <button
             type="button"
             onClick={() => setEditing((v) => !v)}
-            className="mt-2 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[12px] transition-colors"
+            className="mt-2 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs transition-colors"
             style={{
               color: editing ? "#ffffff" : "rgba(255,255,255,0.55)",
               backgroundColor: editing ? NAV_ACTIVE : "transparent",
@@ -267,7 +267,7 @@ export function AppLayout({ children }: { children?: ReactNode }) {
             {editing ? <Check size={15} /> : <SlidersHorizontal size={15} />}
             <span>{editing ? "Done customizing" : "Customize sidebar"}</span>
             {!editing && hidden.length ? (
-              <span className="ml-auto text-[11px]" style={{ color: "rgba(255,255,255,0.4)" }}>
+              <span className="ml-auto text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>
                 {hidden.length} hidden
               </span>
             ) : null}
@@ -288,12 +288,32 @@ export function AppLayout({ children }: { children?: ReactNode }) {
         {children ?? <Outlet />}
       </main>
 
-      <HelpFab />
+      <BackToTopFab />
     </div>
   );
 }
 
-function HelpFab() {
+/**
+ * Scroll-to-top control.
+ *
+ * Was named HelpFab and rendered a question-mark icon while its aria-label,
+ * title, and click handler all said "back to top" — so sighted users were
+ * offered help and screen-reader users were offered a scroll. Same control
+ * announcing two different things is worse than either. It scrolls, so it
+ * looks like scrolling now.
+ *
+ * Hidden until the page is actually scrolled: a jump-to-top button at the top
+ * of the page is a control that does nothing.
+ */
+function BackToTopFab() {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setVisible(window.scrollY > 300);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  if (!visible) return null;
   return (
     <button
       type="button"
@@ -306,7 +326,7 @@ function HelpFab() {
         boxShadow: "0 4px 14px rgba(31,61,43,0.35)",
       }}
     >
-      <HelpCircle size={22} strokeWidth={2} />
+      <ArrowUp size={22} strokeWidth={2} />
     </button>
   );
 }

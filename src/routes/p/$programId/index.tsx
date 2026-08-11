@@ -6,10 +6,13 @@ import {
   priorityLabel,
   priorityColor,
   inferWorkstream,
+  isBlocked,
+  isHighPriority,
+  byPriority,
   type StoredLinearIssue,
 } from "@/hooks/use-stored-data";
 import { relativeTime } from "@/hooks/use-program-data";
-import { PROGRAMS, pageTitle, upcomingMilestones, workstreamOf } from "@/lib/program.config";
+import { PROGRAMS, pageTitle, workstreamOf } from "@/lib/program.config";
 import { daysUntilLocal, shortDate } from "@/lib/local-date";
 import { useProgram } from "./route";
 
@@ -35,18 +38,11 @@ function WhatsImportant() {
   const { linear, isLoading, origin } = useStoredData(program.id);
 
   const active = linear.filter((i) => bucketOf(i) === "in_progress");
-  const blocked = linear.filter((i) => {
-    const t = i.title.toLowerCase();
-    return (
-      t.includes("blocked") ||
-      t.includes("blocker") ||
-      (i.labels ?? []).some((l) => /block/i.test(l))
-    );
-  });
-  const urgent = linear
-    .filter((i) => i.priority === 1 || i.priority === 2)
-    .filter((i) => bucketOf(i) !== "done" && bucketOf(i) !== "canceled")
-    .sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99));
+  // Shared predicates, so this page and the dependency map cannot disagree
+  // about what "blocked" means. They previously did: this list counted closed
+  // blockers, the dependency map did not.
+  const blocked = linear.filter(isBlocked);
+  const urgent = linear.filter(isHighPriority).sort(byPriority);
 
   const doneCount = linear.filter((i) => bucketOf(i) === "done").length;
   const totalTracked = linear.filter((i) => bucketOf(i) !== "canceled").length;
@@ -133,21 +129,6 @@ function WhatsImportant() {
             )}
           </Panel>
 
-          {/* Next milestones */}
-          <Panel title="Next milestones" accent="#3a5a40">
-            <ul className="space-y-2 text-[12px]">
-              {/* Shared helper — same upcoming-milestone logic as the Program
-                  Overview, from the program's own strip and named dates. */}
-              {upcomingMilestones(program, new Date().toISOString().slice(0, 10)).map((m) => (
-                <MilestoneRow
-                  key={`${m.label}-${m.date}`}
-                  label={m.label}
-                  date={m.date}
-                  danger={m.date === program.keyDates.launch}
-                />
-              ))}
-            </ul>
-          </Panel>
         </div>
       )}
     </AppLayout>
@@ -173,7 +154,7 @@ function Kpi({
         borderLeft: `3px solid ${danger ? "#b3261e" : "#005ea2"}`,
       }}
     >
-      <div className="text-[10px] uppercase tracking-wide" style={{ color: "#565c65" }}>
+      <div className="text-xs uppercase tracking-wide" style={{ color: "#565c65" }}>
         {label}
       </div>
       <div
@@ -185,7 +166,7 @@ function Kpi({
       >
         {value}
       </div>
-      <div className="text-[11px]" style={{ color: "#565c65" }}>
+      <div className="text-xs" style={{ color: "#565c65" }}>
         {sub}
       </div>
     </div>
@@ -207,7 +188,7 @@ function Panel({
       style={{ border: "1px solid #e5e5e2", borderTop: `3px solid ${accent}` }}
     >
       <div
-        className="px-3 py-2 text-[12px] font-semibold"
+        className="px-3 py-2 text-xs font-semibold"
         style={{
           color: "#3a5a40",
           borderBottom: "1px solid #eee",
@@ -223,7 +204,7 @@ function Panel({
 
 function Empty({ text }: { text: string }) {
   return (
-    <div className="py-4 text-center text-[12px]" style={{ color: "#565c65" }}>
+    <div className="py-4 text-center text-xs" style={{ color: "#565c65" }}>
       {text}
     </div>
   );
@@ -240,7 +221,7 @@ function IssueRow({ issue, showPriority }: { issue: StoredLinearIssue; showPrior
           href={issue.url ?? "#"}
           target="_blank"
           rel="noreferrer"
-          className="font-mono text-[11px] underline"
+          className="font-mono text-xs underline"
           style={{ color: "#005ea2" }}
         >
           {issue.identifier}
@@ -248,7 +229,7 @@ function IssueRow({ issue, showPriority }: { issue: StoredLinearIssue; showPrior
         <span className="text-[13px] font-medium">{issue.title}</span>
       </div>
       <div
-        className="mt-1 flex flex-wrap items-center gap-2 text-[11px]"
+        className="mt-1 flex flex-wrap items-center gap-2 text-xs"
         style={{ color: "#565c65" }}
       >
         <span
@@ -277,21 +258,6 @@ function IssueRow({ issue, showPriority }: { issue: StoredLinearIssue; showPrior
         ) : null}
         <span className="ml-auto">{relativeTime(issue.source_updated_at)}</span>
       </div>
-    </li>
-  );
-}
-
-function MilestoneRow({ label, date, danger }: { label: string; date: string; danger?: boolean }) {
-  const d = daysUntil(date);
-  return (
-    <li className="flex items-center justify-between">
-      <span>{label}</span>
-      <span
-        className="font-mono"
-        style={{ color: danger ? "#b3261e" : "#3a5a40", fontWeight: danger ? 700 : 500 }}
-      >
-        {d > 0 ? `${d}d` : d === 0 ? "today" : `${-d}d ago`} · {shortDate(date)}
-      </span>
     </li>
   );
 }
