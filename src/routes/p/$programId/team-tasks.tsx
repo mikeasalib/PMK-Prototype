@@ -89,31 +89,82 @@ function priorityStyle(p: number | null): { color: string; bg: string } {
   }
 }
 
+/**
+ * Work, by person.
+ *
+ * Rebuilt around a default working set. It used to render the whole dataset
+ * three times over — the Notion tracker fully expanded, a "Right this second"
+ * list, per-person cards, and then a table of everything — which measured 6.5
+ * screens of scroll and 107 rows, with all 43 tickets appearing in more than
+ * one section. The reader was left to do the reduction.
+ *
+ * The principle borrowed from the nav collapse: grouping is a control, not a
+ * destination. One level down, volume is a control too. So this shows what
+ * needs attention now, and everything else is one click away:
+ *
+ *   - The scope selector replaces the "Right this second" section. That list
+ *     was a filter of the table rendered as its own inventory; now it IS the
+ *     default filter, so the same tickets are not printed twice.
+ *   - Tracker sections start collapsed. 47 open checkboxes across six
+ *     headings is a page on its own; the counts are the summary.
+ *   - Owner chips are a filter row, styled as controls rather than as cards,
+ *     because that is what they always were.
+ *   - The table lost the Priority and Workstream columns. Priority is a dot
+ *     against the title; workstream has an entire tab of its own, which is the
+ *     point of the tab grouping.
+ */
+type Scope = "attention" | "open" | "all";
+
+const SCOPES: Array<{ key: Scope; label: string; hint: string }> = [
+  { key: "attention", label: "Needs attention", hint: "In progress, or urgent and high priority" },
+  { key: "open", label: "All open", hint: "Everything not done or cancelled" },
+  { key: "all", label: "Everything", hint: "Including done and cancelled" },
+];
+
 function TeamTasks() {
   const program = useProgram();
   const { isLoading, linear, origin } = useStoredData(program.id);
-  // Whichever window in this program's own strip contains today.
   const todayIso = new Date().toISOString().slice(0, 10);
   const currentWindow =
     program.sprintStrip.find((w) => w.start <= todayIso && todayIso <= w.end) ?? null;
-  const [filter, setFilter] = useState<Person | "All">("All");
-  // Whoever is actually on this program's board, alphabetical, unassigned last
-  // so it does not lead the row of cards.
-  const team = useMemo(() => {
-    const names = new Set(linear.map(ownerOf));
-    const real = [...names].filter((n) => n !== UNASSIGNED).sort();
-    return names.has(UNASSIGNED) ? [...real, UNASSIGNED] : real;
-  }, [linear]);
-  const [hideDone, setHideDone] = useState(true);
+
+  const [scope, setScope] = useState<Scope>("attention");
+  const [owner, setOwner] = useState<Person | "All">("All");
 
   const withOwner = useMemo(
     () => linear.map((i) => ({ ...i, _owner: ownerOf(i), _bucket: bucketOf(i) })),
     [linear],
   );
 
-  const filtered = useMemo(() => {
-    let out = filter === "All" ? withOwner : withOwner.filter((t) => t._owner === filter);
-    if (hideDone) out = out.filter((t) => t._bucket !== "done" && t._bucket !== "canceled");
+  const team = useMemo(() => {
+    const names = new Set(withOwner.map((t) => t._owner));
+    const real = [...names].filter((n) => n !== UNASSIGNED).sort();
+    return names.has(UNASSIGNED) ? [...real, UNASSIGNED] : real;
+  }, [withOwner]);
+
+  const countsByOwner = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const t of withOwner) {
+      if (t._bucket === "done" || t._bucket === "canceled") continue;
+      m[t._owner] = (m[t._owner] ?? 0) + 1;
+    }
+    return m;
+  }, [withOwner]);
+
+  const rows = useMemo(() => {
+    let out = withOwner;
+    if (scope === "attention") {
+      out = out.filter(
+        (t) =>
+          t._bucket !== "done" &&
+          t._bucket !== "canceled" &&
+          (t._bucket === "in_progress" || t.priority === 1 || t.priority === 2),
+      );
+    } else if (scope === "open") {
+      out = out.filter((t) => t._bucket !== "done" && t._bucket !== "canceled");
+    }
+    if (owner !== "All") out = out.filter((t) => t._owner === owner);
+
     const bucketOrder: Record<LinearBucket, number> = {
       in_progress: 0,
       todo: 1,
@@ -124,36 +175,22 @@ function TeamTasks() {
     return [...out].sort((a, b) => {
       const bo = bucketOrder[a._bucket] - bucketOrder[b._bucket];
       if (bo !== 0) return bo;
-      const pa = a.priority ?? 99;
-      const pb = b.priority ?? 99;
+      const pa = a.priority && a.priority > 0 ? a.priority : 99;
+      const pb = b.priority && b.priority > 0 ? b.priority : 99;
       if (pa !== pb) return pa - pb;
       return a.identifier.localeCompare(b.identifier);
     });
-  }, [withOwner, filter, hideDone]);
+  }, [withOwner, scope, owner]);
 
-  const rightNow = useMemo(() => {
-    return withOwner
-      .filter((t) => t._bucket !== "done" && t._bucket !== "canceled")
-      .filter((t) => t._bucket === "in_progress" || t.priority === 1)
-      .sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99));
-  }, [withOwner]);
-
-  const countsByOwner = useMemo(() => {
-    const m: Record<string, { open: number; done: number }> = {};
-    for (const p of team) m[p] = { open: 0, done: 0 };
-    for (const t of withOwner) {
-      if (!m[t._owner]) m[t._owner] = { open: 0, done: 0 };
-      if (t._bucket === "done" || t._bucket === "canceled") m[t._owner].done++;
-      else m[t._owner].open++;
-    }
-    return m;
-  }, [withOwner]);
+  const openTotal = withOwner.filter(
+    (t) => t._bucket !== "done" && t._bucket !== "canceled",
+  ).length;
+  const activeScope = SCOPES.find((sc) => sc.key === scope)!;
 
   return (
     <AppLayout>
       <PageHeader
-        // Was a hardcoded "Sprint 4", which named a VA sprint on every program.
-        title={currentWindow ? `Team tasks — ${currentWindow.label}` : "Team tasks"}
+        title={currentWindow ? `Work — ${currentWindow.label}` : "Work"}
         subtitle={
           origin === "snapshot"
             ? "From a captured snapshot · assignees, statuses and priorities are as of the capture"
@@ -161,329 +198,194 @@ function TeamTasks() {
         }
       />
       <SectionTabs group="work" />
-      <div className="px-4 py-5 space-y-6 sm:px-6">
-        {/* Notion tracker tasks. First on the page because on the VA program
-            they outnumber the Linear board roughly two to one: 42 open
-            checkboxes against 26 open issues. Reading Linear alone made this
-            page confidently under-report what is actually in flight. */}
-        <NotionTrackerSection programId={program.id} />
-
-        {/* Right now */}
-        <section
-          style={{
-            border: "1px solid #dfe1e2",
-            borderLeft: "4px solid #b3261e",
-            backgroundColor: "#fff",
-            padding: 16,
-          }}
-        >
-          <div
-            className="text-[13px] font-semibold uppercase tracking-wide"
-            style={{ color: "#b3261e", fontFamily: "Public Sans, system-ui, sans-serif" }}
-          >
-            Right this second
+      <div className="space-y-5 px-4 py-5 sm:px-6">
+        {/* Scope. The page's one real control: it decides how much you are
+            being shown, which is the thing that was previously not adjustable
+            because everything was always shown. */}
+        <div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {SCOPES.map((sc) => {
+              const active = sc.key === scope;
+              const count =
+                sc.key === "attention"
+                  ? withOwner.filter(
+                      (t) =>
+                        t._bucket !== "done" &&
+                        t._bucket !== "canceled" &&
+                        (t._bucket === "in_progress" || t.priority === 1 || t.priority === 2),
+                    ).length
+                  : sc.key === "open"
+                    ? openTotal
+                    : withOwner.length;
+              return (
+                <button
+                  key={sc.key}
+                  type="button"
+                  onClick={() => setScope(sc.key)}
+                  aria-pressed={active}
+                  className="rounded-full px-3 py-1.5 text-sm font-medium transition-colors"
+                  style={{
+                    backgroundColor: active ? "#1b1b1b" : "#fff",
+                    color: active ? "#fff" : "#565c65",
+                    border: `1px solid ${active ? "#1b1b1b" : "#dfe1e2"}`,
+                  }}
+                >
+                  {sc.label} · {count}
+                </button>
+              );
+            })}
           </div>
-          <div className="mt-1 text-xs" style={{ color: "#565c65" }}>
-            Anything currently In Progress or marked Urgent in Linear.
+          <div className="mt-1.5 text-xs" style={{ color: "#8a8a80" }}>
+            {activeScope.hint}.
           </div>
-          {isLoading ? (
-            <div className="mt-3 text-[13px]" style={{ color: "#565c65" }}>
-              Loading…
-            </div>
-          ) : rightNow.length === 0 ? (
-            <div className="mt-3 text-[13px]" style={{ color: "#565c65" }}>
-              Nothing active — nice.
-            </div>
-          ) : (
-            <ul className="mt-3 space-y-1.5">
-              {rightNow.map((t) => {
-                const pr = priorityStyle(t.priority);
-                const st = bucketStyle(t._bucket);
-                return (
-                  <li
-                    key={t.id}
-                    className="flex items-center gap-3 text-[13px]"
-                    style={{ padding: "6px 0", borderBottom: "1px solid #f0f0f0" }}
-                  >
-                    <span
-                      className="text-xs font-mono"
-                      style={{ color: "#565c65", minWidth: 70 }}
-                    >
-                      {t.identifier}
-                    </span>
-                    <a
-                      href={t.url ?? "#"}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{ flex: 1, color: "#1b1b1b", textDecoration: "none" }}
-                    >
-                      {t.title}
-                    </a>
-                    <span
-                      className="text-xs font-semibold"
-                      style={{
-                        color: pr.color,
-                        backgroundColor: pr.bg,
-                        padding: "2px 8px",
-                        borderRadius: 3,
-                      }}
-                    >
-                      {priorityLabel(t.priority)}
-                    </span>
-                    <span
-                      className="text-xs font-semibold"
-                      style={{
-                        color: st.color,
-                        backgroundColor: st.bg,
-                        padding: "2px 8px",
-                        borderRadius: 3,
-                      }}
-                    >
-                      {BUCKET_LABEL[t._bucket]}
-                    </span>
-                    <span
-                      className="text-xs font-semibold"
-                      style={{ color: "#565c65", minWidth: 80 }}
-                    >
-                      {t._owner}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
-
-        {/* Owner summary */}
-        <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
-          {team.map((p) => {
-            const c = countsByOwner[p];
-            const active = filter === p;
-            return (
-              <button
-                key={p}
-                onClick={() => setFilter(active ? "All" : p)}
-                style={{
-                  border: active ? "2px solid #3a5a40" : "1px solid #dfe1e2",
-                  backgroundColor: "#fff",
-                  padding: 12,
-                  textAlign: "left",
-                  cursor: "pointer",
-                }}
-              >
-                <div className="text-[13px] font-semibold" style={{ color: "#1b1b1b" }}>
-                  {p}
-                </div>
-                <div className="mt-1 text-xs" style={{ color: "#565c65" }}>
-                  {c.open} open · {c.done} done
-                </div>
-              </button>
-            );
-          })}
-        </section>
-
-        {/* Filters */}
-        <div className="flex items-center gap-3 text-xs" style={{ color: "#565c65" }}>
-          <span>Showing:</span>
-          <button
-            onClick={() => setFilter("All")}
-            style={{
-              padding: "3px 10px",
-              border: "1px solid #dfe1e2",
-              backgroundColor: filter === "All" ? "#3a5a40" : "#fff",
-              color: filter === "All" ? "#fff" : "#1b1b1b",
-              cursor: "pointer",
-            }}
-          >
-            All ({withOwner.length})
-          </button>
-          <label className="flex items-center gap-1.5 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={hideDone}
-              onChange={(e) => setHideDone(e.target.checked)}
-            />
-            Hide done / canceled
-          </label>
         </div>
 
-        {/* Task table */}
-        <section style={{ border: "1px solid #dfe1e2", backgroundColor: "#fff" }}>
-          {isLoading ? (
-            <div className="p-4 text-[13px]" style={{ color: "#565c65" }}>
-              Loading Linear issues…
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="p-4 text-[13px]" style={{ color: "#565c65" }}>
-              No issues match.
-            </div>
-          ) : (
+        {/* Owner filter. A row of chips, not a grid of cards: these were always
+            controls, and card styling made them read as content to be read. */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <FilterChip label="Everyone" active={owner === "All"} onClick={() => setOwner("All")} />
+          {team.map((p) => (
+            <FilterChip
+              key={p}
+              label={`${p} · ${countsByOwner[p] ?? 0}`}
+              active={owner === p}
+              onClick={() => setOwner(p)}
+            />
+          ))}
+        </div>
+
+        {isLoading ? (
+          <div className="text-sm" style={{ color: "#565c65" }}>
+            Loading…
+          </div>
+        ) : rows.length === 0 ? (
+          <div
+            className="rounded-md border border-dashed p-6 text-center text-sm"
+            style={{ borderColor: "#dcdcd6", color: "#565c65" }}
+          >
+            Nothing in this scope.
+            {scope === "attention" ? " Nothing in progress and nothing urgent — try All open." : ""}
+          </div>
+        ) : (
+          <div
+            className="overflow-hidden rounded-md bg-white"
+            style={{ border: "1px solid #e5e5e2" }}
+          >
             <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-[13px]" style={{ borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ borderBottom: "1px solid #dfe1e2", backgroundColor: "#f8f9fa" }}>
-                  <th
-                    style={{
-                      padding: "8px 10px",
-                      textAlign: "left",
-                      width: 78,
-                      color: "#565c65",
-                      fontWeight: 600,
-                      fontSize: 12,
-                      textTransform: "uppercase",
-                    }}
+              <table className="w-full min-w-[520px] text-sm" style={{ borderCollapse: "collapse" }}>
+                <thead>
+                  <tr
+                    className="text-left uppercase tracking-wide"
+                    style={{ color: "#8a8a80", fontSize: 12, borderBottom: "1px solid #e5e5e2" }}
                   >
-                    Ticket
-                  </th>
-                  <th
-                    style={{
-                      padding: "8px 10px",
-                      textAlign: "left",
-                      color: "#565c65",
-                      fontWeight: 600,
-                      fontSize: 12,
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Title
-                  </th>
-                  <th
-                    style={{
-                      padding: "8px 10px",
-                      textAlign: "left",
-                      color: "#565c65",
-                      fontWeight: 600,
-                      fontSize: 12,
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Priority
-                  </th>
-                  <th
-                    style={{
-                      padding: "8px 10px",
-                      textAlign: "left",
-                      color: "#565c65",
-                      fontWeight: 600,
-                      fontSize: 12,
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Status
-                  </th>
-                  <th
-                    style={{
-                      padding: "8px 10px",
-                      textAlign: "left",
-                      color: "#565c65",
-                      fontWeight: 600,
-                      fontSize: 12,
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Owner
-                  </th>
-                  <th
-                    style={{
-                      padding: "8px 10px",
-                      textAlign: "left",
-                      color: "#565c65",
-                      fontWeight: 600,
-                      fontSize: 12,
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Workstream
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((t) => {
-                  const pr = priorityStyle(t.priority);
-                  const st = bucketStyle(t._bucket);
-                  return (
-                    <tr key={t.id} style={{ borderBottom: "1px solid #f0f0f0" }}>
-                      <td
-                        className="font-mono text-xs"
-                        style={{ padding: "8px 10px", color: "#565c65" }}
-                      >
+                    <th className="px-3 py-2 font-medium">Ticket</th>
+                    <th className="px-3 py-2 font-medium">Title</th>
+                    <th className="px-3 py-2 font-medium">Owner</th>
+                    <th className="px-3 py-2 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((t) => (
+                    <tr key={t.id} style={{ borderTop: "1px solid #f0f0ec" }}>
+                      <td className="px-3 py-2 align-top">
                         <a
-                          href={t.url ?? "#"}
+                          href={t.url ?? undefined}
                           target="_blank"
-                          rel="noreferrer"
-                          style={{ color: "#1a6fa8", textDecoration: "none" }}
+                          rel="noopener noreferrer"
+                          className="font-mono text-xs hover:underline"
+                          style={{ color: "#565c65" }}
                         >
                           {t.identifier}
                         </a>
                       </td>
-                      <td style={{ padding: "8px 10px", color: "#1b1b1b" }}>{t.title}</td>
-                      <td style={{ padding: "8px 10px" }}>
-                        <span
-                          className="text-xs font-semibold"
-                          style={{
-                            color: pr.color,
-                            backgroundColor: pr.bg,
-                            padding: "2px 8px",
-                            borderRadius: 3,
-                          }}
-                        >
-                          {priorityLabel(t.priority)}
+                      <td className="px-3 py-2 align-top" style={{ color: "#1b1b1b" }}>
+                        <span className="flex items-start gap-2">
+                          {/* One accent, spent on the only thing that is
+                              actually wrong: urgent or high priority. Medium,
+                              low and none get no colour at all, because a row
+                              carrying four coloured tokens tells you nothing
+                              about which row to read first. */}
+                          <UrgencyDot priority={t.priority} />
+                          <span>{t.title}</span>
                         </span>
                       </td>
-                      <td style={{ padding: "8px 10px" }}>
-                        <span
-                          className="text-xs font-semibold"
-                          style={{
-                            color: st.color,
-                            backgroundColor: st.bg,
-                            padding: "2px 8px",
-                            borderRadius: 3,
-                          }}
-                        >
-                          {t.state_name ?? BUCKET_LABEL[t._bucket]}
-                        </span>
+                      <td className="px-3 py-2 align-top" style={{ color: "#565c65" }}>
+                        {t._owner}
                       </td>
-                      <td style={{ padding: "8px 10px", color: "#1b1b1b" }}>{t._owner}</td>
-                      <td className="text-xs" style={{ padding: "8px 10px", color: "#565c65" }}>
-                        {/* The stored column is null unless the source itself
-                            said a workstream — neither board does — so fall back
-                            to the program's classifier, which is what every other
-                            page shows. */}
-                        {t.workstream ?? inferWorkstream(t, program)}
+                      <td className="px-3 py-2 align-top text-xs" style={{ color: "#565c65" }}>
+                        {BUCKET_LABEL[t._bucket]}
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )}
-        </section>
+          </div>
+        )}
 
-        <p className="text-xs" style={{ color: "#888" }}>
-          Two sources of truth, on purpose. Tickets live in Linear; the checkbox
-          tracker lives in Notion. Edit either at source and hit Refresh — nothing
-          typed here is written back.
+        {/* Tracker below the ticket table and collapsed by default: it is the
+            larger population but the less structured one, and 47 expanded
+            checkboxes was most of the page's height. */}
+        <NotionTrackerSection programId={program.id} />
+
+        <p className="text-xs" style={{ color: "#8a8a80" }}>
+          Tickets live in Linear; the checkbox tracker lives in Notion. Edit either
+          at source and hit Refresh — nothing typed here is written back.
         </p>
       </div>
     </AppLayout>
   );
 }
 
-/**
- * The Notion checkbox tracker, grouped by the headings the author wrote.
- *
- * These tasks are not Linear issues and are not presented as if they were: no
- * fabricated identifier, no assignee column, no status pill. What the source
- * gives is text, checked/unchecked, and a section — so that is what renders,
- * plus any DEP-/REC- reference the author typed inline, shown as a citation.
- *
- * Done items collapse behind a toggle. A tracker accumulates completed work all
- * sprint, and 21 checked rows above 42 open ones buries the thing you came for.
- */
+function FilterChip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className="rounded px-2 py-1 text-xs font-medium transition-colors"
+      style={{
+        backgroundColor: active ? "#eef2ee" : "transparent",
+        color: active ? "#1b1b1b" : "#8a8a80",
+        border: `1px solid ${active ? "#c3d3c3" : "#e5e5e2"}`,
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+/** Urgent and high only. Everything else renders nothing, which is the point. */
+function UrgencyDot({ priority }: { priority: number | null }) {
+  if (priority !== 1 && priority !== 2) return <span className="w-2 shrink-0" aria-hidden />;
+  const urgent = priority === 1;
+  return (
+    <span
+      className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+      style={{ backgroundColor: urgent ? "#b3261e" : "#d98324" }}
+      title={urgent ? "Urgent" : "High priority"}
+      aria-label={urgent ? "Urgent" : "High priority"}
+    />
+  );
+}
+
 function NotionTrackerSection({ programId }: { programId: string }) {
   const { isLoading, open, done, bySection, readAt, status } = useNotionTasks(programId);
   const [showDone, setShowDone] = useState(false);
+  // Sections start collapsed. Forty-seven open checkboxes across six headings
+  // was most of this page's height, and the counts on the headers are the
+  // summary a reader actually wanted first.
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const toggleSection = (key: string) =>
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
 
   if (status === "not-configured") return null;
 
@@ -545,15 +447,25 @@ function NotionTrackerSection({ programId }: { programId: string }) {
           {bySection.map((group) => {
             const rows = showDone ? [...group.open, ...group.done] : group.open;
             if (rows.length === 0) return null;
+            const expanded = Boolean(openSections[group.section]);
             return (
               <div key={group.section}>
-                <div
-                  className="mb-1.5 text-xs font-semibold uppercase tracking-wide"
+                <button
+                  type="button"
+                  onClick={() => toggleSection(group.section)}
+                  aria-expanded={expanded}
+                  className="mb-1.5 flex w-full items-baseline gap-2 text-left text-xs font-semibold uppercase tracking-wide"
                   style={{ color: "#565c65" }}
                 >
-                  {tidySection(group.section)} · {group.open.length} open
-                  {group.done.length ? ` · ${group.done.length} done` : ""}
-                </div>
+                  <span aria-hidden style={{ width: 10, display: "inline-block" }}>
+                    {expanded ? "▾" : "▸"}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    {tidySection(group.section)} · {group.open.length} open
+                    {group.done.length ? ` · ${group.done.length} done` : ""}
+                  </span>
+                </button>
+                {expanded ? (
                 <ul className="space-y-1">
                   {rows.map((t) => {
                     const sum = summarizeTask(t.text);
@@ -613,6 +525,7 @@ function NotionTrackerSection({ programId }: { programId: string }) {
                     );
                   })}
                 </ul>
+                ) : null}
               </div>
             );
           })}
