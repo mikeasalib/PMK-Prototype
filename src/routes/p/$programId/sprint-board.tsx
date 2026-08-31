@@ -1,6 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
+import { WsTag } from "@/components/va-ui";
+import {
+  Bullet,
+  Chip,
+  Eyebrow,
+  KZ,
+  List,
+  Mono,
+  PanelHead,
+  SectionTitle,
+  Tag,
+  pad2,
+} from "@/components/kz";
 import type { WorkstreamKey } from "@/lib/va-data";
 import {
   useStoredData,
@@ -24,142 +37,180 @@ export const Route = createFileRoute("/p/$programId/sprint-board")({
   component: SprintBoard,
 });
 
-const COLUMNS: { key: LinearBucket; label: string; color: string }[] = [
-  { key: "backlog", label: "Backlog", color: "#565c65" },
-  { key: "todo", label: "Todo", color: "#1a6fa8" },
-  { key: "in_progress", label: "In Progress", color: "#8a5a00" },
-  { key: "done", label: "Done", color: "#2e8540" },
+const COLUMNS: { key: LinearBucket; label: string }[] = [
+  { key: "backlog", label: "Backlog" },
+  { key: "todo", label: "Todo" },
+  { key: "in_progress", label: "In Progress" },
+  { key: "done", label: "Done" },
 ];
+
+/** Cards per column before a "show more". Eight fills a screen without
+ *  scrolling past the other columns. */
+const COLUMN_CAP = 8;
 
 function SprintBoard() {
   const program = useProgram();
-  // Per-program. Was module-level.
   const WS_KEYS: (WorkstreamKey | "all")[] = ["all", ...workstreamKeys(program)];
   const seed = seedFor(program.id);
   const { linear, isLoading } = useStoredData(program.id);
   const [ws, setWs] = useState<WorkstreamKey | "all">("all");
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const expandColumn = (key: string) => setExpanded((prev) => ({ ...prev, [key]: true }));
 
   const filtered = useMemo(
     () => linear.filter((i) => ws === "all" || inferWorkstream(i, program) === ws),
-    [linear, ws],
+    [linear, ws, program],
   );
+
+  const update = ws === "all" ? null : (seed.workstreamUpdates.find((x) => x.ws === ws) ?? null);
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const currentWindow =
+    program.sprintStrip.find((w) => w.start <= todayIso && todayIso <= w.end) ?? null;
 
   return (
     <AppLayout>
       <PageHeader
+        eyebrow={currentWindow ? currentWindow.label : "Board"}
         title="Sprint board"
-        subtitle="Live Linear board for the DEP project — grouped by state."
+        subtitle="The Linear board grouped by state, with the workstream's own status from the weekly sync."
       />
+
+      {/* Workstream chips. Active fills in the workstream's own colour, which is
+          the only place this page spends colour on a control. */}
       <div
-        className="flex flex-wrap items-center gap-2 px-6 py-3"
-        style={{ borderBottom: "1px solid #dfe1e2", backgroundColor: "#f0f0f0" }}
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 8,
+          padding: "16px var(--kz-pad-x)",
+          borderBottom: `1px solid ${KZ.bone}`,
+        }}
       >
-        <span
-          className="text-[11px] uppercase tracking-wide font-semibold"
-          style={{ color: "#3a5a40" }}
-        >
+        <Mono size={10} tone={KZ.muted} style={{ textTransform: "uppercase", marginRight: 6 }}>
           Workstream
-        </span>
-        {WS_KEYS.map((k) => {
-          const active = ws === k;
-          const color = k === "all" ? "#3a5a40" : workstreamOf(k, program).color;
-          return (
-            <button
-              key={k}
-              onClick={() => setWs(k)}
-              className="rounded px-2 py-1 text-[11px] font-semibold"
-              style={{
-                border: `1px solid ${active ? color : "#dfe1e2"}`,
-                backgroundColor: active ? color : "#fff",
-                color: active ? "#fff" : "#1b1b1b",
-              }}
-            >
-              {k === "all" ? "All" : k}
-            </button>
-          );
-        })}
-        <span className="ml-auto text-[11px]" style={{ color: "#565c65" }}>
-          {filtered.length} issues
-        </span>
+        </Mono>
+        {WS_KEYS.map((k) => (
+          <Chip
+            key={k}
+            label={k === "all" ? "All" : k}
+            active={ws === k}
+            tone={k === "all" ? KZ.ink : workstreamOf(k, program).color}
+            onClick={() => setWs(k)}
+          />
+        ))}
+        <Mono size={11} tone={KZ.muted} style={{ marginLeft: "auto" }}>
+          {pad2(filtered.length)} issues
+        </Mono>
       </div>
 
-      {ws !== "all" &&
-        (() => {
-          const u = seed.workstreamUpdates.find((x) => x.ws === ws);
-          if (!u) return null;
-          return (
-            <div
-              className="mx-6 mt-4 rounded-md bg-white p-4"
-              style={{
-                border: "1px solid #e5e5e2",
-                borderLeft: `3px solid ${HEALTH_COLOR[u.health]}`,
-              }}
-            >
-              <div className="flex items-baseline justify-between gap-3">
-                <div>
-                  <div
-                    className="text-[13px] font-semibold"
-                    style={{ color: "#3a5a40", fontFamily: "Public Sans, system-ui, sans-serif" }}
-                  >
-                    {u.ws} · {u.name}
-                  </div>
-                  <div className="text-[11px]" style={{ color: "#565c65" }}>
-                    Lead: {u.owner} · from Mon 7/13 sync
-                  </div>
-                </div>
-                <span
-                  className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase"
-                  style={{
-                    color: HEALTH_COLOR[u.health],
-                    backgroundColor: `${HEALTH_COLOR[u.health]}14`,
-                    border: `1px solid ${HEALTH_COLOR[u.health]}44`,
-                  }}
-                >
-                  {HEALTH_LABEL[u.health]}
-                </span>
-              </div>
-              <div className="mt-2 text-[12px]">{u.headline}</div>
-              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-                <UpdateList title="In progress" color="#1a6fa8" items={u.progress} />
-                <UpdateList title="Risks" color="#b3261e" items={u.risks} />
-                <UpdateList title="Next steps" color="#2e8540" items={u.nextSteps} />
-              </div>
-            </div>
-          );
-        })()}
+      {/* The selected workstream's status band — the one tinted panel here. */}
+      {update ? (
+        <div
+          style={{
+            margin: "24px var(--kz-pad-x) 0 var(--kz-pad-x)",
+            border: `1px solid ${KZ.bone}`,
+            background: KZ.grey050,
+            padding: "20px 24px",
+          }}
+        >
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 12 }}>
+            <WsTag ws={update.ws} />
+            <SectionTitle size={16}>{update.name}</SectionTitle>
+            <Mono size={10.5}>Lead: {update.owner} · from the weekly sync</Mono>
+            <Tag tone={HEALTH_COLOR[update.health]} style={{ marginLeft: "auto" }}>
+              {HEALTH_LABEL[update.health]}
+            </Tag>
+          </div>
+          <p
+            style={{
+              margin: "10px 0 0 0",
+              fontSize: 14,
+              lineHeight: 1.5,
+              color: KZ.body,
+              maxWidth: "80ch",
+            }}
+          >
+            {update.headline}
+          </p>
+          <div
+            style={{
+              marginTop: 18,
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))",
+              gap: 24,
+            }}
+          >
+            <UpdateList title="In progress" items={update.progress} />
+            <UpdateList title="Risks" items={update.risks} tone={KZ.coral} />
+            <UpdateList title="Next steps" items={update.nextSteps} />
+          </div>
+        </div>
+      ) : null}
 
       {isLoading ? (
-        <div className="p-6 text-[13px]" style={{ color: "#565c65" }}>
-          Loading live data…
+        <div style={{ padding: "28px var(--kz-pad-x)" }}>
+          <Mono size={11}>Loading…</Mono>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 p-4 sm:p-6 md:grid-cols-2 lg:grid-cols-4">
+        <div
+          style={{
+            padding: "24px var(--kz-pad-x) 60px var(--kz-pad-x)",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))",
+            gap: 20,
+            alignItems: "start",
+          }}
+        >
           {COLUMNS.map((col) => {
             const items = filtered.filter((t) => bucketOf(t) === col.key);
+            // Columns are capped rather than filtered: a board's columns are the
+            // point of a board, so none of them disappears — but Backlog and
+            // Done carrying twenty cards each is what made this page ten screens
+            // tall.
+            const cap = expanded[col.key] ? items.length : COLUMN_CAP;
+            const shown = items.slice(0, cap);
+            const hidden = items.length - shown.length;
             return (
-              <div
-                key={col.key}
-                className="rounded-md p-2"
-                style={{ backgroundColor: "#f7f7f5", border: "1px solid #e5e5e2", minHeight: 300 }}
-              >
+              <section key={col.key} style={{ border: `1px solid ${KZ.bone}`, minHeight: 320 }}>
+                <PanelHead
+                  label={col.label}
+                  right={pad2(items.length)}
+                  style={{ padding: "12px 14px", paddingBottom: 12 }}
+                />
                 <div
-                  className="mb-2 flex items-center justify-between px-1 text-[11px] font-semibold uppercase tracking-wide"
-                  style={{ color: col.color }}
+                  style={{
+                    padding: 12,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 12,
+                  }}
                 >
-                  <span>{col.label}</span>
-                  <span
-                    className="rounded px-1.5"
-                    style={{ backgroundColor: `${col.color}14`, color: col.color }}
-                  >
-                    {items.length}
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {items.map((t) => (
-                    <IssueCard key={t.id} issue={t} />
+                  {shown.map((t) => (
+                    <IssueCard key={t.identifier} issue={t} />
                   ))}
+                  {hidden > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => expandColumn(col.key)}
+                      className="kz-transition"
+                      style={{
+                        border: `1px solid ${KZ.bone}`,
+                        background: KZ.white,
+                        color: KZ.ink,
+                        fontFamily: "var(--font-mono)",
+                        fontSize: 10,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.02em",
+                        padding: "8px 10px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Show {hidden} more
+                    </button>
+                  ) : null}
                 </div>
-              </div>
+              </section>
             );
           })}
         </div>
@@ -168,68 +219,67 @@ function SprintBoard() {
   );
 }
 
+/**
+ * One card: identifier and workstream on the top line, title, then owner and
+ * priority. Priority tags only at urgent and high — a card carrying a tag at
+ * every level tells you nothing about which card to read first.
+ */
 function IssueCard({ issue }: { issue: StoredLinearIssue }) {
   const program = useProgram();
   const ws = inferWorkstream(issue, program) as WorkstreamKey;
-  const color = workstreamOf(ws, program).color;
   return (
-    <div
-      className="rounded bg-white p-2"
-      style={{ border: "1px solid #e5e5e2", borderLeft: `3px solid ${color}` }}
+    <article
+      style={{ border: `1px solid ${KZ.grey200}`, padding: 12 }}
+      title={`${ws} · ${priorityLabel(issue.priority)} · updated ${relativeTime(issue.source_updated_at)}`}
     >
-      <div className="flex items-center justify-between text-[10px]" style={{ color: "#565c65" }}>
-        <a
-          href={issue.url ?? "#"}
-          target="_blank"
-          rel="noreferrer"
-          className="font-mono underline"
-          style={{ color: "#005ea2" }}
-        >
-          {issue.identifier}
-        </a>
-        <span
-          className="rounded px-1 py-0.5 font-semibold uppercase"
-          style={{ color, backgroundColor: `${color}14`, border: `1px solid ${color}44` }}
-        >
-          {ws}
-        </span>
-      </div>
-      <div className="mt-1 text-[12px] font-medium leading-snug">{issue.title}</div>
       <div
-        className="mt-1 flex items-center justify-between text-[10px]"
-        style={{ color: "#565c65" }}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+        }}
       >
-        <span>{issue.assignee ?? "unassigned"}</span>
-        <span
-          className="rounded px-1 py-0.5 font-semibold uppercase"
-          style={{
-            color: priorityColor(issue.priority),
-            backgroundColor: `${priorityColor(issue.priority)}14`,
-            border: `1px solid ${priorityColor(issue.priority)}44`,
-          }}
-        >
-          {priorityLabel(issue.priority)}
-        </span>
+        <a href={issue.url ?? undefined} target="_blank" rel="noreferrer">
+          <Mono size={10.5} tone={KZ.blue}>
+            {issue.identifier}
+          </Mono>
+        </a>
+        <WsTag ws={ws} />
       </div>
-      <div className="mt-1 text-[10px]" style={{ color: "#8a9099" }}>
-        {relativeTime(issue.source_updated_at)}
+      <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.4 }}>{issue.title}</div>
+      <div
+        style={{
+          marginTop: 10,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+        }}
+      >
+        <Mono size={10} style={{ minWidth: 0 }}>
+          {issue.assignee ?? "unassigned"}
+        </Mono>
+        {issue.priority === 1 || issue.priority === 2 ? (
+          <Tag tone={priorityColor(issue.priority)}>{priorityLabel(issue.priority)}</Tag>
+        ) : null}
       </div>
-    </div>
+    </article>
   );
 }
 
-function UpdateList({ title, color, items }: { title: string; color: string; items: string[] }) {
+function UpdateList({ title, items, tone }: { title: string; items: string[]; tone?: string }) {
   if (!items.length) return <div />;
   return (
     <div>
-      <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color }}>
-        {title}
-      </div>
-      <ul className="mt-0.5 list-disc pl-4 text-[11px]" style={{ color: "#3d3d3d" }}>
-        {items.map((i, idx) => (
-          <li key={idx}>{i}</li>
+      <Eyebrow size={10}>{title}</Eyebrow>
+      <List style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 7 }}>
+        {items.map((i) => (
+          <Bullet key={i} tone={tone}>
+            {i}
+          </Bullet>
         ))}
-      </ul>
+      </List>
     </div>
   );
 }

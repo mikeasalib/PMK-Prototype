@@ -104,7 +104,7 @@ function Login() {
         </button>
 
         <div
-          className="mt-4 rounded-md px-3 py-2 text-[11px] leading-relaxed"
+          className="mt-4 rounded-md px-3 py-2 text-xs leading-relaxed"
           style={{ backgroundColor: "#f7f7f5", border: "1px solid #e5e5e2", color: "#565c65" }}
         >
           Static demo sign-in for now. Real identity will slot in behind this

@@ -1,28 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { CircleUserRound } from "lucide-react";
 import { PROGRAMS, type ProgramConfig } from "@/lib/program.config";
 import { useProgram } from "@/routes/p/$programId/route";
 import { useAuth } from "@/hooks/use-auth";
+import { KZ, Mono, Square } from "./kz";
 
 /**
- * Kaizen's dark green. Fixed rather than taken from program.navColor: the
- * account control is app chrome, and it should not change colour when you switch
- * engagements. The sidebar is where per-program colour belongs.
- */
-const KAIZEN_GREEN = "#1f3d2b";
-
-/**
- * Account-style menu, top right — mirrors the pattern on the customer-facing
- * reservation site: a plain circle-user trigger and an unadorned white menu.
+ * The program chip, top right — trigger and account menu in one.
  *
- * Where that site puts "Admin Dashboard" first, this puts the other programs, so
- * switching engagements is the same gesture as switching accounts. A single
- * cross-program view for the head of programs is a separate, later thing and is
- * deliberately not stubbed in here.
+ * In the design this is a hairline chip: a 6×6 swatch, then the program and the
+ * sprint it is in. It replaces the round account avatar, which was the last
+ * rounded, shadowed thing on the page. Everything the avatar menu did still
+ * happens here; only the shape changed.
  *
  * Switching keeps the current page — /p/va/risks becomes /p/ventura/risks — and
- * it changes the URL rather than hidden state, so a program stays a linkable
+ * changes the URL rather than hidden state, so a program stays a linkable
  * address and two tabs can hold two engagements at once.
  */
 export function ProgramSwitcher() {
@@ -68,40 +60,49 @@ export function ProgramSwitcher() {
             ? `${user.name}, ${user.role}. ${program.name}. Switch program or sign out.`
             : `${program.name}. Sign in or switch program.`
         }
-        className="flex h-9 w-9 items-center justify-center rounded-full transition-all hover:brightness-110"
+        className="kz-transition"
         style={{
-          backgroundColor: KAIZEN_GREEN,
-          color: "#ffffff",
-          // A visible ring plus a small lift, so it reads as the one persistent
-          // control on the page rather than another grey icon.
-          boxShadow: open
-            ? `0 0 0 3px rgba(31,61,43,0.28)`
-            : "0 1px 2px rgba(17,47,78,0.18), 0 2px 6px -2px rgba(17,47,78,0.20)",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "10px 14px",
+          border: `1px solid ${open ? KZ.ink : KZ.bone}`,
+          background: KZ.white,
+          color: KZ.ink,
+          fontFamily: "var(--font-mono)",
+          fontSize: 11,
+          textTransform: "uppercase",
+          letterSpacing: "0.02em",
+          cursor: "pointer",
+          whiteSpace: "nowrap",
         }}
       >
-        <CircleUserRound size={20} strokeWidth={2} />
+        <Square tone={program.navColor} filled />
+        <span>{chipLabel(program)}</span>
       </button>
 
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 z-50 mt-2 min-w-[240px] rounded bg-white py-2"
-          style={{ boxShadow: "0 2px 10px rgba(0,0,0,0.13), 0 0 1px rgba(0,0,0,0.08)" }}
+          className="absolute right-0 z-50"
+          style={{
+            marginTop: 8,
+            minWidth: 260,
+            background: KZ.white,
+            border: `1px solid ${KZ.ink}`,
+          }}
         >
-          {/* Identity row — the signed-in name up top so the menu answers
-              "who am I" before "what can I switch to." Renders only after
-              hydration so the server render never disagrees with the client. */}
+          {/* Identity first, so the menu answers "who am I" before "what can I
+              switch to". Rendered only after hydration so the server render
+              never disagrees with the client. */}
           {hydrated && user ? (
-            <div
-              className="border-b px-4 py-2"
-              style={{ borderColor: "#eee" }}
-            >
-              <div className="text-[13px] font-semibold" style={{ color: "#1b1b1b" }}>
-                {user.name} — {user.role}
+            <div style={{ padding: "12px 16px", borderBottom: `1px solid ${KZ.grey200}` }}>
+              <div style={{ fontSize: 13.5, fontWeight: 500 }}>
+                {user.name} · {user.role}
               </div>
-              <div className="text-[11px]" style={{ color: "#8a8a80" }}>
+              <Mono size={10.5} tone={KZ.muted}>
                 Signed in via {user.provider === "okta" ? "Okta" : "static demo"}
-              </div>
+              </Mono>
             </div>
           ) : null}
 
@@ -111,45 +112,63 @@ export function ProgramSwitcher() {
               type="button"
               role="menuitem"
               onClick={() => switchTo(p.id)}
-              className="flex w-full items-center gap-2.5 px-4 py-2 text-left text-[14px] transition-colors hover:bg-[#f5f5f2]"
-              style={{ color: "#1b1b1b" }}
+              className="kz-transition"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                width: "100%",
+                padding: "11px 16px",
+                border: 0,
+                background: "transparent",
+                color: KZ.ink,
+                fontSize: 13.5,
+                textAlign: "left",
+                cursor: "pointer",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = KZ.grey050)}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
             >
               <Seal program={p} />
               <span className="truncate">{p.name}</span>
             </button>
           ))}
 
-          {/* Auth affordance flips shape with state — "Sign in" as a link to
-              /login when nobody is signed in, "Log out" as a mutator when
-              someone is. Same slot, different meaning; no separate config. */}
-          {hydrated && user ? (
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
+          {/* The auth affordance flips shape with state — "Sign in" as a link
+              when nobody is signed in, "Log out" as a mutator when someone is.
+              Same slot, different meaning. */}
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              if (hydrated && user) {
                 signOut();
                 navigate({ to: "/login", replace: true });
-              }}
-              className="w-full px-4 py-2 text-left text-[14px] transition-colors hover:bg-[#f5f5f2]"
-              style={{ color: "#1b1b1b" }}
-            >
-              Log out
-            </button>
-          ) : (
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
+              } else {
                 navigate({ to: "/login" });
-              }}
-              className="w-full px-4 py-2 text-left text-[14px] transition-colors hover:bg-[#f5f5f2]"
-              style={{ color: "#1b1b1b" }}
-            >
-              Sign in
-            </button>
-          )}
+              }
+            }}
+            className="kz-transition"
+            style={{
+              width: "100%",
+              padding: "11px 16px",
+              border: 0,
+              borderTop: `1px solid ${KZ.grey200}`,
+              background: "transparent",
+              color: KZ.ink,
+              fontFamily: "var(--font-mono)",
+              fontSize: 10,
+              textTransform: "uppercase",
+              letterSpacing: "0.02em",
+              textAlign: "left",
+              cursor: "pointer",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = KZ.grey050)}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+          >
+            {hydrated && user ? "Log out" : "Sign in"}
+          </button>
         </div>
       ) : null}
     </div>
@@ -157,10 +176,23 @@ export function ProgramSwitcher() {
 }
 
 /**
+ * "VA · Sprint 6", or just "VA" when today falls outside every window in the
+ * strip. The sprint is read from the program's own strip rather than hardcoded,
+ * so a chip never claims a sprint the program is not in.
+ */
+function chipLabel(program: ProgramConfig): string {
+  const today = new Date().toISOString().slice(0, 10);
+  const now = program.sprintStrip.find((s) => s.start <= today && today <= s.end);
+  const id = program.id.toUpperCase();
+  return now ? `${id} · ${now.label}` : id;
+}
+
+/**
  * The program's seal, or an initials chip when no asset has been supplied.
  *
- * The fallback is deliberately a flat lettermark rather than anything seal-like:
- * a hand-made approximation of an official seal would misrepresent it.
+ * The fallback is deliberately a flat lettermark rather than anything
+ * seal-like: a hand-made approximation of an official seal would misrepresent
+ * it.
  */
 function Seal({ program }: { program: ProgramConfig }) {
   // A configured path is not a guarantee the file is there. Falling back on
@@ -185,8 +217,13 @@ function Seal({ program }: { program: ProgramConfig }) {
   return (
     <span
       aria-hidden="true"
-      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-[9px] font-semibold text-white"
-      style={{ backgroundColor: program.navColor }}
+      className="flex h-5 w-5 shrink-0 items-center justify-center"
+      style={{
+        background: program.navColor,
+        color: KZ.white,
+        fontFamily: "var(--font-mono)",
+        fontSize: 10,
+      }}
     >
       {initials}
     </span>

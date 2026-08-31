@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { ExternalLink, Activity } from "lucide-react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
+import { Button, Eyebrow, KZ, Mono } from "@/components/kz";
 import { PROGRAMS, pageTitle } from "@/lib/program.config";
 import { mintHexSignedEmbedUrl, type HexSignedEmbed } from "@/lib/hex.functions";
 import { useProgram } from "./route";
@@ -21,15 +21,14 @@ export const Route = createFileRoute("/p/$programId/customer-health")({
 });
 
 /**
- * Three states, disclosed in the subtitle rather than hidden behind indistinguishable
- * "Live Hex project" text:
+ * Three states, disclosed in the subtitle rather than hidden behind
+ * indistinguishable "Live Hex project" text:
  *
- * - "signed embed" — server minted a presigned URL against HEX_API_KEY. Anyone
- *   with app access sees the dashboard, regardless of whether they have a
- *   Hex account.
+ * - "signed embed" — the server minted a presigned URL against HEX_API_KEY.
+ *   Anyone with app access sees the dashboard, Hex account or not.
  * - "session-based auth" — no HEX_API_KEY (or the mint failed) and the plain
  *   embedUrl is loaded directly. Viewers signed in to Hex in the same browser
- *   see the dashboard; viewers without a session see Hex's login screen.
+ *   see the dashboard; others see Hex's login screen.
  * - "not configured" — neither embedUrl nor projectId is set for this program.
  */
 type EmbedMode =
@@ -44,10 +43,8 @@ function CustomerHealth() {
   const mint = useServerFn(mintHexSignedEmbedUrl);
   const [mode, setMode] = useState<EmbedMode>(() => {
     if (!projectId && !embedUrl) return { kind: "not-configured" };
-    // Optimistic: render the session-auth fallback immediately so the page
-    // isn't blank while the server mint request is in flight. If the signed
-    // URL comes back it swaps in; if it doesn't, we're already in the right
-    // place.
+    // Optimistic: render the session-auth fallback immediately so the page is
+    // not blank while the mint request is in flight.
     if (embedUrl) return { kind: "session", url: embedUrl, note: null };
     return { kind: "pending" };
   });
@@ -73,7 +70,7 @@ function CustomerHealth() {
         setMode({
           kind: "session",
           url: embedUrl,
-          note: result.reason === "no-api-key" ? null : result.detail ?? null,
+          note: result.reason === "no-api-key" ? null : (result.detail ?? null),
         });
       } else {
         setMode({ kind: "not-configured" });
@@ -83,7 +80,7 @@ function CustomerHealth() {
       cancelled = true;
     };
     // projectId and embedUrl are stable per program; the effect re-runs on
-    // program switch. mint is stable (useServerFn returns a memoised binding).
+    // program switch. mint is a memoised binding.
   }, [projectId, embedUrl, mint]);
 
   const subtitleTail = describeMode(mode);
@@ -92,37 +89,53 @@ function CustomerHealth() {
   return (
     <AppLayout>
       <PageHeader
+        eyebrow="Sentiment"
         title="Customer health"
-        subtitle={[
-          program.domainLabel,
+        subtitle={
           subtitleTail
-            ? `Live Hex project · ${subtitleTail}${projectLabel ? ` · ${projectLabel}` : ""}`
-            : "Not configured — no Hex project wired to this program yet",
-        ]
-          .filter(Boolean)
-          .join(" · ")}
+            ? `Live Hex project · ${subtitleTail}${projectLabel ? ` · ${projectLabel}` : ""} · ${program.domainLabel} sentiment.`
+            : `No Hex project is wired to ${program.domainLabel} yet.`
+        }
         actions={
           openInHexUrl ? (
-            <a
-              href={openInHexUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-[13px] font-medium text-neutral-700 transition hover:border-neutral-400"
-            >
-              <ExternalLink size={14} />
-              Open in Hex
+            <a href={openInHexUrl} target="_blank" rel="noreferrer">
+              <Button style={{ borderColor: KZ.bone }}>Open in Hex</Button>
             </a>
           ) : null
         }
       />
 
-      {mode.kind === "not-configured" ? (
-        <NotConfigured />
-      ) : mode.kind === "pending" ? (
-        <PendingEmbed />
-      ) : (
-        <HexEmbed url={mode.url} />
-      )}
+      <div style={{ padding: "28px var(--kz-pad-x) 60px var(--kz-pad-x)" }}>
+        {mode.kind === "not-configured" ? (
+          <NotConfigured />
+        ) : mode.kind === "pending" ? (
+          <Placeholder>Requesting a signed embed URL from Hex…</Placeholder>
+        ) : (
+          <>
+            <iframe
+              src={mode.url}
+              title="Customer health dashboard"
+              style={{
+                width: "100%",
+                height: "calc(100vh - 200px)",
+                minHeight: 520,
+                border: `1px solid ${KZ.bone}`,
+                background: KZ.white,
+                display: "block",
+              }}
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+            {mode.kind === "session" && mode.note ? (
+              <div style={{ marginTop: 12 }}>
+                <Mono size={10.5} tone={KZ.amber}>
+                  Signed embed unavailable: {mode.note}. This falls back to session auth, so only
+                  viewers already signed in to Hex will see it.
+                </Mono>
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
     </AppLayout>
   );
 }
@@ -141,10 +154,9 @@ function describeMode(mode: EmbedMode): string | null {
 }
 
 /**
- * The "Open in Hex" button always points at the human-readable app URL, not the
- * signed one — presigned URLs are single-use, so opening one in a new tab would
- * either race the iframe or hand the recipient a dead link. Strip the
- * "?embedded=true" query so the user lands on the full Hex UI.
+ * "Open in Hex" always points at the human-readable app URL, not the signed
+ * one — presigned URLs are single-use, so opening one in a new tab would either
+ * race the iframe or hand the recipient a dead link.
  */
 function deriveOpenInHex(embedUrl: string | null, projectId: string | null): string | null {
   if (embedUrl) return embedUrl.replace(/\?embedded=true(&|$)/, (_, tail) => (tail ? "?" : ""));
@@ -152,65 +164,62 @@ function deriveOpenInHex(embedUrl: string | null, projectId: string | null): str
   return null;
 }
 
-function HexEmbed({ url }: { url: string }) {
+/** The one tinted panel shape, used where the embed cannot render. */
+function Placeholder({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mt-4 px-6 pb-6">
-      <iframe
-        src={url}
-        title="Customer health dashboard"
-        className="w-full rounded-lg border border-neutral-200 bg-white"
-        style={{ height: "calc(100vh - 200px)", minHeight: 520 }}
-        referrerPolicy="no-referrer-when-downgrade"
-      />
-    </div>
-  );
-}
-
-function PendingEmbed() {
-  return (
-    <div className="mt-4 mx-6 mb-6 rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-8">
-      <div className="mx-auto max-w-xl text-center text-[13px] text-neutral-600">
-        Requesting a signed embed URL from Hex…
-      </div>
+    <div
+      style={{
+        border: `1px solid ${KZ.bone}`,
+        background: KZ.grey050,
+        minHeight: 520,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 14,
+        padding: 40,
+      }}
+    >
+      <Eyebrow size={10}>Hex embed</Eyebrow>
+      <p
+        style={{
+          margin: 0,
+          maxWidth: "52ch",
+          textAlign: "center",
+          fontSize: 14,
+          lineHeight: 1.55,
+          color: KZ.body,
+        }}
+      >
+        {children}
+      </p>
     </div>
   );
 }
 
 function NotConfigured() {
   return (
-    <div className="mt-4 mx-6 mb-6 rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-8">
-      <div className="mx-auto max-w-xl text-center">
-        <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-white text-neutral-500 shadow-sm">
-          <Activity size={18} />
-        </div>
-        <h2 className="text-[15px] font-semibold text-neutral-800">
-          No Hex project connected yet
-        </h2>
-        <p className="mt-2 text-[13px] leading-relaxed text-neutral-600">
-          Customer-health sentiment is meant to render as a live Hex embed. This
-          program hasn't been wired to one — set{" "}
-          <code className="rounded bg-neutral-200 px-1.5 py-0.5 text-[12px] text-neutral-800">
-            hex.customerHealth
-          </code>{" "}
-          on the program in{" "}
-          <code className="rounded bg-neutral-200 px-1.5 py-0.5 text-[12px] text-neutral-800">
-            src/lib/program.config.ts
-          </code>{" "}
-          with either an{" "}
-          <code className="rounded bg-neutral-200 px-1.5 py-0.5 text-[12px] text-neutral-800">
-            embedUrl
-          </code>{" "}
-          (session-auth fallback) or a{" "}
-          <code className="rounded bg-neutral-200 px-1.5 py-0.5 text-[12px] text-neutral-800">
-            projectId
-          </code>{" "}
-          plus{" "}
-          <code className="rounded bg-neutral-200 px-1.5 py-0.5 text-[12px] text-neutral-800">
-            HEX_API_KEY
-          </code>{" "}
-          for signed embeds.
-        </p>
-      </div>
-    </div>
+    <Placeholder>
+      Sentiment renders as a live Hex embed, signed server-side per program. This program has not
+      been wired to one. Set <Code>hex.customerHealth</Code> in{" "}
+      <Code>src/lib/program.config.ts</Code> with either an <Code>embedUrl</Code> (session-auth
+      fallback) or a <Code>projectId</Code> plus <Code>HEX_API_KEY</Code> for signed embeds.
+    </Placeholder>
+  );
+}
+
+function Code({ children }: { children: React.ReactNode }) {
+  return (
+    <code
+      style={{
+        fontFamily: "var(--font-mono)",
+        fontSize: 11.5,
+        border: `1px solid ${KZ.bone}`,
+        background: KZ.white,
+        padding: "1px 5px",
+      }}
+    >
+      {children}
+    </code>
   );
 }

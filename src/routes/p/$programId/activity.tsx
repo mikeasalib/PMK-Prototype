@@ -1,10 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
+import { WsTag } from "@/components/va-ui";
+import { Chip, Disclosure, KZ, List, Mono, Tag, pad2 } from "@/components/kz";
 import type { WorkstreamKey } from "@/lib/va-data";
 import { useStoredData, inferWorkstream } from "@/hooks/use-stored-data";
 import { relativeTime } from "@/hooks/use-program-data";
-import { PROGRAMS, pageTitle, workstreamOf } from "@/lib/program.config";
+import { PROGRAMS, pageTitle } from "@/lib/program.config";
+import { shortDate } from "@/lib/local-date";
 import { useProgram } from "./route";
 
 export const Route = createFileRoute("/p/$programId/activity")({
@@ -13,7 +16,7 @@ export const Route = createFileRoute("/p/$programId/activity")({
       { title: pageTitle("Activity feed", PROGRAMS[params.programId]) },
       {
         name: "description",
-        content: "Reverse-chronological program event stream from Linear, Notion and Granola.",
+        content: "Reverse-chronological program event stream from Linear and Notion.",
       },
     ],
   }),
@@ -22,9 +25,10 @@ export const Route = createFileRoute("/p/$programId/activity")({
 
 type Kind = "linear" | "notion";
 
-const KIND_META: Record<Kind, { label: string; color: string }> = {
-  linear: { label: "Linear", color: "#4a3fb5" },
-  notion: { label: "Notion", color: "#2e6b2f" },
+/** One tone per source, so the column reads by origin at a glance. */
+const KIND_META: Record<Kind, { label: string; tone: string }> = {
+  linear: { label: "Linear", tone: KZ.amber },
+  notion: { label: "Notion", tone: KZ.blue },
 };
 
 type Event = {
@@ -36,6 +40,13 @@ type Event = {
   ws?: WorkstreamKey;
 };
 
+/**
+ * What moved, in order.
+ *
+ * Timeline rows: a mono date column on the left, then the source tag, the label
+ * and the workstream, then the entry itself. Grouped by day, because "when" is
+ * the only axis this page has.
+ */
 function ActivityFeed() {
   const program = useProgram();
   const { linear, notion, isLoading, origin } = useStoredData(program.id);
@@ -48,8 +59,8 @@ function ActivityFeed() {
       out.push({
         ts: i.source_updated_at,
         kind: "linear",
-        title: `${i.identifier} · ${i.title}`,
-        detail: `${i.state_name ?? "—"} · ${i.assignee ?? "unassigned"}`,
+        title: i.title,
+        detail: `${i.identifier} · ${i.state_name ?? "—"} · ${i.assignee ?? "unassigned"}`,
         url: i.url,
         ws: inferWorkstream(i, program) as WorkstreamKey,
       });
@@ -82,117 +93,113 @@ function ActivityFeed() {
   return (
     <AppLayout>
       <PageHeader
-        title="Activity feed"
+        eyebrow="Feed"
+        title="Activity"
         subtitle={
           origin === "snapshot"
-            ? "Everything that changed, newest first — from a captured snapshot."
-            : "Everything that changed, newest first — live from Linear and Notion."
+            ? "What moved, in order, across Linear and Notion. Read from a captured snapshot."
+            : "What moved, in order, across Linear and Notion, live."
         }
       />
+
       <div
-        className="flex flex-wrap items-center gap-3 px-6 py-3"
-        style={{ borderBottom: "1px solid #e5e5e2" }}
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 8,
+          padding: "16px var(--kz-pad-x)",
+          borderBottom: `1px solid ${KZ.bone}`,
+        }}
       >
-        <span className="text-[11px] uppercase tracking-wide" style={{ color: "#666" }}>
+        <Mono size={10} tone={KZ.muted} style={{ textTransform: "uppercase", marginRight: 6 }}>
           Source
-        </span>
-        {(["all", "linear", "notion"] as const).map((k) => {
-          const active = kind === k;
-          const c = k === "all" ? "#3a5a40" : KIND_META[k].color;
-          return (
-            <button
-              key={k}
-              onClick={() => setKind(k)}
-              className="rounded px-2 py-1 text-[11px] font-semibold"
-              style={{
-                border: `1px solid ${active ? c : "#dfe1e2"}`,
-                backgroundColor: active ? c : "#fff",
-                color: active ? "#fff" : "#1b1b1b",
-              }}
-            >
-              {k === "all" ? "All" : KIND_META[k].label}
-            </button>
-          );
-        })}
-        <span className="ml-auto text-[11px]" style={{ color: "#666" }}>
-          {filtered.length} events
-        </span>
+        </Mono>
+        {(["all", "linear", "notion"] as const).map((k) => (
+          <Chip
+            key={k}
+            label={k === "all" ? "All" : KIND_META[k].label}
+            active={kind === k}
+            tone={k === "all" ? KZ.ink : KIND_META[k].tone}
+            onClick={() => setKind(k)}
+          />
+        ))}
+        <Mono size={11} tone={KZ.muted} style={{ marginLeft: "auto" }}>
+          {pad2(filtered.length)} events
+        </Mono>
       </div>
 
-      {isLoading ? (
-        <div className="p-6 text-[13px]" style={{ color: "#565c65" }}>
-          Loading live data…
-        </div>
-      ) : (
-        <div className="p-4 space-y-4 sm:p-6">
-          {grouped.map(([date, items]) => (
-            <section key={date}>
-              <div
-                className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-wide"
-                style={{ color: "#3a5a40" }}
-              >
-                {date}
-              </div>
-              <ul className="rounded-md bg-white" style={{ border: "1px solid #e5e5e2" }}>
-                {items.map((e, i) => {
-                  const k = KIND_META[e.kind];
-                  return (
-                    <li
-                      key={i}
-                      className="flex items-start gap-3 px-3 py-2 text-[13px]"
-                      style={{ borderTop: i === 0 ? undefined : "1px solid #eee" }}
+      <div style={{ padding: "28px var(--kz-pad-x) 60px var(--kz-pad-x)", maxWidth: 1000 }}>
+        {isLoading ? (
+          <Mono size={11}>Loading…</Mono>
+        ) : grouped.length === 0 ? (
+          <div style={{ fontSize: 13.5, color: KZ.body }}>
+            Nothing has moved in this source since the last read.
+          </div>
+        ) : (
+          <List>
+            {grouped.flatMap(([date, items]) =>
+              items.map((e, i) => (
+                <li
+                  key={`${date}-${i}`}
+                  style={{
+                    display: "flex",
+                    gap: 24,
+                    padding: "18px 0",
+                    borderBottom: `1px solid ${KZ.grey200}`,
+                  }}
+                >
+                  {/* The date prints once per day; subsequent rows in the same
+                      day leave the column empty rather than repeating it. */}
+                  <div style={{ width: 66, flex: "0 0 66px" }}>
+                    {i === 0 ? (
+                      <Mono size={11} tone={KZ.ink}>
+                        {shortDate(date)}
+                      </Mono>
+                    ) : null}
+                  </div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                        gap: 10,
+                      }}
                     >
-                      <span
-                        className="mt-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase"
-                        style={{
-                          color: k.color,
-                          backgroundColor: `${k.color}14`,
-                          border: `1px solid ${k.color}44`,
-                          minWidth: 62,
-                          textAlign: "center",
-                        }}
-                      >
-                        {k.label}
-                      </span>
-                      {e.ws ? (
-                        <span
-                          className="mt-1 inline-block h-2 w-2 shrink-0 rounded-full"
-                          style={{ backgroundColor: workstreamOf(e.ws, program).color }}
-                          title={e.ws}
-                        />
+                      <Tag tone={KIND_META[e.kind].tone}>{KIND_META[e.kind].label}</Tag>
+                      {e.detail ? <Mono size={10.5}>{e.detail}</Mono> : null}
+                      {e.ws ? <WsTag ws={e.ws} /> : null}
+                      <Mono size={10.5} style={{ marginLeft: "auto" }}>
+                        {relativeTime(e.ts)}
+                      </Mono>
+                    </div>
+                    <p
+                      style={{
+                        margin: "8px 0 0 0",
+                        fontSize: 14,
+                        lineHeight: 1.5,
+                        maxWidth: "78ch",
+                      }}
+                    >
+                      {e.url ? (
+                        <a href={e.url} target="_blank" rel="noreferrer" style={{ color: KZ.ink }}>
+                          {e.title}
+                        </a>
                       ) : (
-                        <span className="mt-1 inline-block h-2 w-2 shrink-0" />
+                        e.title
                       )}
-                      <div className="min-w-0 flex-1">
-                        <div className="font-medium">
-                          {e.url ? (
-                            <a
-                              href={e.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="underline"
-                              style={{ color: "#005ea2" }}
-                            >
-                              {e.title}
-                            </a>
-                          ) : (
-                            e.title
-                          )}
-                        </div>
-                        {e.detail ? (
-                          <div className="text-[11px]" style={{ color: "#565c65" }}>
-                            {e.detail} · {relativeTime(e.ts)}
-                          </div>
-                        ) : null}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ))}
-        </div>
-      )}
+                    </p>
+                  </div>
+                </li>
+              )),
+            )}
+          </List>
+        )}
+        <Disclosure>
+          Ordered by each source's own last-updated timestamp, not by when this app read it
+        </Disclosure>
+      </div>
     </AppLayout>
   );
 }

@@ -1,7 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
-
+import {
+  Chip,
+  Disclosure,
+  Eyebrow,
+  KZ,
+  List,
+  Mono,
+  SectionTitle,
+  Square,
+  Tag,
+  pad2,
+} from "@/components/kz";
 import { PROGRAMS, pageTitle } from "@/lib/program.config";
 import type { GlossaryCategory } from "@/lib/va-glossary";
 import { seedFor } from "@/lib/program-seed";
@@ -9,121 +20,90 @@ import { useProgram } from "./route";
 
 export const Route = createFileRoute("/p/$programId/stakeholders")({
   head: ({ params }) => ({
-    meta: [{ title: pageTitle("Stakeholders & glossary", PROGRAMS[params.programId]) }],
+    meta: [{ title: pageTitle("Stakeholders & Glossary", PROGRAMS[params.programId]) }],
   }),
   component: Stakeholders,
 });
 
-type Tab = "people" | "glossary";
-
+/**
+ * Who and what.
+ *
+ * Both halves on one page rather than behind a tab pair: the roster and the
+ * glossary are each a reference you arrive at knowing which one you want, and a
+ * tab strip made you click to find out the other existed. Org cards tile at
+ * 320px, glossary categories at 380px, and adjacent cards collapse their
+ * borders into one hairline grid.
+ */
 function Stakeholders() {
   const program = useProgram();
   const seed = seedFor(program.id);
-  const [tab, setTab] = useState<Tab>("people");
 
   return (
     <AppLayout>
       <PageHeader
-        title="Stakeholders & glossary"
-        subtitle="Who's who across VA and GovCIO, and what the acronyms mean when they show up in notes."
+        eyebrow="Who and what"
+        title="Stakeholders & Glossary"
+        subtitle={`The roster across ${seed.orgs.length} organizations, plus the acronym glossary for reading the program notes.`}
       />
 
-      <div className="px-4 pt-4 sm:px-6">
+      <div style={{ padding: "28px var(--kz-pad-x) 60px var(--kz-pad-x)" }}>
         <div
-          className="inline-flex rounded-md text-[12px] font-medium"
-          style={{ border: "1px solid #d5d5d0", backgroundColor: "#fff" }}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))",
+            gap: 0,
+          }}
         >
-          {(
-            [
-              { k: "people", label: "People" },
-              { k: "glossary", label: "Glossary" },
-            ] as const
-          ).map((t, i) => {
-            const active = tab === t.k;
-            return (
-              <button
-                key={t.k}
-                type="button"
-                onClick={() => setTab(t.k)}
-                className="px-3 py-1.5 transition-colors"
+          {seed.orgs.map((org) => (
+            <section
+              key={org.name}
+              style={{ border: `1px solid ${KZ.bone}`, margin: -0.5, padding: "20px 24px" }}
+            >
+              <div
                 style={{
-                  backgroundColor: active ? "#2e5d3a" : "transparent",
-                  color: active ? "#fff" : "#333",
-                  borderLeft: i === 0 ? "none" : "1px solid #d5d5d0",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  borderBottom: `1px solid ${KZ.bone}`,
+                  paddingBottom: 10,
                 }}
               >
-                {t.label}
-              </button>
-            );
-          })}
+                <Square tone={org.color} filled size={8} />
+                <SectionTitle size={16}>{org.name}</SectionTitle>
+                <Mono size={11} style={{ marginLeft: "auto" }}>
+                  {pad2(org.contacts.length)}
+                </Mono>
+              </div>
+              <List>
+                {org.contacts.map((c) => (
+                  <li
+                    key={c.name}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 16,
+                      padding: "9px 0",
+                      borderBottom: `1px solid ${KZ.grey200}`,
+                    }}
+                  >
+                    <span style={{ fontSize: 13.5 }}>{c.name}</span>
+                    <Mono size={10.5} style={{ textAlign: "right" }}>
+                      {[c.role, c.ws].filter(Boolean).join(" · ")}
+                    </Mono>
+                  </li>
+                ))}
+              </List>
+            </section>
+          ))}
         </div>
-      </div>
 
-      {tab === "people" ? <PeoplePanel /> : <GlossaryPanel />}
+        <GlossarySection />
+      </div>
     </AppLayout>
   );
 }
 
-function PeoplePanel() {
-  const program = useProgram();
-  const seed = seedFor(program.id);
-  return (
-    <div className="grid grid-cols-1 gap-4 p-6 xl:grid-cols-2 2xl:grid-cols-4">
-      {seed.orgs.map((org) => (
-        <section
-          key={org.name}
-          className="rounded-md"
-          style={{ border: "1px solid #e5e5e2", backgroundColor: "#fff" }}
-        >
-          <div
-            className="flex items-center gap-2 px-3 py-2"
-            style={{
-              backgroundColor: `${org.color}14`,
-              borderBottom: `1px solid ${org.color}44`,
-            }}
-          >
-            <span
-              className="inline-block h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: org.color }}
-            />
-            <h2 className="text-[13px] font-semibold" style={{ color: org.color }}>
-              {org.name}
-            </h2>
-            <span className="ml-auto text-[11px]" style={{ color: "#666" }}>
-              {org.contacts.length} contacts
-            </span>
-          </div>
-          <ul className="divide-y" style={{ borderColor: "#eee" }}>
-            {org.contacts.map((c) => (
-              <li key={c.name} className="flex items-start justify-between gap-2 px-3 py-2">
-                <div>
-                  <div className="text-[13px] font-medium">{c.name}</div>
-                  <div className="text-[11px]" style={{ color: "#666" }}>
-                    {c.role}
-                  </div>
-                </div>
-                {c.ws ? (
-                  <span
-                    className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
-                    style={{
-                      backgroundColor: "#f0eef7",
-                      color: "#4a3fb5",
-                      border: "1px solid #4a3fb544",
-                    }}
-                  >
-                    {c.ws}
-                  </span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-    </div>
-  );
-}
-
-function GlossaryPanel() {
+function GlossarySection() {
   const program = useProgram();
   const seed = seedFor(program.id);
   const [q, setQ] = useState("");
@@ -140,7 +120,7 @@ function GlossaryPanel() {
         (e.lead ?? "").toLowerCase().includes(needle)
       );
     });
-  }, [q, activeCat]);
+  }, [seed, q, activeCat]);
 
   const grouped = useMemo(() => {
     const map = new Map<GlossaryCategory, typeof seed.glossary>();
@@ -150,86 +130,84 @@ function GlossaryPanel() {
       map.set(e.category, arr);
     }
     return map;
-  }, [filtered]);
+  }, [seed, filtered]);
+
+  if (seed.glossary.length === 0) return null;
 
   return (
-    <div className="p-6">
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+    <div style={{ marginTop: 44 }}>
+      <Eyebrow size={11}>Acronym glossary</Eyebrow>
+      {/* A program without a glossary source has none to cite; crediting one
+          program's Notion page for another's glossary would be a fabrication. */}
+      <div style={{ marginTop: 6 }}>
+        {seed.glossarySource ? (
+          <Mono size={10.5}>
+            Sourced from Notion ·{" "}
+            <a href={seed.glossarySource.url} target="_blank" rel="noreferrer">
+              {seed.glossarySource.title}
+            </a>{" "}
+            · updated {seed.glossarySource.updated}
+          </Mono>
+        ) : (
+          <Mono size={10.5}>No source is recorded for this glossary</Mono>
+        )}
+      </div>
+
+      <div
+        style={{
+          marginTop: 18,
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 8,
+        }}
+      >
         <input
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search acronym or meaning…"
-          className="w-64 rounded-md px-2.5 py-1.5 text-[12px] outline-none focus:ring-2"
-          style={{
-            border: "1px solid #d5d5d0",
-            backgroundColor: "#fff",
-          }}
+          className="kz-input"
+          style={{ width: 280, padding: "8px 12px", fontSize: 12.5 }}
         />
-        <button
-          type="button"
+        <Chip
+          label={`All · ${pad2(seed.glossary.length)}`}
+          active={activeCat === "all"}
           onClick={() => setActiveCat("all")}
-          className="rounded px-2 py-1 text-[11px] font-medium"
-          style={{
-            border: "1px solid #d5d5d0",
-            backgroundColor: activeCat === "all" ? "#2e5d3a" : "#fff",
-            color: activeCat === "all" ? "#fff" : "#333",
-          }}
-        >
-          All ({seed.glossary.length})
-        </button>
-        {seed.glossaryCategories.map((c) => {
-          const count = seed.glossary.filter((e) => e.category === c.key).length;
-          const active = activeCat === c.key;
-          return (
-            <button
-              key={c.key}
-              type="button"
-              onClick={() => setActiveCat(c.key)}
-              className="rounded px-2 py-1 text-[11px] font-medium"
-              style={{
-                border: `1px solid ${c.color}55`,
-                backgroundColor: active ? c.color : `${c.color}12`,
-                color: active ? "#fff" : c.color,
-              }}
-            >
-              {c.key} ({count})
-            </button>
-          );
-        })}
-        {/* A program without a glossary has no source to cite. Rendering the
-            attribution unconditionally would credit VA's Notion page for an
-            empty glossary. */}
-        {seed.glossarySource ? (
-          <span className="ml-auto text-[11px]" style={{ color: "#666" }}>
-            Source:{" "}
-            <a
-              href={seed.glossarySource.url}
-              target="_blank"
-              rel="noreferrer"
-              className="underline"
-              style={{ color: "#2e5d3a" }}
-            >
-              {seed.glossarySource.title}
-            </a>{" "}
-            · {seed.glossarySource.updated}
-          </span>
-        ) : null}
+        />
+        {seed.glossaryCategories.map((c) => (
+          <Chip
+            key={c.key}
+            label={c.key}
+            active={activeCat === c.key}
+            onClick={() => setActiveCat(c.key)}
+            title={c.blurb}
+          />
+        ))}
       </div>
 
       {filtered.length === 0 ? (
         <div
-          className="rounded-md p-6 text-center text-[13px]"
           style={{
-            border: "1px dashed #d5d5d0",
-            backgroundColor: "#fff",
-            color: "#666",
+            marginTop: 18,
+            border: `1px solid ${KZ.grey400}`,
+            padding: 40,
+            textAlign: "center",
+            fontSize: 13.5,
+            color: KZ.body,
           }}
         >
-          No matches for "{q}".
+          No matches for “{q}”.
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+        <div
+          style={{
+            marginTop: 18,
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit,minmax(380px,1fr))",
+            gap: 0,
+          }}
+        >
           {seed.glossaryCategories
             .filter((c) => grouped.has(c.key))
             .map((c) => {
@@ -237,76 +215,61 @@ function GlossaryPanel() {
               return (
                 <section
                   key={c.key}
-                  className="rounded-md"
-                  style={{
-                    border: "1px solid #e5e5e2",
-                    backgroundColor: "#fff",
-                  }}
+                  style={{ border: `1px solid ${KZ.bone}`, margin: -0.5, padding: "20px 24px" }}
                 >
                   <div
-                    className="flex items-center gap-2 px-3 py-2"
                     style={{
-                      backgroundColor: `${c.color}14`,
-                      borderBottom: `1px solid ${c.color}44`,
+                      display: "flex",
+                      alignItems: "baseline",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      borderBottom: `1px solid ${KZ.bone}`,
+                      paddingBottom: 10,
                     }}
                   >
-                    <span
-                      className="inline-block h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: c.color }}
-                    />
-                    <h2 className="text-[13px] font-semibold" style={{ color: c.color }}>
+                    <Mono size={11} tone={KZ.ink} style={{ textTransform: "uppercase" }}>
                       {c.key}
-                    </h2>
-                    <span className="ml-auto text-[11px]" style={{ color: "#666" }}>
-                      {entries.length}
-                    </span>
+                    </Mono>
+                    <Mono size={11}>{pad2(entries.length)}</Mono>
                   </div>
-                  <p className="px-3 pb-1.5 pt-1.5 text-[11px]" style={{ color: "#666" }}>
-                    {c.blurb}
-                  </p>
-                  <ul className="divide-y" style={{ borderColor: "#eee" }}>
+                  <List>
                     {entries.map((e) => (
-                      <li key={`${e.category}-${e.term}`} className="px-3 py-2">
-                        <div className="flex flex-wrap items-baseline gap-2">
-                          <span
-                            className="rounded px-1.5 py-0.5 font-mono text-[11px] font-semibold"
-                            style={{
-                              backgroundColor: `${c.color}14`,
-                              color: c.color,
-                              border: `1px solid ${c.color}33`,
-                            }}
-                          >
-                            {e.term}
-                          </span>
-                          {e.lead ? (
-                            <span className="text-[11px]" style={{ color: "#333" }}>
-                              Lead: <span style={{ fontWeight: 600 }}>{e.lead}</span>
-                            </span>
-                          ) : null}
-                          {e.unconfirmed ? (
-                            <span
-                              className="rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide"
-                              style={{
-                                backgroundColor: "#fff4e0",
-                                color: "#8a5a00",
-                                border: "1px solid #8a5a0044",
-                              }}
-                            >
-                              unconfirmed
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="mt-1 text-[12px] leading-snug" style={{ color: "#333" }}>
+                      <li
+                        key={`${e.category}-${e.term}`}
+                        style={{
+                          display: "flex",
+                          gap: 14,
+                          padding: "9px 0",
+                          borderBottom: `1px solid ${KZ.grey200}`,
+                        }}
+                      >
+                        <Mono size={11} tone={KZ.ink} style={{ width: 64, flex: "0 0 64px" }}>
+                          {e.term}
+                        </Mono>
+                        <span style={{ fontSize: 13, lineHeight: 1.45, color: KZ.body }}>
                           {e.meaning.replace(/\s*\(unconfirmed\)\s*/i, " ").trim()}
-                        </div>
+                          {e.lead ? <span style={{ color: KZ.ink }}> · {e.lead}</span> : null}
+                          {/* "Unconfirmed" is the glossary's own honesty
+                              marker: a term nobody has verified reads
+                              differently from one that is settled. */}
+                          {e.unconfirmed ? (
+                            <Tag tone={KZ.amber} style={{ marginLeft: 8 }}>
+                              unconfirmed
+                            </Tag>
+                          ) : null}
+                        </span>
                       </li>
                     ))}
-                  </ul>
+                  </List>
                 </section>
               );
             })}
         </div>
       )}
+      <Disclosure style={{ marginTop: 14 }}>
+        {pad2(filtered.length)} of {pad2(seed.glossary.length)} terms shown · unconfirmed entries
+        are the ones nobody has verified against a source
+      </Disclosure>
     </div>
   );
 }

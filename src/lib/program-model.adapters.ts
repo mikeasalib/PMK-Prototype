@@ -391,3 +391,73 @@ export function recentlyClosed(
   return out.sort((a, b) => a.daysSinceClosed - b.daysSinceClosed);
 }
 
+/**
+ * Gate readiness for a program that states its gates per sprint.
+ *
+ * Replaces the phase-based panel on programs like VA whose plan of record names
+ * one concrete gate per sprint. The phase version had a structural problem: it
+ * scored readiness partly on `exitCriteriaMet`, which no source ever populated,
+ * so the value was hardcoded 0, every row rendered "not tracked yet", and the
+ * pressure figure was one third driven by an input nobody measured. A number
+ * built on a constant is not a reading.
+ *
+ * This scores only what is actually observable — how long is left, and how much
+ * blocking work is open — and shows the gate as the plan wrote it, so a reader
+ * can judge readiness themselves rather than trusting an unverifiable
+ * percentage.
+ *
+ * Phase-based programs keep upcomingGateReadiness: Ventura's exit criteria come
+ * from the Rec Deployment Playbook and are real written conditions, even though
+ * they are likewise not individually tracked yet.
+ */
+export interface SprintGate {
+  key: string;
+  label: string;
+  /** The plan's own "gate to advance" wording. */
+  gate: string;
+  /** One-line focus, when the plan states one. */
+  focus: string | null;
+  /** Days until the sprint window closes. Negative means past. */
+  daysRemaining: number;
+  /** Open blockers, counted against the sprint currently running only. */
+  blockingWorkItems: number;
+  /** 0..1. Time pressure and blocking work, nothing unmeasured. */
+  pressure: number;
+  isCurrent: boolean;
+}
+
+export function upcomingSprintGates(
+  program: ProgramConfig,
+  workItems: Array<Pick<WorkItemRecord, "bucket" | "title" | "labels">>,
+  asOf: string = today(),
+  horizonDays = 60,
+): SprintGate[] {
+  const openBlockers = workItems.filter(
+    (w) => w.bucket !== "done" && w.bucket !== "canceled" && looksBlocking(w),
+  ).length;
+
+  return program.sprintStrip
+    // Only sprints that have not closed. A gate you already passed is history.
+    .filter((sw) => sw.end >= asOf && sw.gate)
+    .map((sw) => {
+      const daysRemaining = daysBetween(asOf, sw.end);
+      const isCurrent = sw.start <= asOf && asOf <= sw.end;
+      // Blockers are charged to the sprint now running. Work items carry no
+      // sprint association, so spreading them across future sprints would add
+      // the same number to every row and read as though each had its own.
+      const blocking = isCurrent ? openBlockers : 0;
+      const urgency = Math.max(0, Math.min(1, 1 - daysRemaining / horizonDays));
+      const blocked = Math.max(0, Math.min(1, blocking / 3));
+      return {
+        key: sw.key,
+        label: sw.label,
+        gate: sw.gate as string,
+        focus: sw.focus ?? null,
+        daysRemaining,
+        blockingWorkItems: blocking,
+        pressure: Math.max(0, Math.min(1, 0.7 * urgency + 0.3 * blocked)),
+        isCurrent,
+      };
+    })
+    .sort((a, b) => a.daysRemaining - b.daysRemaining);
+}

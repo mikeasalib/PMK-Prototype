@@ -92,7 +92,7 @@ function ClientLogin() {
           </p>
         </div>
 
-        <label className="block text-[12px] font-semibold uppercase tracking-wide" style={{ color: "#565c65" }}>
+        <label className="block text-xs font-semibold uppercase tracking-wide" style={{ color: "#565c65" }}>
           Who's signing in
         </label>
         <select
@@ -111,7 +111,7 @@ function ClientLogin() {
             );
           })}
         </select>
-        <p className="mt-2 text-[11px]" style={{ color: "#8a8a80" }}>
+        <p className="mt-2 text-xs" style={{ color: "#8a8a80" }}>
           {CONTACTS.find((c) => c.name === selected)?.role ?? ""}
         </p>
 
@@ -131,7 +131,7 @@ function ClientLogin() {
         </button>
 
         <div
-          className="mt-4 rounded-md px-3 py-2 text-[11px] leading-relaxed"
+          className="mt-4 rounded-md px-3 py-2 text-xs leading-relaxed"
           style={{ backgroundColor: "#fdf5e6", border: "1px solid #e5e5e2", color: "#7a5a00" }}
         >
           Demo sign-in. Real client access will be a signed magic-link tied

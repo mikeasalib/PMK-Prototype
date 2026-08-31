@@ -23,6 +23,21 @@ export interface SprintWindow {
   label: string;
   start: string; // YYYY-MM-DD
   end: string;
+  /**
+   * One-line focus for the sprint, in the plan's own words.
+   *
+   * Optional because not every program keeps a written per-sprint focus; VA
+   * does, on the MyVA Delivery Timeline page in Notion, and that page is the
+   * plan of record. Where it exists it belongs on screen, because "Sprint 7"
+   * alone tells a reader nothing about what Sprint 7 is for.
+   */
+  focus?: string;
+  /**
+   * What has to be true to leave this sprint — the plan's "Gate to advance"
+   * column. Distinct from the lifecycle phase gates in va-data.ts, which are a
+   * coarser decomposition over the same calendar.
+   */
+  gate?: string;
 }
 
 export interface Workstream {
@@ -168,7 +183,7 @@ const VA: ProgramConfig = {
   orgShort: "Kaizen Laboratories",
   appName: "VA Program Intel",
   domainLabel: "VA.gov modernization",
-  navColor: "#1f3d2b",
+  navColor: "#202020",
   seal: { src: "/seal-va.png", alt: "Department of Veterans Affairs seal" },
   artifacts: ["rollup", "sprint-rollup", "project-plan", "poam"],
   timeAxis: "sprint",
@@ -184,19 +199,77 @@ const VA: ProgramConfig = {
   keyDates: {
     launch: "2026-11-11",
     launchLabel: "Nov 11, 2026",
-    codeFreeze: "2026-09-28",
-    nextSprintStart: "2026-08-03",
+    // Was 2026-09-28, which is when Sprint 9 starts — not a freeze. The plan's
+    // hard internal date is "everything production-ready by Oct 15/16", after
+    // which production teams lead and Kaizen is light touch.
+    codeFreeze: "2026-10-15",
+    nextSprintStart: "2026-08-17",
   },
+  // Transcribed from "MyVA Delivery Timeline (Sprint 5-9)" in Notion
+  // (3ac68467f30f81d0afc0d3e5e7f2a5bc), which is the plan of record. Three
+  // things here were wrong before and were visible on every screen that reads
+  // the strip:
+  //
+  //   Sprint 5 started Aug 3, not Jul 28, so the first two weeks of the real
+  //   sprint fell outside it.
+  //   Sprint 8 ran Sep 14 to Oct 23 and was labelled "UAT/PRR" — a six-week
+  //   block covering what the plan splits into Sprint 8 (rollout, two weeks)
+  //   and Sprint 9 (stabilisation + UAT, two weeks). UAT was named a month
+  //   earlier than the plan schedules it.
+  //   Sprint 9 did not exist as a sprint; the slot held "ORR · Launch".
   sprintStrip: [
-    { key: "S4", label: "Sprint 4", start: "2026-07-20", end: "2026-07-31" },
-    { key: "S5", label: "Sprint 5", start: "2026-08-03", end: "2026-08-14" },
-    { key: "S6", label: "Sprint 6", start: "2026-08-17", end: "2026-08-28" },
-    { key: "S7", label: "Sprint 7", start: "2026-08-31", end: "2026-09-11" },
-    { key: "S8", label: "Sprint 8 · UAT/PRR", start: "2026-09-14", end: "2026-10-23" },
-    { key: "S9", label: "ORR · Launch", start: "2026-10-26", end: "2026-11-11" },
+    {
+      key: "S5",
+      label: "Sprint 5",
+      start: "2026-07-28",
+      end: "2026-08-14",
+      focus: "Design refinement + implementation kickoff",
+      gate: "Designs finalized + accessibility research done, MyVA scope locked",
+    },
+    {
+      key: "S6",
+      label: "Sprint 6",
+      start: "2026-08-17",
+      end: "2026-08-28",
+      focus: "Usability testing + more dev",
+      gate: "Usability testing complete + data flowing through, ready to leave local",
+    },
+    {
+      key: "S7",
+      label: "Sprint 7",
+      start: "2026-08-31",
+      end: "2026-09-11",
+      focus: "Staging migration",
+      gate: "Running on staging.va.gov, ready to integrate widely",
+    },
+    {
+      key: "S8",
+      label: "Sprint 8",
+      start: "2026-09-14",
+      end: "2026-09-25",
+      focus: "Wider rollout + integrating",
+      gate: "Components integrated on staging, ready to stabilize",
+    },
+    {
+      key: "S9",
+      label: "Sprint 9",
+      start: "2026-09-28",
+      end: "2026-10-09",
+      focus: "Stabilization + UAT",
+      gate: "UAT passed + 508 clean, ready for hardening",
+    },
+    {
+      key: "S10",
+      label: "Sprint 10+ · Buffer",
+      start: "2026-10-15",
+      end: "2026-11-11",
+      focus: "Buffer + hardening — production teams lead",
+      gate: "Launch readiness confirmed",
+    },
   ],
   namedMilestones: [
-    { id: "code-freeze", label: "Code freeze / UAT start", date: "2026-09-28" },
+    { id: "uat", label: "UAT + 508 audit", date: "2026-09-28" },
+    { id: "prod-ready", label: "Production-ready for hardening", date: "2026-10-15" },
     { id: "launch", label: "Public launch", date: "2026-11-11" },
   ],
   // NOTE: workstream-updates.ts carries a second, differing set of names for
@@ -210,45 +283,45 @@ const VA: ProgramConfig = {
       short: "WS1",
       label: "WS1 · Architecture & API / Brad",
       owner: "Brad / Justin (apothesource)",
-      color: "#005ea2",
+      color: "#325AAC",
     },
     {
       key: "WS2",
       short: "WS2",
       label: "WS2 · Identity & Login / Rain",
       owner: "Mariam (GovCIO / CLEAR)",
-      color: "#2e8540",
+      color: "#4B4B4B",
     },
     {
       key: "WS3",
       short: "WS3",
       label: "WS3 · Landing Page & UI / Kaizen",
       owner: "Lukasz / Daman / Ben (Kaizen + Media Rain)",
-      color: "#54278f",
+      color: "#183E71",
     },
     {
       key: "WS4",
       short: "WS4",
       label: "WS4 · QuickSubmit / VR&E / VLM",
       owner: "John Larkin (GovCIO)",
-      color: "#008480",
+      color: "#8A5A00",
     },
     {
       key: "WS5",
       short: "WS5",
       label: "WS5 · VA Health Chat / OCC",
       owner: "Luke (OCC / VHA coord)",
-      color: "#936f38",
+      color: "#2E8540",
     },
     {
       key: "Admin",
       short: "Admin",
       label: "Admin · Program",
       owner: "Andrea / Kaizen PM / Luke",
-      color: "#565c65",
+      color: "#7C7878",
     },
   ],
-  unknownWorkstreamColor: "#565c65",
+  unknownWorkstreamColor: "#7C7878",
   classifier: {
     explicit: { kind: "prefixedCapture", pattern: /\bWS([1-5])\b/, prefix: "WS" },
     // Short keywords carry \b. Measured against 50 real DEP titles, the
@@ -296,7 +369,7 @@ const VENTURA: ProgramConfig = {
   orgShort: "Kaizen Laboratories",
   appName: "Program Intel",
   domainLabel: "Ventura County Parks recreation deployment",
-  navColor: "#1f3d2b",
+  navColor: "#202020",
   seal: { src: "/seal-ventura.png", alt: "County of Ventura Parks logo" },
   // No POA&M. It is a federal compliance artifact and has no meaning for a
   // county parks reservation system.
@@ -350,45 +423,45 @@ const VENTURA: ProgramConfig = {
       short: "FAC",
       label: "Facilities & Venues",
       owner: "Chad Bowie (Chief Ranger) / William Seelos",
-      color: "#2e8540",
+      color: "#325AAC",
     },
     {
       key: "FIN",
       short: "FIN",
       label: "Finance & Reporting",
       owner: "Brandon Nakamoto / Tina Arellano (Dana Vodantis approves)",
-      color: "#005ea2",
+      color: "#4B4B4B",
     },
     {
       key: "CC",
       short: "CC",
       label: "Call Center (Zion)",
       owner: "Abbey Clove (Zion Dir. Ops) / Mia Clove (lead agent)",
-      color: "#54278f",
+      color: "#183E71",
     },
     {
       key: "MEM",
       short: "MEM",
       label: "Memberships & Passes",
       owner: "William Seelos (approves DV + annual passes)",
-      color: "#008480",
+      color: "#8A5A00",
     },
     {
       key: "PLAT",
       short: "PLAT",
       label: "Platform & Integrations",
       owner: "Nico Turk (Kaizen DS lead)",
-      color: "#936f38",
+      color: "#2E8540",
     },
     {
       key: "Admin",
       short: "Admin",
       label: "Admin · Deployment",
       owner: "Nico Turk (lead) / Michael Salib (secondary)",
-      color: "#565c65",
+      color: "#7C7878",
     },
   ],
-  unknownWorkstreamColor: "#565c65",
+  unknownWorkstreamColor: "#7C7878",
   classifier: {
     // This program does have an explicit convention, just a different one: the
     // board writes an area prefix before the colon. Taken from the live project

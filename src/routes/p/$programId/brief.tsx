@@ -1,23 +1,46 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, Sparkles } from "lucide-react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
+import { WsTag } from "@/components/va-ui";
+import {
+  Bullet,
+  Button,
+  Disclosure,
+  Eyebrow,
+  KZ,
+  List,
+  Mono,
+  NoteBox,
+  Panel,
+  PanelHead,
+  SectionTitle,
+  Tag,
+} from "@/components/kz";
 import { PROGRAMS, pageTitle } from "@/lib/program.config";
 import { generateBrief, type BriefResult } from "@/lib/brief.functions";
+import {
+  HEALTH_COLOR,
+  HEALTH_LABEL,
+  WORKSTREAM_UPDATES,
+  WORKSTREAM_UPDATES_SOURCE,
+} from "@/lib/workstream-updates";
+import { seedFor } from "@/lib/program-seed";
 import { useProgram } from "./route";
 
 /**
- * "How are we doing?" as a paragraph, generated on demand from the program
- * model. Explicit button rather than auto-generated on load: an LLM call is
- * a real spend and a real few-seconds wait; a strategist should know they
- * asked for it. The output is treated the same way as any other artifact —
- * a draft to read, not a canonical status update.
+ * The week, two ways.
  *
- * Every claim the model produces is expected to carry an identifier
- * citation (DEP-1907, R2, milestone name) per the system prompt in
- * brief.functions.ts. The panel doesn't try to interpret those; it just
- * shows them as-is so the reader can jump to the source themselves.
+ * The body of the page is the cross-workstream update as it was written: one
+ * hairline section per workstream carrying its own health, headline and
+ * highlights, closed by the decisions that are still open. That is the record,
+ * and it needs no model to render.
+ *
+ * Above it, "How are we doing?" as a paragraph generated on demand from the
+ * program model. Explicit button rather than auto-generated on load: an LLM call
+ * is a real spend and a real few-seconds wait, and a strategist should know they
+ * asked for it. Every claim is expected to carry an identifier citation; the
+ * panel shows them as-is so the reader can jump to the source.
  */
 export const Route = createFileRoute("/p/$programId/brief")({
   head: ({ params }) => ({
@@ -37,9 +60,7 @@ function Brief() {
   const program = useProgram();
   const run = useServerFn(generateBrief);
   const [state, setState] = useState<
-    | { kind: "idle" }
-    | { kind: "loading" }
-    | { kind: "loaded"; result: BriefResult }
+    { kind: "idle" } | { kind: "loading" } | { kind: "loaded"; result: BriefResult }
   >({ kind: "idle" });
 
   async function generate() {
@@ -61,117 +82,193 @@ function Brief() {
 
   const isLoading = state.kind === "loading";
 
+  // Decisions still open, read from the register rather than typed here: the
+  // high-severity open risks are exactly the calls nobody has made yet.
+  const openDecisions = seedFor(program.id)
+    .risks.filter(
+      (r) => r.status !== "resolved" && (r.severity === "critical" || r.severity === "high"),
+    )
+    .slice(0, 6);
+
   return (
     <AppLayout>
       <PageHeader
+        eyebrow="This week"
         title="Brief"
-        subtitle={`${program.domainLabel} — grounded synthesis of the current program state. Each claim cites its source record.`}
+        subtitle={`${WORKSTREAM_UPDATES_SOURCE.label}, composed from the sync, Linear and the risk register. Every line traces back to a source.`}
+        actions={
+          <Button onClick={generate} disabled={isLoading}>
+            {isLoading
+              ? "Generating…"
+              : state.kind === "loaded"
+                ? "Regenerate synthesis"
+                : "Generate synthesis"}
+          </Button>
+        }
       />
 
-      <div className="px-4 pb-10 pt-2 sm:px-6">
-        <div
-          className="mb-5 rounded-md p-3 text-[12px]"
-          style={{ backgroundColor: "#f7f7f5", border: "1px solid #e5e5e2", color: "#565c65" }}
-        >
-          Reads Linear, Notion risk register, and lifecycle phases at generation
-          time. Every claim the writer produces must cite an identifier
-          ([DEP-1234], [R2], milestone name); a sentence without one is a
-          general observation. The writer will say "not yet sourced" for
-          sections the data does not support. Nothing typed here becomes
-          program-of-record data.
+      <div style={{ padding: "28px var(--kz-pad-x) 60px var(--kz-pad-x)", maxWidth: 1100 }}>
+        <Mono size={10.5}>
+          {WORKSTREAM_UPDATES_SOURCE.label} · {WORKSTREAM_UPDATES_SOURCE.date}
+        </Mono>
+
+        {/* The generated paragraph, when asked for. It sits above the record and
+            is labelled a draft, so it can never be mistaken for it. */}
+        {state.kind === "loaded" ? (
+          <div style={{ marginTop: 20 }}>
+            <Synthesis result={state.result} />
+          </div>
+        ) : null}
+
+        <div style={{ marginTop: 20, display: "flex", flexDirection: "column" }}>
+          {WORKSTREAM_UPDATES.map((u) => (
+            <section
+              key={u.ws}
+              style={{
+                border: `1px solid ${KZ.bone}`,
+                borderBottom: "none",
+                padding: "22px 26px",
+              }}
+            >
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 12 }}>
+                <WsTag ws={u.ws} />
+                <SectionTitle size={18}>{u.name}</SectionTitle>
+                <Mono size={10.5}>{u.owner}</Mono>
+                <Tag tone={HEALTH_COLOR[u.health]} style={{ marginLeft: "auto" }}>
+                  {HEALTH_LABEL[u.health]}
+                </Tag>
+              </div>
+              <p
+                style={{
+                  margin: "12px 0 0 0",
+                  fontSize: 14.5,
+                  lineHeight: 1.5,
+                  maxWidth: "80ch",
+                  color: KZ.ink,
+                  textWrap: "pretty",
+                }}
+              >
+                {u.headline}
+              </p>
+              <List
+                style={{
+                  margin: "14px 0 0 0",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 7,
+                }}
+              >
+                {u.highlights.map((h) => (
+                  <Bullet key={h}>{h}</Bullet>
+                ))}
+              </List>
+            </section>
+          ))}
+
+          {/* The one tinted panel on the page: what still needs a decision. */}
+          <section
+            style={{
+              border: `1px solid ${KZ.bone}`,
+              padding: "22px 26px",
+              background: KZ.grey050,
+            }}
+          >
+            <Eyebrow size={10}>Decisions needed</Eyebrow>
+            {openDecisions.length ? (
+              <List
+                style={{
+                  margin: "12px 0 0 0",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit,minmax(360px,1fr))",
+                  gap: "18px 32px",
+                }}
+              >
+                {openDecisions.map((r) => (
+                  <li key={r.id}>
+                    <div style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.4 }}>{r.title}</div>
+                    <div style={{ marginTop: 5 }}>
+                      <Mono size={10.5}>
+                        {r.owner} · {r.severity}
+                        {r.linkedTicket ? ` · ${r.linkedTicket}` : ""}
+                      </Mono>
+                    </div>
+                    <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.45, color: KZ.body }}>
+                      {r.nextAction}
+                    </div>
+                  </li>
+                ))}
+              </List>
+            ) : (
+              <div style={{ marginTop: 12, fontSize: 13, color: KZ.body }}>
+                No open critical or high risk in the register. Nothing is waiting on a call.
+              </div>
+            )}
+            <Disclosure>
+              Read from the Notion risk register: open entries at high or critical severity
+            </Disclosure>
+          </section>
         </div>
-
-        <button
-          type="button"
-          onClick={generate}
-          disabled={isLoading}
-          className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-[14px] font-medium transition-colors"
-          style={{
-            backgroundColor: "#1f3d2b",
-            color: "#ffffff",
-            opacity: isLoading ? 0.7 : 1,
-            cursor: isLoading ? "wait" : "pointer",
-          }}
-        >
-          {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-          {isLoading ? "Generating…" : state.kind === "loaded" ? "Regenerate brief" : "Generate brief"}
-        </button>
-
-        {state.kind === "loaded" ? <RenderResult result={state.result} /> : null}
       </div>
     </AppLayout>
   );
 }
 
-function RenderResult({ result }: { result: BriefResult }) {
+/** The generated paragraph and its watch list, or the reason there isn't one. */
+function Synthesis({ result }: { result: BriefResult }) {
   if (!result.ok) {
-    return <NotOk result={result} />;
+    const messages: Record<typeof result.reason, string> = {
+      "no-api-key":
+        "ANTHROPIC_API_KEY is not set in this environment, so the brief writer isn't wired up. This is expected in local dev; a deployed instance with the key will render the synthesis here.",
+      "no-program-data":
+        "No work items or risks are reaching this route, so the writer has nothing to summarize. Check the data sources on the rail.",
+      "api-error":
+        "The Anthropic API returned an error. Usually transient, so try again in a moment.",
+      unparseable:
+        "The model returned text that could not be parsed as the expected {paragraph, watchList} JSON. The prompt may need tightening.",
+    };
+    return (
+      <NoteBox style={{ maxWidth: "none", background: KZ.grey050 }}>
+        <div style={{ fontWeight: 500, color: KZ.ink }}>Synthesis not available</div>
+        <p style={{ margin: "8px 0 0 0" }}>{messages[result.reason]}</p>
+        {result.detail ? (
+          <div style={{ marginTop: 12 }}>
+            <Mono size={10.5}>{result.detail}</Mono>
+          </div>
+        ) : null}
+      </NoteBox>
+    );
   }
+
   return (
-    <section
-      className="mt-6 rounded-lg bg-white p-5"
-      style={{ border: "1px solid #e5e5e2" }}
-    >
-      <p className="text-[14px] leading-relaxed" style={{ color: "#1b1b1b" }}>
+    <Panel>
+      <PanelHead label="Generated synthesis" right="draft" rightTone={KZ.amber} />
+      <p
+        style={{
+          margin: "16px 0 0 0",
+          fontSize: 14,
+          lineHeight: 1.6,
+          maxWidth: "80ch",
+          color: KZ.ink,
+          textWrap: "pretty",
+        }}
+      >
         {result.paragraph}
       </p>
       {result.watchList.length > 0 ? (
-        <div className="mt-5">
-          <h3
-            className="mb-2 text-[11px] font-semibold uppercase tracking-wide"
-            style={{ color: "#565c65" }}
-          >
-            Worth watching
-          </h3>
-          <ul className="space-y-1.5 text-[13px]" style={{ color: "#1b1b1b" }}>
-            {result.watchList.map((line, i) => (
-              <li key={i} className="flex gap-2">
-                <span style={{ color: "#3a5a40" }}>▸</span>
-                <span>{line}</span>
-              </li>
+        <div style={{ marginTop: 20 }}>
+          <Eyebrow size={10}>Worth watching</Eyebrow>
+          <List style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+            {result.watchList.map((line) => (
+              <Bullet key={line}>{line}</Bullet>
             ))}
-          </ul>
+          </List>
         </div>
       ) : null}
-      <div className="mt-5 text-[10px]" style={{ color: "#8a8a80" }}>
-        Generated {new Date(result.generatedAt).toLocaleString()} · model {result.model}. Draft —
-        review before sending. Citations reference the identifiers this program uses
-        in Linear / Notion.
-      </div>
-    </section>
-  );
-}
-
-function NotOk({ result }: { result: Extract<BriefResult, { ok: false }> }) {
-  const messages: Record<typeof result.reason, string> = {
-    "no-api-key":
-      "ANTHROPIC_API_KEY is not set in this environment, so the brief writer isn't wired up. This is expected in local dev; a deployed instance with the key will render the summary here.",
-    "no-program-data":
-      "No work items or risks are reaching this route — nothing for the writer to summarise. Check the data source footer.",
-    "api-error":
-      "The Anthropic API returned an error. This is usually a transient issue; try again in a moment.",
-    unparseable:
-      "The model returned text that could not be parsed as the expected {paragraph, watchList} JSON. The model prompt may need tightening.",
-  };
-  return (
-    <section
-      className="mt-6 rounded-lg p-5"
-      style={{
-        backgroundColor: "#fdf5e6",
-        border: "1px solid #e5e5e2",
-        color: "#5a4a00",
-      }}
-    >
-      <div className="text-[13px] font-semibold">Brief not available</div>
-      <p className="mt-2 text-[13px]">{messages[result.reason]}</p>
-      {result.detail ? (
-        <div
-          className="mt-3 rounded p-2 font-mono text-[11px]"
-          style={{ backgroundColor: "#f7f0e0", color: "#5a4a00" }}
-        >
-          {result.detail}
-        </div>
-      ) : null}
-    </section>
+      <Disclosure>
+        Generated {new Date(result.generatedAt).toLocaleString()} · model {result.model} · draft,
+        review before sending. Citations reference the identifiers this program uses in Linear and
+        Notion
+      </Disclosure>
+    </Panel>
   );
 }

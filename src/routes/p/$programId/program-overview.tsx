@@ -1,9 +1,29 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Check } from "lucide-react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
 import { WsPip } from "@/components/va-ui";
+import {
+  Bullet,
+  CheckSquare,
+  Disclosure,
+  Eyebrow,
+  KZ,
+  KpiStrip,
+  List,
+  Mono,
+  Panel,
+  PanelHead,
+  SectionTitle,
+  Square,
+  Tag,
+  Td,
+  Th,
+  Track,
+  doneTextStyle,
+  pad2,
+  toneFor,
+} from "@/components/kz";
 import type { WorkstreamKey } from "@/lib/va-data";
-import { useStoredData, bucketOf } from "@/hooks/use-stored-data";
+import { useStoredData, bucketOf, isHighPriority } from "@/hooks/use-stored-data";
 import { HEALTH_COLOR, HEALTH_LABEL } from "@/lib/workstream-updates";
 import {
   PROGRAMS,
@@ -14,11 +34,10 @@ import {
   workstreamOf,
   type ProgramConfig,
 } from "@/lib/program.config";
-import { daysUntilLocal } from "@/lib/local-date";
-import { seedFor } from "@/lib/program-seed";
+import { daysUntilLocal, shortDate } from "@/lib/local-date";
 import {
   phasesFromLifecycle,
-  upcomingGateReadiness,
+  upcomingSprintGates,
   deriveHealth,
   sittingUntouched,
   recentlyClosed,
@@ -26,8 +45,9 @@ import {
   RECENTLY_CLOSED_WINDOW_DAYS,
   type StalledItem,
   type ClosedItem,
+  type SprintGate,
 } from "@/lib/program-model.adapters";
-import type { GateReadiness, PhaseRecord } from "@/lib/program-model";
+import type { PhaseRecord } from "@/lib/program-model";
 import { useFollowUps } from "@/hooks/use-follow-ups";
 import { useNotionTasks } from "@/hooks/use-notion-tasks";
 import { useProgram } from "./route";
@@ -38,42 +58,46 @@ export const Route = createFileRoute("/p/$programId/program-overview")({
       { title: pageTitle("Command centre", PROGRAMS[params.programId]) },
       {
         name: "description",
-        content: `${PROGRAMS[params.programId].domainLabel} program status — milestones, sprint progress, workstream burn-down.`,
+        content: `${PROGRAMS[params.programId].domainLabel} program status: milestones, sprint progress, workstream burn-down.`,
       },
     ],
   }),
   component: Overview,
 });
 
-// Was already parsing parts locally, but rounding from "now" rather than from
-// midnight, so the number changed during the day. Shared helper does both.
+// Rounding from midnight rather than from "now", so the number does not change
+// during the day.
 const daysFromNow = daysUntilLocal;
 
+/**
+ * Command centre — the landing screen.
+ *
+ * The top of the page is three panels: the phase in flight on the left with its
+ * own progress and the gates it has to clear, the dates that do not move on the
+ * right, and what is owed either way across the full width. Everything below is
+ * the same read-out one level of detail down — the tracker, the burn-down, what
+ * has stopped moving and what actually closed.
+ */
 function Overview() {
   const program = useProgram();
-  const seed = seedFor(program.id);
   const { linear, isLoading, origin } = useStoredData(program.id);
-  // Per-program, from the URL. Was a module-level constant.
   const SPRINT_MILESTONES = program.sprintStrip;
 
   const now = new Date().toISOString();
+  const todayIso = now.slice(0, 10);
   const activeSprint =
-    SPRINT_MILESTONES.find((s) => s.start <= now.slice(0, 10) && now.slice(0, 10) <= s.end) ??
-    SPRINT_MILESTONES[0];
+    SPRINT_MILESTONES.find((s) => s.start <= todayIso && todayIso <= s.end) ?? SPRINT_MILESTONES[0];
 
   const total = linear.filter((i) => bucketOf(i) !== "canceled").length;
   const done = linear.filter((i) => bucketOf(i) === "done").length;
   const inProgress = linear.filter((i) => bucketOf(i) === "in_progress").length;
-  const todo = linear.filter((i) => bucketOf(i) === "todo").length;
-  const backlog = linear.filter((i) => bucketOf(i) === "backlog").length;
-  const pctDone = total ? Math.round((done / total) * 100) : 0;
-
-  const todayIso = now.slice(0, 10);
+  const highPriorityOpen = linear.filter(isHighPriority).length;
+  const daysToLaunch = Math.max(0, daysFromNow(program.keyDates.launch));
 
   // Attribute each issue once, keeping the basis. "stored" or "explicit" mean
   // the source said which workstream this belongs to; "keyword"/"fallback" mean
   // the classifier guessed from the title. Health is only as good as bucketing,
-  // so the burn-down needs to say when a row is mostly inference.
+  // so the burn-down has to say when a row is mostly inference.
   const attributed = linear.map((i) => {
     const a = classifyWorkstreamDetailed(i.title, i.workstream, program);
     return { i, ws: a.workstream, basis: a.basis };
@@ -108,17 +132,18 @@ function Overview() {
     };
   });
 
-  // Lifecycle phases and gate readiness. Both empty on a program with no phase
-  // config; the panels below handle that by hiding themselves.
   const phases = phasesFromLifecycle(program, todayIso);
   const currentPhase = phases.find((p) => p.state === "in_progress") ?? null;
-  const gates = upcomingGateReadiness(
-    phases,
-    linear.map((i) => ({ bucket: bucketOf(i), title: i.title, labels: i.labels ?? [] })),
-    { asOf: todayIso, program },
-  );
+  const blockerInputs = linear.map((i) => ({
+    bucket: bucketOf(i),
+    title: i.title,
+    labels: i.labels ?? [],
+  }));
+  // Sprint gates when the program's plan states one per sprint; phase gates
+  // otherwise. VA has both — the sprint gates are the plan of record and are
+  // concrete, so they win.
+  const sprintGates = upcomingSprintGates(program, blockerInputs, todayIso);
 
-  // Aging candidates share a shape between the two panels — build once.
   const agingCandidates = linear.map((i) => ({
     identifier: i.identifier,
     title: i.title,
@@ -132,509 +157,586 @@ function Overview() {
   const stalled: StalledItem[] = sittingUntouched(agingCandidates, todayIso);
   const closed: ClosedItem[] = recentlyClosed(agingCandidates, todayIso);
 
-  // What the top-left "current" panel means depends on how the program keeps
-  // time. Declared per-program in program.timeAxis so the choice is explicit
-  // instead of inferred from another field.
+  // What the "current" panel means depends on how the program keeps time.
+  // Declared per-program in program.timeAxis so the choice is explicit.
   const usesPhases = program.timeAxis === "phase";
+  const milestones = upcomingMilestones(program, todayIso, 5);
 
   return (
     <AppLayout>
       <PageHeader
+        eyebrow="Program"
         title="Command centre"
         subtitle={[
-          program.domainLabel,
-          // Ventura has no contract number; printing "Contract null" was the
-          // other half of this line being wrong.
-          program.contract.displayNumber ? `Contract ${program.contract.displayNumber}` : null,
-          origin === "snapshot" ? "captured snapshot" : "live from Linear",
+          `Where the ${program.domainLabel} program stands right now: what is in flight, what each side owes, and the dates that do not move.`,
+          origin === "snapshot" ? "Read from a captured snapshot." : null,
         ]
           .filter(Boolean)
-          .join(" · ")}
+          .join(" ")}
       />
 
-      {/* Milestone strip */}
-      <div className="px-4 pt-5 sm:px-6">
-        <div
-          className="flex overflow-x-auto rounded"
-          style={{ border: "1px solid #dfe1e2" }}
-        >
-          {SPRINT_MILESTONES.map((s) => {
-            const isActive = s.key === activeSprint.key;
-            const past = s.end < now.slice(0, 10);
-            return (
-              <div
-                key={s.key}
-                className="min-w-[116px] flex-1 px-3 py-2 text-[11px]"
-                style={{
-                  backgroundColor: isActive ? "#fff5c2" : past ? "#ecf3ec" : "#eef2f7",
-                  color: "#3a5a40",
-                  borderRight: "1px solid #dfe1e2",
-                }}
-              >
-                <div className="font-mono text-[10px]" style={{ opacity: 0.65 }}>
-                  {s.key}
-                </div>
-                <div
-                  className="font-semibold"
-                  style={{ fontFamily: "Public Sans, system-ui, sans-serif" }}
+      <KpiStrip
+        items={[
+          {
+            label: "Days to launch",
+            value: pad2(daysToLaunch),
+            sub: program.keyDates.launchLabel,
+            danger: daysToLaunch < 120,
+          },
+          { label: "In progress", value: pad2(inProgress), sub: `of ${total} tracked` },
+          { label: "Completed", value: pad2(done), sub: "issues closed" },
+          {
+            label: "High priority open",
+            value: pad2(highPriorityOpen),
+            sub: "urgent + high",
+            danger: highPriorityOpen > 5,
+          },
+        ]}
+      />
+
+      <div
+        style={{
+          padding: "28px var(--kz-pad-x) 60px var(--kz-pad-x)",
+          display: "grid",
+          gridTemplateColumns: "minmax(0,2fr) minmax(280px,1fr)",
+          gap: 24,
+          alignItems: "start",
+        }}
+      >
+        <CurrentPanel
+          usesPhases={usesPhases}
+          phases={phases}
+          currentPhase={currentPhase}
+          sprint={activeSprint}
+          gates={sprintGates}
+          today={todayIso}
+        />
+
+        <Panel>
+          <PanelHead label="Upcoming milestones" />
+          <List>
+            {milestones.map((m) => {
+              const isLaunch = m.date === program.keyDates.launch;
+              const days = daysFromNow(m.date);
+              return (
+                <li
+                  key={`${m.date}-${m.label}`}
+                  style={{
+                    display: "flex",
+                    alignItems: "baseline",
+                    justifyContent: "space-between",
+                    gap: 16,
+                    padding: "13px 0",
+                    borderBottom: `1px solid ${KZ.grey200}`,
+                  }}
                 >
-                  {s.label}
+                  <span style={{ fontSize: 13.5, lineHeight: 1.4 }}>{m.label}</span>
+                  <Mono
+                    size={11.5}
+                    tone={isLaunch ? KZ.coral : KZ.ink}
+                    title={`${Math.max(0, days)} days out`}
+                  >
+                    {shortDate(m.date)}
+                  </Mono>
+                </li>
+              );
+            })}
+          </List>
+          <Disclosure style={{ marginTop: 14 }}>
+            Dated milestones come from the program plan, or from Linear where a ticket carries the
+            date
+          </Disclosure>
+        </Panel>
+
+        <div style={{ gridColumn: "1 / -1" }}>
+          <FollowUpsPanel program={program} />
+        </div>
+
+        {/* One level down: the tracker Linear does not hold, the burn-down, and
+            the two paired aging signals. */}
+        <div style={{ gridColumn: "1 / -1" }}>
+          <NotionTrackerPanel program={program} />
+        </div>
+
+        {isLoading ? (
+          <div style={{ gridColumn: "1 / -1" }}>
+            <Mono size={11}>Loading…</Mono>
+          </div>
+        ) : (
+          <>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <Panel>
+                <PanelHead label="Workstream burn-down" right="derived from Linear" />
+                <div style={{ overflowX: "auto", marginTop: 4 }}>
+                  <table
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      fontSize: 12.5,
+                      minWidth: 560,
+                    }}
+                  >
+                    <thead>
+                      <tr>
+                        <Th>Workstream</Th>
+                        <Th>Health</Th>
+                        <Th>Total</Th>
+                        <Th>Complete</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {wsRows.map((r) => {
+                        // Plain ticket completion. A blended score needs a
+                        // formula footnote to read at all, and a number nobody
+                        // can defend in a stakeholder meeting without reciting
+                        // its weighting is not worth showing.
+                        const pctComplete = r.total ? Math.round((r.done / r.total) * 100) : 0;
+                        const color = workstreamOf(r.ws, program).color;
+                        return (
+                          <tr key={r.ws} style={{ borderTop: `1px solid ${KZ.grey200}` }}>
+                            <Td>
+                              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <WsPip ws={r.ws} />
+                                <span>{workstreamOf(r.ws, program).label}</span>
+                              </span>
+                            </Td>
+                            <Td>
+                              <span
+                                style={{
+                                  display: "flex",
+                                  flexWrap: "wrap",
+                                  alignItems: "center",
+                                  gap: 6,
+                                }}
+                              >
+                                {r.health ? (
+                                  <Tag tone={HEALTH_COLOR[r.health]}>{HEALTH_LABEL[r.health]}</Tag>
+                                ) : (
+                                  <Mono size={11}>—</Mono>
+                                )}
+                                {/* Attribution honesty: health depends on
+                                    bucketing, and when the bucketing is mostly
+                                    keyword inference the row says so. */}
+                                {r.inferredPct >= 50 ? (
+                                  <Tag
+                                    tone={KZ.amber}
+                                    title={`${r.inferredPct}% of issues in this workstream were attributed by keyword from the title, not stored in Linear. Tag issues at source to firm this up.`}
+                                  >
+                                    {r.inferredPct}% inferred
+                                  </Tag>
+                                ) : null}
+                              </span>
+                            </Td>
+                            <Td
+                              style={{ fontFamily: "var(--font-mono)", fontSize: 11 }}
+                              title={`${r.done} done · ${r.inProgress} in progress · ${r.todo + r.backlog} todo or backlog`}
+                            >
+                              {pad2(r.total)}
+                            </Td>
+                            <Td>
+                              <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <span style={{ width: 96 }}>
+                                  <Track pct={pctComplete} tone={color} />
+                                </span>
+                                <Mono size={10.5} tone={KZ.monoDate}>
+                                  {r.done}/{r.total}
+                                </Mono>
+                              </span>
+                            </Td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-                <div className="text-[10px]" style={{ color: "#565c65" }}>
-                  {s.start.slice(5)} – {s.end.slice(5)}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* What's at risk — gate readiness, worst first. The "asteroid coming at
-          us" signal from the readout: already computed for the rollup, now on
-          the command centre so it is visible during the day. */}
-      {!isLoading && gates.length > 0 ? (
-        <div className="px-4 pt-4 sm:px-6">
-          <GateReadinessPanel gates={gates} />
-        </div>
-      ) : null}
-
-      {/* Follow-ups sit above the fold because the sub-issue tasks caught
-          between calls are the most action-shaped signal on this page —
-          promoted above "No recent updates" per the strategist's own steer. */}
-      {!isLoading ? (
-        <div className="px-4 pt-4 sm:px-6">
-          <FollowUpsSummary program={program} />
-        </div>
-      ) : null}
-
-      {/* Notion tracker summary. The command centre reported open work off the
-          Linear board alone, which on VA is roughly a third of what is actually
-          in flight — the hand-maintained tracker carries the rest. */}
-      <div className="px-4 pt-4 sm:px-6">
-        <NotionTrackerSummary program={program} />
-      </div>
-
-      {isLoading ? (
-        <div className="p-6 text-[13px]" style={{ color: "#565c65" }}>
-          Loading live data…
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 p-4 sm:p-6 lg:grid-cols-2">
-          {/* Current sprint / current phase — same slot, different concept per
-              program.timeAxis. VA keeps its sprint framing; a rec deployment
-              shows the current lifecycle phase from the playbook instead. */}
-          <section
-            className="rounded-md p-4"
-            style={{ backgroundColor: "#f7f7f5", border: "1px solid #e5e5e2" }}
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <h2
-                className="text-sm font-semibold"
-                style={{ color: "#3a5a40", fontFamily: "Public Sans, system-ui, sans-serif" }}
-              >
-                {usesPhases
-                  ? `Current phase — ${currentPhase?.name ?? "post-launch"}`
-                  : `Current sprint — ${activeSprint.label}`}
-              </h2>
-              <span className="text-[11px]" style={{ color: "#565c65" }}>
-                {usesPhases
-                  ? currentPhase
-                    ? currentPhase.window
-                    : "Live customer handoff"
-                  : `${activeSprint.start.slice(5)} – ${activeSprint.end.slice(5)}`}
-              </span>
+                <Disclosure>
+                  Complete is closed tickets over total tickets. Hover a total for the done /
+                  in-progress / remaining split
+                </Disclosure>
+              </Panel>
             </div>
-            {usesPhases ? (
-              <PhaseProgress phases={phases} currentPhase={currentPhase} />
-            ) : (
+
+            {linear.length > 0 ? (
               <>
-                <div className="flex items-center gap-4">
-                  <Ring pct={pctDone} />
-                  <div className="text-[13px]">
-                    <div>
-                      <b>{done}</b> done · <b>{inProgress}</b> in progress · <b>{todo}</b> todo ·{" "}
-                      <b>{backlog}</b> backlog
-                    </div>
-                    <div style={{ color: "#565c65" }}>{total} issues in Linear (DEP)</div>
-                  </div>
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <StalledPanel program={program} items={stalled} inProgressTotal={inProgress} />
                 </div>
-                <div
-                  className="mt-4 h-2 w-full overflow-hidden rounded-full"
-                  style={{ backgroundColor: "#eee" }}
-                >
-                  <div className="flex h-2">
-                    <span
-                      style={{ width: `${(done / total) * 100}%`, backgroundColor: "#2e8540" }}
-                    />
-                    <span
-                      style={{
-                        width: `${(inProgress / total) * 100}%`,
-                        backgroundColor: "#ffbe2e",
-                      }}
-                    />
-                    <span
-                      style={{ width: `${(todo / total) * 100}%`, backgroundColor: "#a3b8cc" }}
-                    />
-                    <span
-                      style={{ width: `${(backlog / total) * 100}%`, backgroundColor: "#dfe1e2" }}
-                    />
-                  </div>
+                {/* The paired signal. A page with only "what's stalled" reads as
+                    bad news; what actually closed in the same window grounds the
+                    stall count against the real pace of completion. */}
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <ClosedPanel program={program} items={closed} />
                 </div>
               </>
-            )}
-          </section>
-
-          {/* Next milestones */}
-          <section
-            className="rounded-md p-4"
-            style={{ backgroundColor: "#f7f7f5", border: "1px solid #e5e5e2" }}
-          >
-            <h2
-              className="mb-3 text-sm font-semibold"
-              style={{ color: "#3a5a40", fontFamily: "Public Sans, system-ui, sans-serif" }}
-            >
-              Next milestones
-            </h2>
-            {/* Program-driven, from the same helper as the What's Important
-                panel. Was four fixed slots labelled "Sprint 5 start" / "Code
-                freeze" — VA wording that read wrong on a rec deployment. */}
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              {upcomingMilestones(program, now.slice(0, 10)).map((m) => (
-                <Milestone
-                  key={`${m.label}-${m.date}`}
-                  label={m.label}
-                  date={m.date}
-                  days={daysFromNow(m.date)}
-                  danger={m.date === program.keyDates.launch}
-                />
-              ))}
-            </div>
-          </section>
-
-          {/* Workstream burn-down */}
-          <section
-            className="lg:col-span-2 rounded-md py-4 pl-2 pr-4"
-            style={{ backgroundColor: "#f7f7f5", border: "1px solid #e5e5e2" }}
-          >
-            <div className="mb-3 flex items-baseline justify-between">
-              <h2
-                className="text-sm font-semibold"
-                style={{ color: "#3a5a40", fontFamily: "Public Sans, system-ui, sans-serif" }}
-              >
-                Workstream burn-down
-              </h2>
-              <span className="text-[11px]" style={{ color: "#565c65" }}>
-                Health derived from live Linear signals
-                {seed.workstreamUpdatesSource
-                  ? ` · progress notes ${seed.workstreamUpdatesSource.date}`
-                  : ""}
-              </span>
-            </div>
-            <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] text-[12px]">
-              <thead>
-                <tr
-                  className="text-left uppercase tracking-wide"
-                  style={{ color: "#565c65", fontSize: 10 }}
-                >
-                  <th className="px-2 py-1 font-medium">Workstream</th>
-                  <th className="px-2 py-1 font-medium">Health</th>
-                  <th className="px-2 py-1 font-medium">Done</th>
-                  <th className="px-2 py-1 font-medium">In Prog</th>
-                  <th className="px-2 py-1 font-medium leading-tight">
-                    <div>Todo +</div>
-                    <div>Backlog</div>
-                  </th>
-                  <th className="px-2 py-1 font-medium">Total</th>
-                  <th className="px-2 py-1 font-medium">Signals</th>
-                  <th className="px-2 py-1 font-medium">Burn-down</th>
-                </tr>
-              </thead>
-              <tbody>
-                {wsRows.map((r) => {
-                  const update = seed.workstreamUpdates.find((u) => u.ws === r.ws);
-                  const progressCount = update?.progress.length ?? 0;
-                  const openCount = (update?.risks.length ?? 0) + (update?.nextSteps.length ?? 0);
-                  const linearRatio = r.total ? r.done / r.total : 0;
-                  const hasSignals = progressCount + openCount > 0;
-                  const signalRatio = hasSignals ? progressCount / (progressCount + openCount) : 0;
-                  // Blend real completion with logged program-truth signals only
-                  // when there are signals; otherwise pure Linear completion, so a
-                  // program without hand-logged notes is not silently scaled down.
-                  const blended =
-                    r.total === 0
-                      ? 0
-                      : hasSignals
-                        ? Math.round((linearRatio * 0.6 + signalRatio * 0.4) * 100)
-                        : Math.round(linearRatio * 100);
-                  const color = workstreamOf(r.ws, program).color;
-                  return (
-                    <tr key={r.ws} style={{ borderTop: "1px solid #eee" }}>
-                      <td className="px-2 py-2">
-                        <div className="flex items-center gap-2">
-                          <WsPip ws={r.ws} />
-                          <span>{workstreamOf(r.ws, program).label}</span>
-                        </div>
-                      </td>
-                      <td className="px-2 py-2">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {r.health ? (
-                            <span
-                              className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase"
-                              style={{
-                                color: HEALTH_COLOR[r.health],
-                                backgroundColor: `${HEALTH_COLOR[r.health]}14`,
-                                border: `1px solid ${HEALTH_COLOR[r.health]}44`,
-                              }}
-                            >
-                              {HEALTH_LABEL[r.health]}
-                            </span>
-                          ) : (
-                            <span style={{ color: "#a0a099" }}>—</span>
-                          )}
-                          {/* Attribution honesty. Health depends on bucketing;
-                              when the bucketing is mostly keyword inference
-                              (Ventura carries no stored workstream on any
-                              issue), the health can only be as accurate as
-                              those guesses, and the row says so. */}
-                          {r.inferredPct >= 50 ? (
-                            <span
-                              className="rounded px-1 py-0.5 text-[9px] font-medium"
-                              style={{
-                                color: "#8a5a00",
-                                backgroundColor: "#f2e6cf",
-                                border: "1px solid #e0c98a",
-                              }}
-                              title={`${r.inferredPct}% of issues in this workstream were attributed by keyword from the title, not stored in Linear. Tag issues at source to firm this up.`}
-                            >
-                              {r.inferredPct}% inferred
-                            </span>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td className="px-2 py-2 font-mono">{r.done}</td>
-                      <td className="px-2 py-2 font-mono">{r.inProgress}</td>
-                      <td className="px-2 py-2 font-mono">{r.todo + r.backlog}</td>
-                      <td className="px-2 py-2 font-mono">{r.total}</td>
-                      <td className="px-2 py-2 font-mono text-[11px]">
-                        <span title="Progress items logged" style={{ color: "#2e8540" }}>
-                          {progressCount}▲
-                        </span>{" "}
-                        <span title="Open risks + next steps" style={{ color: "#b3261e" }}>
-                          {openCount}●
-                        </span>
-                      </td>
-                      <td className="px-2 py-2">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="h-1.5 w-24 rounded-full"
-                            style={{ backgroundColor: "#eee" }}
-                          >
-                            <div
-                              className="h-1.5 rounded-full"
-                              style={{ width: `${blended}%`, backgroundColor: color }}
-                            />
-                          </div>
-                          <span style={{ color: "#565c65" }}>{blended}%</span>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            </div>
-            <div className="mt-2 text-[10px]" style={{ color: "#565c65" }}>
-              Burn-down blends Linear ticket completion (60%) with logged program progress vs open
-              risks/next-steps (40%). Signals: ▲ progress items logged · ● open risks + next steps.
-            </div>
-          </section>
-
-          {/* Sitting-in-place, at the bottom of the grid: still visible during
-              scan, but ranked below Follow-ups since those are the tasks a
-              strategist can act on directly, while "no recent updates" is a
-              symptom to investigate. */}
-          {linear.length > 0 ? (
-            <div className="lg:col-span-2">
-              <SittingUntouchedPanel
-                program={program}
-                items={stalled}
-                inProgressTotal={inProgress}
-              />
-            </div>
-          ) : null}
-
-          {/* Wins column, directly below No-recent-updates: the paired signal.
-              A page with only "what's stalled" reads as bad news; showing what
-              actually closed in the same window is honest and grounds the
-              stall count against the pace of real completion. */}
-          {linear.length > 0 ? (
-            <div className="lg:col-span-2">
-              <RecentlyClosedPanel program={program} items={closed} />
-            </div>
-          ) : null}
-        </div>
-      )}
+            ) : null}
+          </>
+        )}
+      </div>
     </AppLayout>
   );
 }
 
 /**
- * The command-centre view of Follow-ups: the open items caught between calls,
- * with a count breakdown, inline "mark done" (so a forgotten to-do can be
- * cleared without leaving the overview), and a link to the full page. Reads the
- * same per-program curation as the Follow-ups route, so a done here shows there.
+ * The phase in flight — or the sprint, on a program that keeps time in sprints.
+ *
+ * Same slot, one concept per program.timeAxis: the bordered id, the name at
+ * 24px, the window, a status tag, the goal, a day-count track, and the gates
+ * that have to clear. The gates carry days-left and blocker counts because those
+ * are measurable; whether a gate is *met* is a judgement no source tracks, and
+ * the disclosure says so rather than printing a score nobody can verify.
  */
-/**
- * Phase progress for a rec deployment: how far through the lifecycle the
- * program is (phases-complete-of-total), plus how much of the current phase's
- * window has elapsed. Not issue-completion — a rec board holds open commitments
- * that don't map to "sprint velocity", so borrowing the sprint ring for phases
- * would double-count things it shouldn't. A finished deployment (post-Launch,
- * in Live Customer Handoff) shows steady-state rather than a % done.
- */
-function PhaseProgress({
+function CurrentPanel({
+  usesPhases,
   phases,
   currentPhase,
+  sprint,
+  gates,
+  today,
 }: {
+  usesPhases: boolean;
   phases: PhaseRecord[];
   currentPhase: PhaseRecord | null;
+  sprint: ProgramConfig["sprintStrip"][number];
+  gates: SprintGate[];
+  today: string;
 }) {
-  const done = phases.filter((p) => p.state === "complete").length;
-  const pct = phases.length ? Math.round((done / phases.length) * 100) : 0;
+  const phasesDone = phases.filter((p) => p.state === "complete").length;
+
+  // Elapsed share of whatever window is current. On the sprint axis that is the
+  // sprint; on the phase axis, the phase's own window is prose ("Jul 6 – Jul
+  // 31"), so the fraction of phases complete is the honest measure instead.
+  const spanDays = Math.max(1, dayDiff(sprint.start, sprint.end) + 1);
+  const elapsed = Math.min(spanDays, Math.max(0, dayDiff(sprint.start, today) + 1));
+  const pct = usesPhases
+    ? phases.length
+      ? Math.round((phasesDone / phases.length) * 100)
+      : 0
+    : Math.round((elapsed / spanDays) * 100);
+
+  const heading = usesPhases ? (currentPhase?.name ?? "Live customer handoff") : sprint.label;
+  const window = usesPhases
+    ? (currentPhase?.window ?? "post-launch")
+    : `${shortDate(sprint.start)} – ${shortDate(sprint.end)}`;
+  const status = usesPhases ? (currentPhase ? "in progress" : "steady state") : "in progress";
 
   return (
-    <>
-      <div className="flex items-center gap-4">
-        <Ring pct={pct} />
-        <div className="text-[13px]">
-          <div>
-            <b>{done}</b> of <b>{phases.length}</b> phases complete
-          </div>
-          <div style={{ color: "#565c65" }}>
-            {currentPhase
-              ? `Now in ${currentPhase.name.toLowerCase()} — ${currentPhase.goal}`
-              : "Post-launch — steady operations, handoff to Customer Success"}
-          </div>
+    <Panel>
+      <PanelHead
+        label={usesPhases ? "Current phase" : "Current sprint"}
+        style={{ paddingBottom: 12 }}
+      />
+      <div
+        style={{
+          marginTop: 18,
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "baseline",
+          gap: 14,
+        }}
+      >
+        <Mono
+          size={11}
+          tone={KZ.ink}
+          style={{ border: `1px solid ${KZ.bone}`, padding: "4px 8px" }}
+        >
+          {usesPhases ? (currentPhase?.id ?? "—") : sprint.key}
+        </Mono>
+        <SectionTitle size={24}>{heading}</SectionTitle>
+        <Mono size={11} tone={KZ.monoDate}>
+          {window}
+        </Mono>
+        <Tag tone={toneFor(status)} style={{ marginLeft: "auto" }}>
+          {status}
+        </Tag>
+      </div>
+
+      {usesPhases && currentPhase ? (
+        <p
+          style={{
+            margin: "14px 0 0 0",
+            fontSize: 14,
+            lineHeight: 1.55,
+            maxWidth: "70ch",
+            color: KZ.body,
+            textWrap: "pretty",
+          }}
+        >
+          {currentPhase.goal}
+        </p>
+      ) : sprint.focus ? (
+        <p
+          style={{
+            margin: "14px 0 0 0",
+            fontSize: 14,
+            lineHeight: 1.55,
+            maxWidth: "70ch",
+            color: KZ.body,
+            textWrap: "pretty",
+          }}
+        >
+          {sprint.focus}
+        </p>
+      ) : null}
+
+      <div style={{ marginTop: 22 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "baseline",
+            justifyContent: "space-between",
+            fontFamily: "var(--font-mono)",
+            fontSize: 10.5,
+            color: KZ.monoDate,
+          }}
+        >
+          <span>
+            {usesPhases
+              ? `${phasesDone} of ${phases.length} phases complete`
+              : `Day ${elapsed} of ${spanDays}`}
+          </span>
+          <span>
+            {usesPhases
+              ? currentPhase
+                ? `${currentPhase.name} in flight`
+                : "post-launch"
+              : `${sprint.label} · closes ${shortDate(sprint.end)}`}
+          </span>
+        </div>
+        <div style={{ marginTop: 8 }}>
+          <Track pct={pct} />
         </div>
       </div>
-      {currentPhase ? (
-        <ul className="mt-4 space-y-1 text-[12px]">
-          {currentPhase.exitCriteria.slice(0, 4).map((c) => (
-            <li key={c} className="flex items-start gap-2" style={{ color: "#3d3d3d" }}>
-              <span aria-hidden style={{ color: "#a0a099" }}>
-                ▢
-              </span>
-              <span>{c}</span>
+
+      <div style={{ marginTop: 24 }}>
+        <Eyebrow size={10}>Gates to clear</Eyebrow>
+        {gates.length ? (
+          <List style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
+            {gates.slice(0, 4).map((g) => {
+              const late = g.daysRemaining < 0;
+              return (
+                <li key={g.key} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                  <Square style={{ marginTop: 6 }} />
+                  <span style={{ minWidth: 0 }}>
+                    <span
+                      style={{
+                        fontFamily: "var(--font-mono)",
+                        fontSize: 11.5,
+                        lineHeight: 1.5,
+                        color: KZ.ink,
+                      }}
+                    >
+                      {g.gate}
+                    </span>
+                    <span style={{ display: "block", marginTop: 4 }}>
+                      <Mono size={10} tone={late ? KZ.coral : KZ.muted}>
+                        {g.label}
+                        {g.isCurrent ? " · now" : ""} ·{" "}
+                        {late ? `${-g.daysRemaining}d past` : `${g.daysRemaining}d left`}
+                        {g.blockingWorkItems > 0 ? ` · ${g.blockingWorkItems} blocking` : ""}
+                      </Mono>
+                    </span>
+                  </span>
+                </li>
+              );
+            })}
+          </List>
+        ) : currentPhase ? (
+          <List style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+            {currentPhase.gates.map((g) => (
+              <Bullet key={g} mono>
+                {g}
+              </Bullet>
+            ))}
+          </List>
+        ) : (
+          <Mono size={11} style={{ display: "block", marginTop: 10 }}>
+            No gate is stated for this window in the plan
+          </Mono>
+        )}
+        <Disclosure>Gate state is not individually tracked in any source</Disclosure>
+      </div>
+    </Panel>
+  );
+}
+
+/**
+ * Open follow-ups, top six, checkable in place — the same per-program curation
+ * the Follow-ups route reads, so a check here shows there. Two columns on a wide
+ * viewport because these are short lines and a single column of six wastes the
+ * width.
+ */
+function FollowUpsPanel({ program }: { program: ProgramConfig }) {
+  const { hydrated, buckets, setStatus } = useFollowUps(program.id);
+  const open = buckets.open;
+  const top = open.slice(0, 6);
+
+  return (
+    <Panel>
+      <PanelHead
+        label="Open follow-ups"
+        right={hydrated ? `Top ${Math.min(6, open.length)} of ${pad2(open.length)}` : "reading…"}
+        style={{ paddingBottom: 12 }}
+      />
+      {!hydrated ? (
+        <Mono size={11} style={{ display: "block", marginTop: 14 }}>
+          Loading…
+        </Mono>
+      ) : open.length === 0 ? (
+        <div style={{ marginTop: 14, fontSize: 13, color: KZ.body }}>
+          Nothing open. Every follow-up is done or dismissed.
+        </div>
+      ) : (
+        <List
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit,minmax(380px,1fr))",
+            gap: "0 32px",
+          }}
+        >
+          {top.map((item) => (
+            <li
+              key={item.id}
+              style={{
+                display: "flex",
+                gap: 14,
+                alignItems: "flex-start",
+                padding: "14px 0",
+                borderBottom: `1px solid ${KZ.grey200}`,
+              }}
+            >
+              <CheckSquare
+                done={false}
+                onClick={() => setStatus(item.id, "done")}
+                label={`Mark done: ${item.title}`}
+              />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={doneTextStyle(false)}>{item.title}</div>
+                <div
+                  style={{
+                    marginTop: 6,
+                    display: "flex",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    gap: 10,
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 10.5,
+                    color: KZ.muted,
+                  }}
+                >
+                  <Tag
+                    tone={
+                      item.direction === "we-owe"
+                        ? KZ.blue
+                        : item.direction === "they-owe"
+                          ? KZ.amber
+                          : KZ.muted
+                    }
+                  >
+                    {item.direction === "we-owe"
+                      ? "We owe"
+                      : item.direction === "they-owe"
+                        ? "They owe"
+                        : "To do"}
+                  </Tag>
+                  {item.owner ? <span>{item.owner}</span> : null}
+                  {/* Provenance travels with the item: a derived follow-up
+                      always says where it was said. */}
+                  {item.source ? <span>· {item.source.label}</span> : null}
+                </div>
+              </div>
             </li>
           ))}
-          {currentPhase.exitCriteria.length > 4 ? (
-            <li className="text-[11px]" style={{ color: "#8a8a80" }}>
-              +{currentPhase.exitCriteria.length - 4} more exit criteria
-            </li>
-          ) : null}
-        </ul>
-      ) : null}
-    </>
-  );
-}
-
-/** How the pressure score reads at a glance. Same thresholds as the rollup. */
-function pressureBand(p: number): { label: string; color: string } {
-  const pct = Math.round(p * 100);
-  if (p >= 0.75) return { label: `${pct}% critical`, color: "#b3261e" };
-  if (p >= 0.5) return { label: `${pct}% high`, color: "#bf6a02" };
-  if (p >= 0.25) return { label: `${pct}% moderate`, color: "#8a5a00" };
-  return { label: `${pct}% low`, color: "#2e8540" };
-}
-
-/**
- * Gate readiness across the open lifecycle phases, worst first. Pressure blends
- * time remaining, unmet exit criteria, and open blockers — so a gate that is
- * near, under-met, and blocked rises to the top. Blockers attach only to the
- * phase actually running; future gates carry none, and a footnote says why.
- */
-function GateReadinessPanel({ gates }: { gates: GateReadiness[] }) {
-  return (
-    <section
-      className="rounded-md p-4"
-      style={{ backgroundColor: "#fff", border: "1px solid #e5e5e2" }}
-    >
-      <h2
-        className="mb-3 text-sm font-semibold"
-        style={{ color: "#3a5a40", fontFamily: "Public Sans, system-ui, sans-serif" }}
-      >
-        What's at risk — gate readiness
-      </h2>
-      <div className="space-y-2">
-        {gates.map((g) => {
-          const band = pressureBand(g.pressure);
-          return (
-            <div
-              key={g.phaseId}
-              className="flex flex-col gap-1.5 md:flex-row md:items-center md:gap-3"
-            >
-              <div className="truncate text-[12px] md:w-40 md:shrink-0" title={g.phaseName}>
-                {g.phaseName}
-              </div>
-              <div
-                className="h-2 flex-1 overflow-hidden rounded-full"
-                style={{ backgroundColor: "#eee" }}
-              >
-                <div
-                  className="h-2 rounded-full"
-                  style={{ width: `${Math.round(g.pressure * 100)}%`, backgroundColor: band.color }}
-                />
-              </div>
-              {/* Band + detail share a wrapped row below md; above it they
-                  return to their own fixed columns via md:contents. */}
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 md:contents">
-              <div
-                className="shrink-0 text-[11px] font-semibold md:w-24 md:text-right"
-                style={{ color: band.color }}
-              >
-                {band.label}
-              </div>
-              <div className="text-[11px] md:w-52 md:shrink-0" style={{ color: "#565c65" }}>
-                {g.daysRemaining >= 0 ? `${g.daysRemaining}d out` : `${-g.daysRemaining}d overdue`}
-                {/* Exit criteria are not individually tracked in any source yet,
-                    so exitCriteriaMet is always 0. Labelled a placeholder in
-                    place instead of showing a bare "0/5 met" that reads like a
-                    measurement. */}
-                <span
-                  title="Exit criteria are not individually tracked in Linear or Notion yet — placeholder"
-                  style={{ color: "#8a5a00" }}
-                >
-                  {" · not tracked yet"}
-                </span>
-                {g.blockingWorkItems > 0 ? ` · ${g.blockingWorkItems} blocking` : ""}
-              </div>
-              </div>
-            </div>
-          );
-        })}
+        </List>
+      )}
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+        <Disclosure>
+          Checkmarks are your working notes, saved in this browser only and never written back
+        </Disclosure>
+        <Link to="/p/$programId/follow-ups" params={{ programId: program.id }}>
+          <Mono size={10.5} tone={KZ.blue}>
+            All follow-ups
+          </Mono>
+        </Link>
       </div>
-      <div className="mt-2 text-[10px]" style={{ color: "#8a8a80" }}>
-        Pressure = time remaining × unmet exit criteria × open blockers. Blockers count against the
-        phase now running; exit criteria are not individually tracked yet, so "0 met" reads as "not
-        yet demonstrable," not "none done."
-      </div>
-    </section>
+    </Panel>
   );
 }
 
 /**
- * "Sitting untouched" — in-progress items with no source_updated_at movement in
- * the aging window. Present-tense, small, and lists items rather than
- * summarising, so the eye lands on which cards are stalled, not on a number.
+ * The Notion checkbox tracker: an open count and the per-section split.
  *
- * When nothing is stalled the panel renders a one-line "Nothing stalled" state
- * rather than hiding — the absence itself is worth reading, and hiding would
- * make it indistinguishable from "the signal isn't wired up." When there are
- * no in-progress items at all (a program that hasn't started work yet), the
- * panel does hide, because there is nothing coherent to say.
+ * Renders nothing when the program keeps no tracker, because an empty panel
+ * labelled "Notion tracker" would imply one exists and is empty. Configuration
+ * problems DO render, with the reason — a silently missing 42 open items is the
+ * failure this panel exists to prevent.
  */
-function SittingUntouchedPanel({
+function NotionTrackerPanel({ program }: { program: ProgramConfig }) {
+  const { isLoading, open, bySection, status } = useNotionTasks(program.id);
+  if (status === "not-configured") return null;
+
+  return (
+    <Panel>
+      <PanelHead
+        label="Notion tracker"
+        right={status === "ok" ? `${pad2(open.length)} open` : status}
+        rightTone={status === "ok" ? undefined : KZ.amber}
+      />
+      {isLoading ? (
+        <Mono size={11} style={{ display: "block", marginTop: 14 }}>
+          Reading the tracker…
+        </Mono>
+      ) : status !== "ok" ? (
+        <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: KZ.amber }}>
+          {status === "no-token"
+            ? "NOTION_API_KEY is not set, so the hand-maintained tracker is not being read. Open counts on this page reflect Linear only."
+            : "Could not read the tracker page. Usually that means it has not been shared with the Notion integration, so open counts on this page reflect Linear only."}
+        </div>
+      ) : open.length === 0 ? (
+        <div style={{ marginTop: 14, fontSize: 13, color: KZ.body }}>
+          Every checkbox on the tracker is ticked.
+        </div>
+      ) : (
+        <>
+          <List>
+            {bySection
+              .filter((g) => g.open.length > 0)
+              .map((g) => (
+                <li
+                  key={g.section}
+                  style={{
+                    display: "flex",
+                    alignItems: "baseline",
+                    gap: 14,
+                    padding: "11px 0",
+                    borderBottom: `1px solid ${KZ.grey200}`,
+                  }}
+                >
+                  <Mono size={11} tone={KZ.ink} style={{ width: 28, textAlign: "right" }}>
+                    {pad2(g.open.length)}
+                  </Mono>
+                  <span style={{ minWidth: 0, fontSize: 13.5 }}>{g.section}</span>
+                </li>
+              ))}
+          </List>
+          <Disclosure>
+            Checkbox tasks from the sprint tracker page, separate from the Linear board. Most never
+            became tickets, which is why the two counts do not add up
+          </Disclosure>
+        </>
+      )}
+    </Panel>
+  );
+}
+
+/**
+ * "No recent updates" — in-progress items Linear has not seen a change on
+ * inside the aging window. Lists items rather than summarising, so the eye lands
+ * on which cards are stalled rather than on a number.
+ *
+ * When nothing is stalled it says so instead of hiding: the absence is worth
+ * reading, and hiding would make it indistinguishable from an unwired signal.
+ */
+function StalledPanel({
   program,
   items,
   inProgressTotal,
@@ -646,472 +748,173 @@ function SittingUntouchedPanel({
   if (inProgressTotal === 0) return null;
   const top = items.slice(0, 8);
   return (
-    <section
-      className="rounded-md p-4"
-      style={{ backgroundColor: "#fff", border: "1px solid #e5e5e2" }}
-    >
-      <div className="mb-3 flex items-baseline justify-between">
-        <h2
-          className="text-sm font-semibold"
-          style={{ color: "#3a5a40", fontFamily: "Public Sans, system-ui, sans-serif" }}
-        >
-          No recent updates — {items.length} of {inProgressTotal} in progress
-        </h2>
-        <Link
-          to="/p/$programId/sprint-board"
-          params={{ programId: program.id }}
-          className="text-[11px] font-medium"
-          style={{ color: "#3a5a40" }}
-        >
-          Sprint board →
-        </Link>
-      </div>
+    <Panel>
+      <PanelHead
+        label="No recent updates"
+        right={`${pad2(items.length)} of ${pad2(inProgressTotal)} in progress`}
+        rightTone={items.length ? KZ.coral : undefined}
+      />
       {items.length === 0 ? (
-        <div className="text-[12px]" style={{ color: "#565c65" }}>
+        <div style={{ marginTop: 14, fontSize: 13, color: KZ.body }}>
           Every in-progress item has been updated in the last {AGING_THRESHOLD_DAYS} days.
         </div>
       ) : (
-        <div className="space-y-1.5">
-          {top.map((i) => {
-            const band = agingBand(i.severity);
-            return (
-              <div
-                key={i.identifier}
-                className="flex flex-col gap-1 text-[12px] md:flex-row md:items-center md:gap-3"
+        <List>
+          {top.map((i) => (
+            <li
+              key={i.identifier}
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: 14,
+                padding: "13px 0",
+                borderBottom: `1px solid ${KZ.grey200}`,
+              }}
+            >
+              <Mono size={11} tone={KZ.blue} style={{ width: 76, flex: "0 0 76px" }}>
+                {i.identifier}
+              </Mono>
+              <span style={{ flex: 1, minWidth: 220, fontSize: 14, lineHeight: 1.35 }}>
+                {i.url ? (
+                  <a href={i.url} target="_blank" rel="noreferrer" style={{ color: KZ.ink }}>
+                    {i.title}
+                  </a>
+                ) : (
+                  i.title
+                )}
+              </span>
+              <Tag
+                tone={agingTone(i.severity)}
+                title={`${i.daysSinceUpdate} days since Linear last saw a change on this issue (${i.severity})`}
               >
-                {/* Below md the fixed columns (id + chip + workstream +
-                    assignee) summed past the available width and the title
-                    flexed to zero. Meta wraps onto its own line instead. */}
-                <div className="flex items-center gap-2 md:contents">
-                  <div className="w-16 shrink-0 font-mono text-[11px]" style={{ color: "#565c65" }}>
-                    {i.identifier}
-                  </div>
-                  <div
-                    className="w-16 shrink-0 rounded px-1.5 py-0.5 text-center text-[10px] font-semibold"
-                    style={{ backgroundColor: band.bg, color: band.fg }}
-                    title={`${i.daysSinceUpdate} days since Linear last saw a change on this issue (${i.severity})`}
-                  >
-                    {i.daysSinceUpdate}d
-                  </div>
-                </div>
-                <div className="min-w-0 flex-1 truncate">
+                {i.daysSinceUpdate}d {i.severity}
+              </Tag>
+              <Mono size={10.5} style={{ width: 60 }}>
+                {i.workstream}
+              </Mono>
+              <Mono size={10.5} style={{ width: 110 }} title={i.assignee ?? "Unassigned"}>
+                {i.assignee ?? "—"}
+              </Mono>
+            </li>
+          ))}
+        </List>
+      )}
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+        <Disclosure>
+          Days since Linear last saw a change on the issue: any field, any comment. An item created
+          months ago but nudged this week is not stale
+          {items.length > top.length ? ` · +${items.length - top.length} more` : ""}
+        </Disclosure>
+        <Link to="/p/$programId/sprint-board" params={{ programId: program.id }}>
+          <Mono size={10.5} tone={KZ.blue}>
+            Sprint board
+          </Mono>
+        </Link>
+      </div>
+    </Panel>
+  );
+}
+
+/**
+ * "Recently closed" — the same two-week slice as the aging panel, read the other
+ * way. Canceled items carry a "dropped" tag rather than a green one: a canceled
+ * ticket is a scope decision worth seeing, not a shipped win.
+ */
+function ClosedPanel({ program, items }: { program: ProgramConfig; items: ClosedItem[] }) {
+  const top = items.slice(0, 10);
+  return (
+    <Panel>
+      <PanelHead
+        label="Recently closed"
+        right={`${pad2(items.length)} in ${RECENTLY_CLOSED_WINDOW_DAYS}d`}
+      />
+      {items.length === 0 ? (
+        <div style={{ marginTop: 14, fontSize: 13, color: KZ.body }}>
+          Nothing closed in the last {RECENTLY_CLOSED_WINDOW_DAYS} days.
+        </div>
+      ) : (
+        <List>
+          {top.map((i) => {
+            const dropped = i.bucket === "canceled";
+            return (
+              <li
+                key={i.identifier}
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  gap: 14,
+                  padding: "13px 0",
+                  borderBottom: `1px solid ${KZ.grey200}`,
+                }}
+              >
+                <Mono size={11} tone={KZ.blue} style={{ width: 76, flex: "0 0 76px" }}>
+                  {i.identifier}
+                </Mono>
+                <span style={{ flex: 1, minWidth: 220, fontSize: 14, lineHeight: 1.35 }}>
                   {i.url ? (
-                    <a
-                      href={i.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hover:underline"
-                      style={{ color: "#1b1b1b" }}
-                    >
+                    <a href={i.url} target="_blank" rel="noreferrer" style={{ color: KZ.ink }}>
                       {i.title}
                     </a>
                   ) : (
                     i.title
                   )}
-                </div>
-                <div className="flex items-center gap-3 text-[10px] md:contents">
-                  <div
-                    className="shrink-0 md:w-16 md:text-right"
-                    style={{ color: "#565c65" }}
-                  >
-                    {i.workstream}
-                  </div>
-                  <div
-                    className="min-w-0 truncate md:w-28 md:shrink-0 md:text-right"
-                    style={{ color: "#565c65" }}
-                    title={i.assignee ?? "Unassigned"}
-                  >
-                    {i.assignee ?? "—"}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-          {items.length > top.length ? (
-            <div className="pt-1 text-[10px]" style={{ color: "#8a8a80" }}>
-              +{items.length - top.length} more — see sprint board.
-            </div>
-          ) : null}
-        </div>
-      )}
-      <div className="mt-2 text-[10px]" style={{ color: "#8a8a80" }}>
-        Days since Linear last saw a change on the issue — any field, any
-        comment. Not opened_at: an item created months ago but nudged this
-        week does not count as stale.
-      </div>
-    </section>
-  );
-}
-
-/** Colour bands mirroring the severity labels sittingUntouched attaches. Kept
- *  local to the panel because they're one screen's presentation choice, not a
- *  cross-page palette. */
-/**
- * "Recently closed" — the paired signal to "No recent updates". Same window
- * as the aging function's threshold (14 days), so the two panels together
- * describe one two-week slice: what left the board vs what stopped moving.
- *
- * Canceled items are shown with a "dropped" tag rather than a "shipped" tag,
- * because a canceled ticket is a scope decision worth seeing but not a win.
- * Empty state renders as a one-liner — the absence of closures in a fortnight
- * is itself a signal, and hiding it would make quiet weeks indistinguishable
- * from a wired-up feed with nothing to say.
- */
-function RecentlyClosedPanel({
-  program,
-  items,
-}: {
-  program: ProgramConfig;
-  items: ClosedItem[];
-}) {
-  const top = items.slice(0, 10);
-  return (
-    <section
-      className="rounded-md p-4"
-      style={{ backgroundColor: "#fff", border: "1px solid #e5e5e2" }}
-    >
-      <div className="mb-3 flex items-baseline justify-between">
-        <h2
-          className="text-sm font-semibold"
-          style={{ color: "#3a5a40", fontFamily: "Public Sans, system-ui, sans-serif" }}
-        >
-          Recently closed — {items.length} in the last {RECENTLY_CLOSED_WINDOW_DAYS} days
-        </h2>
-        <Link
-          to="/p/$programId/activity"
-          params={{ programId: program.id }}
-          className="text-[11px] font-medium"
-          style={{ color: "#3a5a40" }}
-        >
-          Activity feed →
-        </Link>
-      </div>
-      {items.length === 0 ? (
-        <div className="text-[12px]" style={{ color: "#565c65" }}>
-          Nothing closed in the last {RECENTLY_CLOSED_WINDOW_DAYS} days.
-        </div>
-      ) : (
-        <div className="space-y-1.5">
-          {top.map((i) => {
-            const dropped = i.bucket === "canceled";
-            return (
-              <div
-                key={i.identifier}
-                className="flex flex-col gap-1 text-[12px] md:flex-row md:items-center md:gap-3"
-              >
-                <div className="flex items-center gap-2 md:contents">
-                <div className="w-16 shrink-0 font-mono text-[11px]" style={{ color: "#565c65" }}>
-                  {i.identifier}
-                </div>
-                <div
-                  className="w-16 shrink-0 rounded px-1.5 py-0.5 text-center text-[10px] font-semibold"
-                  style={
-                    dropped
-                      ? { backgroundColor: "#eee", color: "#565c65" }
-                      : { backgroundColor: "#dcecdd", color: "#1f5c2f" }
-                  }
+                </span>
+                <Tag
+                  tone={dropped ? KZ.muted : KZ.green}
                   title={
                     dropped
                       ? `Canceled ${i.daysSinceClosed}d ago`
                       : `Closed ${i.daysSinceClosed}d ago`
                   }
                 >
-                  {dropped ? "dropped" : `${i.daysSinceClosed}d`}
-                </div>
-                </div>
-                <div className="min-w-0 flex-1 truncate">
-                  {i.url ? (
-                    <a
-                      href={i.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hover:underline"
-                      style={{ color: "#1b1b1b" }}
-                    >
-                      {i.title}
-                    </a>
-                  ) : (
-                    i.title
-                  )}
-                </div>
-                <div className="flex items-center gap-3 text-[10px] md:contents">
-                  <div
-                    className="shrink-0 md:w-16 md:text-right"
-                    style={{ color: "#565c65" }}
-                  >
-                    {i.workstream}
-                  </div>
-                  <div
-                    className="min-w-0 truncate md:w-28 md:shrink-0 md:text-right"
-                    style={{ color: "#565c65" }}
-                    title={i.assignee ?? "Unassigned"}
-                  >
-                    {i.assignee ?? "—"}
-                  </div>
-                </div>
-              </div>
+                  {dropped ? "dropped" : `${i.daysSinceClosed}d closed`}
+                </Tag>
+                <Mono size={10.5} style={{ width: 60 }}>
+                  {i.workstream}
+                </Mono>
+                <Mono size={10.5} style={{ width: 110 }} title={i.assignee ?? "Unassigned"}>
+                  {i.assignee ?? "—"}
+                </Mono>
+              </li>
             );
           })}
-          {items.length > top.length ? (
-            <div className="pt-1 text-[10px]" style={{ color: "#8a8a80" }}>
-              +{items.length - top.length} more — see activity feed.
-            </div>
-          ) : null}
-        </div>
+        </List>
       )}
-      <div className="mt-2 text-[10px]" style={{ color: "#8a8a80" }}>
-        "Closed" is the Linear state change to done or canceled within the last{" "}
-        {RECENTLY_CLOSED_WINDOW_DAYS} days. Canceled items are shown as "dropped" —
-        a scope decision worth seeing, not a shipped win.
-      </div>
-    </section>
-  );
-}
-
-/**
- * Command-centre summary of the Notion checkbox tracker: an open count, the
- * per-section split, and a link through to the full list on Team tasks.
- *
- * Renders nothing when the program keeps no tracker (Ventura), because an empty
- * panel labelled "Notion tracker" would imply a page exists and is empty rather
- * than that none was configured. Configuration problems DO render, with the
- * reason, since a silently missing 42 open items is the failure this whole
- * panel exists to prevent.
- */
-function NotionTrackerSummary({ program }: { program: ProgramConfig }) {
-  const { isLoading, open, bySection, status } = useNotionTasks(program.id);
-  if (status === "not-configured") return null;
-
-  return (
-    <section
-      className="rounded-md p-4"
-      style={{ backgroundColor: "#fff", border: "1px solid #e5e5e2" }}
-    >
-      <div className="mb-3 flex items-baseline justify-between">
-        <h2
-          className="text-sm font-semibold"
-          style={{ color: "#3a5a40", fontFamily: "Public Sans, system-ui, sans-serif" }}
-        >
-          Notion tracker{status === "ok" ? ` \u00b7 ${open.length} open` : ""}
-        </h2>
-        <Link
-          to="/p/$programId/team-tasks"
-          params={{ programId: program.id }}
-          className="text-[11px] font-medium"
-          style={{ color: "#3a5a40" }}
-        >
-          Team tasks →
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+        <Disclosure>
+          "Closed" is the Linear state change to done or canceled inside the window
+          {items.length > top.length ? ` · +${items.length - top.length} more` : ""}
+        </Disclosure>
+        <Link to="/p/$programId/activity" params={{ programId: program.id }}>
+          <Mono size={10.5} tone={KZ.blue}>
+            Activity feed
+          </Mono>
         </Link>
       </div>
-
-      {isLoading ? (
-        <div className="text-[12px]" style={{ color: "#565c65" }}>
-          Reading the tracker…
-        </div>
-      ) : status !== "ok" ? (
-        <div className="text-[12px]" style={{ color: "#8a5a00" }}>
-          {status === "no-token"
-            ? "NOTION_API_KEY is not set, so the hand-maintained tracker is not being read. Open counts on this page reflect Linear only."
-            : "Could not read the tracker page \u2014 usually it has not been shared with the Notion integration. Open counts on this page reflect Linear only."}
-        </div>
-      ) : open.length === 0 ? (
-        <div className="text-[12px]" style={{ color: "#565c65" }}>
-          Every checkbox on the tracker is ticked.
-        </div>
-      ) : (
-        <div className="space-y-1.5">
-          {bySection
-            .filter((g) => g.open.length > 0)
-            .map((g) => (
-              <div key={g.section} className="flex items-baseline gap-3 text-[12px]">
-                <div
-                  className="w-10 shrink-0 text-right font-semibold"
-                  style={{ color: "#1b1b1b" }}
-                >
-                  {g.open.length}
-                </div>
-                <div className="min-w-0 flex-1 truncate" style={{ color: "#565c65" }}>
-                  {g.section}
-                </div>
-              </div>
-            ))}
-          <div className="pt-1 text-[10px]" style={{ color: "#8a8a80" }}>
-            Checkbox tasks from the sprint tracker page. Separate from the Linear
-            board — most of these never became tickets, which is why counts here
-            and on the sprint board do not add up to the same total.
-          </div>
-        </div>
-      )}
-    </section>
+    </Panel>
   );
 }
 
-function agingBand(severity: StalledItem["severity"]): { bg: string; fg: string } {
+/** Whole days between two YYYY-MM-DD dates, in local calendar terms. */
+function dayDiff(from: string, to: string): number {
+  const [fy, fm, fd] = from.split("-").map(Number);
+  const [ty, tm, td] = to.split("-").map(Number);
+  return Math.round(
+    (new Date(ty, tm - 1, td).getTime() - new Date(fy, fm - 1, fd).getTime()) / 86400000,
+  );
+}
+
+/** The aging bands, in the one accent scale the whole app uses. */
+function agingTone(severity: StalledItem["severity"]): string {
   switch (severity) {
     case "cold":
-      return { bg: "#fce4e4", fg: "#8a1c1c" };
+      return KZ.coral;
     case "stalled":
-      return { bg: "#fbe6c8", fg: "#8a4a00" };
+      return KZ.amber;
     case "aging":
     default:
-      return { bg: "#fff5c2", fg: "#5a4a00" };
+      return KZ.blue;
   }
-}
-
-function FollowUpsSummary({ program }: { program: ProgramConfig }) {
-  const { hydrated, buckets, setStatus } = useFollowUps(program.id);
-  const open = buckets.open;
-  const weOwe = open.filter((i) => i.direction === "we-owe").length;
-  const theyOwe = open.filter((i) => i.direction === "they-owe").length;
-  const todo = open.filter((i) => i.direction === null).length;
-  const top = open.slice(0, 6);
-
-  return (
-    <section
-      className="lg:col-span-2 rounded-md p-4"
-      style={{ backgroundColor: "#f7f7f5", border: "1px solid #e5e5e2" }}
-    >
-      <div className="mb-3 flex items-baseline justify-between">
-        <h2
-          className="text-sm font-semibold"
-          style={{ color: "#3a5a40", fontFamily: "Public Sans, system-ui, sans-serif" }}
-        >
-          Follow-ups{hydrated ? ` · ${open.length} open` : ""}
-        </h2>
-        <Link
-          to="/p/$programId/follow-ups"
-          params={{ programId: program.id }}
-          className="text-[11px] underline"
-          style={{ color: "#2e5d3a" }}
-        >
-          View all →
-        </Link>
-      </div>
-
-      {!hydrated ? (
-        <div className="text-[12px]" style={{ color: "#8a8a80" }}>
-          Loading…
-        </div>
-      ) : open.length === 0 ? (
-        <div className="text-[12px]" style={{ color: "#565c65" }}>
-          Nothing open — all follow-ups are done or dismissed.
-        </div>
-      ) : (
-        <>
-          <div
-            className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px]"
-            style={{ color: "#565c65" }}
-          >
-            {weOwe ? (
-              <span>
-                <b style={{ color: "#1b1b1b" }}>{weOwe}</b> we owe
-              </span>
-            ) : null}
-            {theyOwe ? (
-              <span>
-                <b style={{ color: "#1b1b1b" }}>{theyOwe}</b> they owe
-              </span>
-            ) : null}
-            {todo ? (
-              <span>
-                <b style={{ color: "#1b1b1b" }}>{todo}</b> to do
-              </span>
-            ) : null}
-          </div>
-          <ul className="space-y-1.5">
-            {top.map((item) => (
-              <li key={item.id} className="flex items-start gap-2.5">
-                <button
-                  type="button"
-                  aria-label="Mark done"
-                  onClick={() => setStatus(item.id, "done")}
-                  className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors hover:bg-[#eef3ee]"
-                  style={{ borderColor: "#c9c9c2", backgroundColor: "#ffffff" }}
-                >
-                  <Check size={11} strokeWidth={3} style={{ opacity: 0 }} />
-                </button>
-                <span className="min-w-0 flex-1 text-[12px]" style={{ color: "#1b1b1b" }}>
-                  {item.title}
-                  {item.owner ? <span style={{ color: "#8a8a80" }}> · {item.owner}</span> : null}
-                </span>
-              </li>
-            ))}
-          </ul>
-          {open.length > top.length ? (
-            <div className="mt-2 text-[11px]" style={{ color: "#8a8a80" }}>
-              +{open.length - top.length} more
-            </div>
-          ) : null}
-        </>
-      )}
-    </section>
-  );
-}
-
-function Ring({ pct }: { pct: number }) {
-  const r = 26;
-  const c = 2 * Math.PI * r;
-  const off = c - (pct / 100) * c;
-  return (
-    <svg width="70" height="70" viewBox="0 0 70 70">
-      <circle cx="35" cy="35" r={r} fill="none" stroke="#e5e5e2" strokeWidth="6" />
-      <circle
-        cx="35"
-        cy="35"
-        r={r}
-        fill="none"
-        stroke="#1a6fa8"
-        strokeWidth="6"
-        strokeDasharray={c}
-        strokeDashoffset={off}
-        transform="rotate(-90 35 35)"
-        strokeLinecap="round"
-      />
-      <text x="35" y="39" textAnchor="middle" fontSize="13" fontWeight="600" fill="#1a1a1a">
-        {pct}%
-      </text>
-    </svg>
-  );
-}
-
-function Milestone({
-  label,
-  date,
-  days,
-  danger,
-}: {
-  label: string;
-  date: string;
-  days: number;
-  danger?: boolean;
-}) {
-  return (
-    <div
-      className="rounded-md bg-white p-3"
-      style={{ border: `1px solid ${danger ? "#b3261e55" : "#e5e5e2"}` }}
-    >
-      <div className="text-[11px] uppercase tracking-wide" style={{ color: "#565c65" }}>
-        {label}
-      </div>
-      <div
-        className="mt-1 text-2xl font-semibold"
-        style={{ color: danger ? "#b3261e" : "#1a1a1a" }}
-      >
-        {Math.max(0, days)}
-        <span className="ml-1 text-[11px] font-normal" style={{ color: "#565c65" }}>
-          days
-        </span>
-      </div>
-      <div className="text-[11px]" style={{ color: "#565c65" }}>
-        {(() => {
-          const [y, m, d] = date.split("-").map(Number);
-          return new Date(y, m - 1, d).toLocaleDateString(undefined, {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          });
-        })()}
-      </div>
-    </div>
-  );
 }

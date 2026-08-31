@@ -22,10 +22,11 @@ export const HEALTH_LABEL: Record<Health, string> = {
   blocked: "Blocked",
 };
 
+/** The Kaizen accent scale. Green is reserved for on-track. */
 export const HEALTH_COLOR: Record<Health, string> = {
-  on_track: "#2e8540",
-  at_risk: "#8a5a00",
-  blocked: "#b3261e",
+  on_track: "#2E8540",
+  at_risk: "#8A5A00",
+  blocked: "#FB4938",
 };
 
 export interface WorkstreamUpdate {
@@ -105,7 +106,8 @@ export const WORKSTREAM_UPDATES: WorkstreamUpdate[] = [
     name: "Design + Intelligent Search",
     owner: "Lukasz / Daman / Ben (Kaizen + Media Rain)",
     health: "at_risk",
-    headline: "Active design sprint on critical path. 3 product outlines ready; search go/no-go open.",
+    headline:
+      "Active design sprint on critical path. 3 product outlines ready; search go/no-go open.",
     progress: [
       "MyVA authenticated prototype (v A/B/C) reviewed 7/7 and 7/13 — ~80% designed, third rail removed",
       "Unauth homepage wireframes live; first click-through prototype in progress",
@@ -171,7 +173,8 @@ export const WORKSTREAM_UPDATES: WorkstreamUpdate[] = [
     name: "Health Chat + PEP",
     owner: "Luke (OCC / VHA coord)",
     health: "at_risk",
-    headline: "Lowest scope — integration handshake. Possible completion before September. ATO conversation still needed.",
+    headline:
+      "Lowest scope — integration handshake. Possible completion before September. ATO conversation still needed.",
     progress: [
       "Follow-up WS5 Health Chat/PEP call held 7/9 with Derek Juang, Patrick Bateman, Robyn Singleton, Brian Olinger, Matt Bouma",
       "Bi-directional integration discussions underway; spikes planned for Sprint 4",

@@ -1,11 +1,28 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
 import { WsTag } from "@/components/va-ui";
-import { type LifecyclePhase, type PhaseStatus, type WorkstreamKey } from "@/lib/va-data";
-import { PROGRAMS, pageTitle, upcomingMilestones, workstreamOf } from "@/lib/program.config";
+import {
+  Bullet,
+  Disclosure,
+  Eyebrow,
+  KZ,
+  KpiStrip,
+  List,
+  Mono,
+  Panel,
+  PanelHead,
+  SectionTitle,
+  Square,
+  Tag,
+} from "@/components/kz";
+import { type PhaseStatus, type WorkstreamKey } from "@/lib/va-data";
+import { PROGRAMS, pageTitle, upcomingMilestones } from "@/lib/program.config";
 import { seedFor } from "@/lib/program-seed";
-import { lifecyclePhasesFor, today as todayIso, derivePhaseState } from "@/lib/program-model.adapters";
+import {
+  lifecyclePhasesFor,
+  today as todayIso,
+  derivePhaseState,
+} from "@/lib/program-model.adapters";
 import { shortDate, localDate } from "@/lib/local-date";
 import { useProgram } from "./route";
 
@@ -22,267 +39,246 @@ export const Route = createFileRoute("/p/$programId/lifecycle")({
   component: LifecyclePage,
 });
 
-const STATUS_STYLE: Record<PhaseStatus, { label: string; bg: string; fg: string; bar: string }> = {
-  complete: { label: "Complete", bg: "#ecf3ec", fg: "#2e6b2f", bar: "#2e8540" },
-  in_progress: { label: "In progress", bg: "#fff5c2", fg: "#7a5a00", bar: "#ffbe2e" },
-  upcoming: { label: "Upcoming", bg: "#eef2f7", fg: "#3a4a5c", bar: "#a9aeb1" },
+/** One tone per phase state. Blue for the phase in flight, green for done. */
+const STATUS_TONE: Record<PhaseStatus, { label: string; tone: string }> = {
+  complete: { label: "Complete", tone: KZ.green },
+  in_progress: { label: "In progress", tone: KZ.blue },
+  upcoming: { label: "Upcoming", tone: KZ.muted },
 };
 
 function LifecyclePage() {
   const program = useProgram();
   const seed = seedFor(program.id);
   const total = seed.lifecycle.length;
-  const done = seed.lifecycle.filter((p) => p.status === "complete").length;
-  const active = seed.lifecycle.filter((p) => p.status === "in_progress").length;
+  const rawPhases = lifecyclePhasesFor(program);
+  const iso = todayIso();
+
+  // Status is derived from the phase window, never read from the stored
+  // `status` literal on the seed. That literal said Phase 2 was in progress
+  // through August — it was authored in July and nobody moved it — so a strip
+  // that derived and cards that did not named different active phases on the
+  // same screen.
+  const statusOf = (id: string): PhaseStatus => {
+    const raw = rawPhases.find((ph) => ph.id === id);
+    if (!raw) return "upcoming";
+    const st = derivePhaseState(raw, iso);
+    return st === "complete" ? "complete" : st === "in_progress" ? "in_progress" : "upcoming";
+  };
+  const done = seed.lifecycle.filter((p) => statusOf(p.id) === "complete").length;
   const pctDone = Math.round((done / total) * 100);
 
-  const [openPhases, setOpenPhases] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(seed.lifecycle.map((p) => [p.id, p.status === "in_progress"])),
-  );
-  const allOpen = seed.lifecycle.every((p) => openPhases[p.id]);
-  const togglePhase = (id: string) => setOpenPhases((prev) => ({ ...prev, [id]: !prev[id] }));
-  const setAll = (open: boolean) =>
-    setOpenPhases(Object.fromEntries(seed.lifecycle.map((p) => [p.id, open])));
+  const activePhase = rawPhases.find((ph) => derivePhaseState(ph, iso) === "in_progress") ?? null;
+  const lastPhase = rawPhases.length ? rawPhases[rawPhases.length - 1] : null;
+  const activeSprint = program.sprintStrip.find((sw) => sw.start <= iso && iso <= sw.end) ?? null;
 
   return (
     <AppLayout>
       <PageHeader
+        eyebrow="Plan"
         title="Lifecycle plan"
-        subtitle="End-to-end delivery blocks — from discovery through the October deliverable to the November 11, 2026 launch."
+        subtitle={`${total} phases from discovery to launch, with the exit criteria and gates each one has to clear.`}
       />
 
-      {/* KPI strip */}
-      <div
-        className="grid grid-cols-2 gap-3 px-4 py-4 sm:px-6 md:grid-cols-4"
-        style={{ borderBottom: "1px solid #dfe1e2", backgroundColor: "#f8f8f6" }}
-      >
-        <Kpi label="Phases complete" value={`${done} / ${total}`} sub={`${pctDone}% of program`} />
-        <Kpi
-          label="Active phase"
-          value={active > 0 ? "Phase 2 · Foundations" : "—"}
-          sub="S4 – S5"
-        />
-        <Kpi
-          label="October deliverable"
-          value="Phase 5 · UAT / PRR"
-          sub="Sep 28 – Oct 23 · code freeze"
-        />
-        <Kpi
-          label="Launch deadline"
-          value={program.keyDates.launchLabel}
-          sub="Phase 6 · ORR & launch"
-        />
-      </div>
+      <KpiStrip
+        items={[
+          {
+            label: "Phases complete",
+            value: `${done} / ${total}`,
+            sub: `${pctDone}% of program`,
+          },
+          {
+            label: "Active phase",
+            value: activePhase ? activePhase.id : "—",
+            sub: activePhase
+              ? `${activePhase.window} · ${activePhase.sprints}`
+              : "none in progress",
+            title: activePhase?.name,
+          },
+          {
+            label: "Current sprint",
+            value: activeSprint ? activeSprint.key : "—",
+            sub: activeSprint
+              ? `${shortDate(activeSprint.start)} – ${shortDate(activeSprint.end)}`
+              : "outside the strip",
+            title: activeSprint?.focus ?? undefined,
+          },
+          {
+            label: "Launch",
+            value: shortDate(program.keyDates.launch),
+            sub: lastPhase ? lastPhase.id : program.keyDates.launchLabel,
+            danger: true,
+          },
+        ]}
+      />
 
-      {/* Gantt-style timeline. Phases sized to their actual duration, milestones
-          as tick marks, "today" as a vertical line. Only rendered when the
-          program has real phase dates — a program with an empty lifecycle
-          config (there are none today, but the safety belongs here) hides
-          this section rather than drawing an empty axis. */}
-      <div className="px-4 pt-5 sm:px-6">
+      <div style={{ padding: "28px var(--kz-pad-x) 0 var(--kz-pad-x)" }}>
         <LifecycleTimeline program={program} />
       </div>
 
-      {/* Original equal-width strip: kept as the compact scan/jump index. Sized
-          panels above give proportional time; this one gives one-click jumps
-          to each phase card below. */}
-      <div className="px-4 pt-4 sm:px-6">
-        <div
-          className="flex items-stretch overflow-hidden rounded"
-          style={{ border: "1px solid #dfe1e2" }}
-        >
-          {seed.lifecycle.map((p) => {
-            const s = STATUS_STYLE[p.status];
-            return (
-              <a
-                key={p.id}
-                href={`#${p.id}`}
-                className="flex-1 px-3 py-2 text-[11px]"
-                style={{
-                  backgroundColor: s.bg,
-                  color: s.fg,
-                  borderRight: "1px solid #dfe1e2",
-                  textDecoration: "none",
-                }}
-              >
-                <div className="font-mono" style={{ fontSize: 10, opacity: 0.75 }}>
-                  {p.id} · {p.sprints}
-                </div>
-                <div
-                  className="mt-0.5 font-semibold"
-                  style={{ fontFamily: "Public Sans, system-ui, sans-serif", color: "#3a5a40" }}
-                >
-                  {p.name.replace(/^Phase \d+ · /, "")}
-                </div>
-                <div className="mt-0.5" style={{ fontSize: 10 }}>
-                  {p.window}
-                </div>
-              </a>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Phase cards */}
-      <div className="p-4 space-y-4 sm:p-6">
-        <div className="flex items-center justify-end gap-2 text-[11px]">
-          <button
-            type="button"
-            onClick={() => setAll(!allOpen)}
-            className="rounded px-2 py-1 font-semibold uppercase tracking-wide"
-            style={{ border: "1px solid #dfe1e2", backgroundColor: "#fff", color: "#3a5a40" }}
-          >
-            {allOpen ? "Collapse all" : "Expand all"}
-          </button>
-        </div>
-        {seed.lifecycle.map((p) => {
-          const s = STATUS_STYLE[p.status];
-          const isOpen = !!openPhases[p.id];
+      {/* Stacked phase frames sharing borders: one continuous sheet from
+          discovery to launch, with the phase in flight on the tinted fill. */}
+      <div
+        style={{
+          padding: "24px var(--kz-pad-x) 60px var(--kz-pad-x)",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        {seed.lifecycle.map((p, idx) => {
+          const status = statusOf(p.id);
+          const s = STATUS_TONE[status];
           return (
             <section
               id={p.id}
               key={p.id}
-              className="rounded-md bg-white"
-              style={{ border: "1px solid #e5e5e2", borderLeft: `4px solid ${s.bar}` }}
+              style={{
+                border: `1px solid ${KZ.bone}`,
+                borderTop: idx === 0 ? `1px solid ${KZ.bone}` : "none",
+                padding: "24px 28px",
+                background: status === "in_progress" ? KZ.grey050 : KZ.white,
+              }}
             >
-              <button
-                type="button"
-                onClick={() => togglePhase(p.id)}
-                aria-expanded={isOpen}
-                aria-controls={`${p.id}-body`}
-                className="flex w-full flex-wrap items-baseline gap-3 px-4 py-3 text-left"
+              <div
                 style={{
-                  borderBottom: isOpen ? "1px solid #eee" : "none",
-                  background: "transparent",
-                  cursor: "pointer",
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "baseline",
+                  gap: 14,
+                  borderBottom: `1px solid ${KZ.bone}`,
+                  paddingBottom: 14,
                 }}
               >
-                <span
-                  aria-hidden
-                  className="font-mono text-[12px]"
-                  style={{ color: "#565c65", width: 12, display: "inline-block" }}
+                <Mono
+                  size={11}
+                  tone={KZ.ink}
+                  style={{ border: `1px solid ${KZ.bone}`, padding: "4px 8px" }}
                 >
-                  {isOpen ? "▾" : "▸"}
-                </span>
-                <h2
-                  className="text-[16px] font-semibold"
-                  style={{ fontFamily: "Public Sans, system-ui, sans-serif", color: "#3a5a40" }}
-                >
-                  {p.name}
-                </h2>
-                <span
-                  className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                  style={{ backgroundColor: s.bg, color: s.fg }}
-                >
-                  {s.label}
-                </span>
-                <span className="font-mono text-[11px]" style={{ color: "#565c65" }}>
+                  {p.id}
+                </Mono>
+                <SectionTitle size={19}>{p.name.replace(/^Phase \d+ · /, "")}</SectionTitle>
+                <Mono size={11} tone={KZ.monoDate}>
                   {p.window} · {p.sprints}
-                </span>
-                {p.milestone ? (
-                  <span
-                    className="ml-auto rounded px-2 py-0.5 text-[11px] font-semibold"
-                    style={{ backgroundColor: "#3a5a40", color: "#ffbe2e" }}
+                </Mono>
+                {p.milestone ? <Mono size={10.5}>{p.milestone}</Mono> : null}
+                <Tag tone={s.tone} style={{ marginLeft: "auto" }}>
+                  {s.label}
+                </Tag>
+              </div>
+
+              <p
+                style={{
+                  margin: "16px 0 0 0",
+                  fontSize: 14,
+                  lineHeight: 1.55,
+                  maxWidth: "80ch",
+                  color: KZ.body,
+                  textWrap: "pretty",
+                }}
+              >
+                {p.goal}
+              </p>
+
+              <div
+                style={{
+                  marginTop: 20,
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))",
+                  gap: 24,
+                }}
+              >
+                <div>
+                  <Eyebrow size={10}>Exit criteria</Eyebrow>
+                  <List
+                    style={{
+                      marginTop: 10,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                    }}
                   >
-                    {p.milestone}
-                  </span>
-                ) : null}
-              </button>
-
-              {isOpen ? (
-                <div id={`${p.id}-body`} className="px-4 pt-3 pb-4">
-                  <p className="text-[13px]" style={{ color: "#333" }}>
-                    <strong style={{ color: "#3a5a40" }}>Goal.</strong> {p.goal}
-                  </p>
-
-                  <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div>
-                      <h3
-                        className="mb-2 text-[11px] font-semibold uppercase tracking-wide"
-                        style={{ color: "#565c65" }}
-                      >
-                        Big blocks
-                      </h3>
-                      <ul className="space-y-2">
-                        {p.blocks.map((b, i) => {
-                          const bs = STATUS_STYLE[b.status];
-                          return (
-                            <li
-                              key={i}
-                              className="rounded p-2"
-                              style={{
-                                border: "1px solid #eee",
-                                borderLeft: `3px solid ${workstreamOf(b.ws, program).color}`,
-                              }}
-                            >
-                              <div className="flex items-center gap-2">
-                                <WsTag ws={b.ws as WorkstreamKey} />
-                                <span
-                                  className="text-[13px] font-semibold"
-                                  style={{ color: "#3a5a40" }}
-                                >
-                                  {b.title}
-                                </span>
-                                <span
-                                  className="ml-auto rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase"
-                                  style={{ backgroundColor: bs.bg, color: bs.fg }}
-                                >
-                                  {bs.label}
-                                </span>
-                              </div>
-                              <p className="mt-1 text-[12px]" style={{ color: "#3a3a3a" }}>
-                                {b.detail}
-                              </p>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div>
-                        <h3
-                          className="mb-2 text-[11px] font-semibold uppercase tracking-wide"
-                          style={{ color: "#565c65" }}
-                        >
-                          Exit criteria
-                        </h3>
-                        <ul className="space-y-1 text-[13px]" style={{ color: "#333" }}>
-                          {p.exitCriteria.map((c, i) => (
-                            <li key={i} className="flex gap-2">
-                              <span style={{ color: s.bar }}>▸</span>
-                              <span>{c}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div>
-                        <h3
-                          className="mb-2 text-[11px] font-semibold uppercase tracking-wide"
-                          style={{ color: "#565c65" }}
-                        >
-                          Gates
-                        </h3>
-                        <div className="flex flex-wrap gap-1.5">
-                          {p.gates.map((g, i) => (
-                            <span
-                              key={i}
-                              className="rounded px-2 py-0.5 text-[11px]"
-                              style={{
-                                backgroundColor: "#f0f0f0",
-                                color: "#333",
-                                border: "1px solid #dfe1e2",
-                              }}
-                            >
-                              {g}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                    {p.exitCriteria.map((c) => (
+                      <Bullet key={c} tone={KZ.bone}>
+                        {c}
+                      </Bullet>
+                    ))}
+                  </List>
+                  <Disclosure>Not individually tracked in any source</Disclosure>
                 </div>
-              ) : null}
+
+                <div>
+                  <Eyebrow size={10}>Gates</Eyebrow>
+                  <List
+                    style={{
+                      marginTop: 10,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                    }}
+                  >
+                    {p.gates.map((g) => (
+                      <li
+                        key={g}
+                        style={{
+                          fontFamily: "var(--font-mono)",
+                          fontSize: 11.5,
+                          lineHeight: 1.45,
+                          color: KZ.ink,
+                        }}
+                      >
+                        {g}
+                      </li>
+                    ))}
+                  </List>
+                </div>
+
+                {/* The plan's own big blocks, kept because they are the only
+                    place the phase says which workstream carries what. */}
+                {p.blocks.length ? (
+                  <div>
+                    <Eyebrow size={10}>Big blocks</Eyebrow>
+                    <List
+                      style={{
+                        marginTop: 10,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 12,
+                      }}
+                    >
+                      {p.blocks.map((b) => {
+                        const bs = STATUS_TONE[b.status];
+                        return (
+                          <li key={`${b.ws}-${b.title}`}>
+                            <div
+                              style={{
+                                display: "flex",
+                                flexWrap: "wrap",
+                                alignItems: "center",
+                                gap: 8,
+                              }}
+                            >
+                              <WsTag ws={b.ws as WorkstreamKey} />
+                              <span style={{ fontSize: 13.5, fontWeight: 500 }}>{b.title}</span>
+                              <Tag tone={bs.tone} style={{ marginLeft: "auto" }}>
+                                {bs.label}
+                              </Tag>
+                            </div>
+                            <p
+                              style={{
+                                margin: "6px 0 0 0",
+                                fontSize: 13,
+                                lineHeight: 1.45,
+                                color: KZ.body,
+                              }}
+                            >
+                              {b.detail}
+                            </p>
+                          </li>
+                        );
+                      })}
+                    </List>
+                  </div>
+                ) : null}
+              </div>
             </section>
           );
         })}
@@ -291,19 +287,33 @@ function LifecyclePage() {
   );
 }
 
+/** Reserved height at the bottom of the plot for milestone keys + month axis. */
+const AXIS_BAND = 56;
+
 /**
- * Proportional timeline of phases with milestones and "today" as an overlay.
- *
- * Positions are percentages of the program window (earliest phase start →
- * latest phase end, or the launch date if it falls past that). Every element
- * that renders past the window is clipped rather than drawn off-canvas — the
- * chart is a proportional read of what's in front of us, not a scroll.
- *
- * A milestone that falls outside the window (e.g. a post-launch date not
- * covered by any phase) is silently omitted rather than glued to an edge,
- * because a tick at 100% would read as "same day as launch" and lie.
+ * A milestone label short enough to sit on a tick without colliding. The full
+ * label and date stay on the tooltip, and the phase frames below carry the same
+ * dates in full.
  */
+function shortMilestoneKey(label: string): string {
+  const sprint = label.match(/sprint\s*(\d+)/i);
+  if (sprint) return `S${sprint[1]}`;
+  if (/launch/i.test(label)) return "Launch";
+  if (/uat/i.test(label)) return "UAT";
+  if (/production|hardening/i.test(label)) return "Prod";
+  return label.split(/[\s·]+/)[0];
+}
+
 type ProgramLike = ReturnType<typeof useProgram>;
+
+/**
+ * Proportional timeline: phases sized to their real duration, milestones as
+ * ticks, today as a coral line.
+ *
+ * Positions are percentages of the program window. Anything outside it is
+ * omitted rather than clamped to an edge — a tick at 100% would read as "same
+ * day as launch" and lie.
+ */
 function LifecycleTimeline({ program }: { program: ProgramLike }) {
   const phases = lifecyclePhasesFor(program);
   if (phases.length === 0) return null;
@@ -321,48 +331,45 @@ function LifecycleTimeline({ program }: { program: ProgramLike }) {
   };
 
   const todayInside = iso >= windowStart && iso <= windowEnd;
-  const milestones = upcomingMilestones(program, windowStart).filter(
+  const milestones = upcomingMilestones(program, windowStart, 12).filter(
     (m) => m.date >= windowStart && m.date <= windowEnd,
   );
-
   const monthTicks = monthMarkers(windowStart, windowEnd);
 
   return (
-    <section
-      className="rounded-md bg-white p-4"
-      style={{ border: "1px solid #e5e5e2" }}
-    >
-      <div className="mb-3 flex items-baseline justify-between">
-        <h2
-          className="text-sm font-semibold"
-          style={{ color: "#3a5a40", fontFamily: "Public Sans, system-ui, sans-serif" }}
-        >
-          Timeline · {shortDate(windowStart)} – {shortDate(windowEnd)}
-        </h2>
-        <span className="text-[11px]" style={{ color: "#565c65" }}>
-          Bars sized to phase duration · milestones as ticks · today line
-        </span>
-      </div>
+    <Panel>
+      <PanelHead
+        label={`Timeline · ${shortDate(windowStart)} – ${shortDate(windowEnd)}`}
+        right="bars sized to phase duration"
+      />
 
-      <div className="relative" style={{ height: 24 + 34 * phases.length + 40 }}>
-        {/* Month gridlines. Faint verticals so the eye can measure spans
-            without a full ruler. */}
+      <div style={{ position: "relative", height: 24 + 34 * phases.length + AXIS_BAND }}>
+        {/* Month gridlines: faint verticals so the eye can measure spans
+            without a full ruler. They stop at the axis band. */}
         {monthTicks.map((t) => (
           <div
             key={`gl-${t.iso}`}
-            className="absolute top-0 bottom-10"
             style={{
+              position: "absolute",
+              top: 0,
               left: `${pct(t.iso)}%`,
+              bottom: AXIS_BAND,
               width: 1,
-              backgroundColor: "#f0f0ec",
+              background: KZ.grey200,
             }}
           />
         ))}
 
-        {/* Phase bars, stacked one row per phase. */}
         {phases.map((p, idx) => {
           const state = derivePhaseState(p, iso);
-          const s = STATUS_STYLE[state];
+          const s =
+            STATUS_TONE[
+              state === "in_progress"
+                ? "in_progress"
+                : state === "complete"
+                  ? "complete"
+                  : "upcoming"
+            ];
           const left = pct(p.startsOn);
           const right = pct(p.endsOn);
           const width = Math.max(1, right - left);
@@ -370,50 +377,60 @@ function LifecycleTimeline({ program }: { program: ProgramLike }) {
             <a
               key={p.id}
               href={`#${p.id}`}
-              className="absolute rounded"
               style={{
+                position: "absolute",
                 top: 24 + idx * 34,
                 left: `${left}%`,
                 width: `${width}%`,
                 height: 26,
-                backgroundColor: s.bar,
-                opacity: state === "upcoming" ? 0.55 : 1,
-                textDecoration: "none",
+                // Hairline bars, filled only for the phase in flight: an
+                // upcoming phase is a plan, not a fact.
+                border: `1px solid ${s.tone}`,
+                background: state === "in_progress" ? s.tone : KZ.white,
                 overflow: "hidden",
               }}
               title={`${p.name} · ${p.window}`}
             >
               <div
-                className="truncate px-2 py-1 text-[11px] font-semibold"
-                style={{ color: "#ffffff" }}
+                className="truncate"
+                style={{
+                  padding: "5px 8px",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 10,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.02em",
+                  color: state === "in_progress" ? KZ.white : s.tone,
+                }}
               >
-                {p.name.replace(/^Phase \d+ · /, "")}
+                {p.id} · {p.name.replace(/^Phase \d+ · /, "")}
               </div>
             </a>
           );
         })}
 
-        {/* Today line — only when today falls inside the plotted window;
-            outside it, a tick clamped to the edge would misread as "today is
-            launch day." */}
+        {/* Today, only when it falls inside the plotted window: a tick clamped
+            to the edge would misread as "today is launch day". */}
         {todayInside ? (
           <>
             <div
-              className="absolute top-0"
               style={{
+                position: "absolute",
+                top: 0,
                 left: `${pct(iso)}%`,
-                width: 2,
+                width: 1,
                 bottom: 40,
-                backgroundColor: "#b3261e",
+                background: KZ.coral,
               }}
             />
             <div
-              className="absolute rounded px-1.5 py-0.5 text-[10px] font-semibold"
               style={{
-                left: `calc(${pct(iso)}% - 20px)`,
-                top: 4,
-                backgroundColor: "#b3261e",
-                color: "#ffffff",
+                position: "absolute",
+                left: `calc(${pct(iso)}% - 18px)`,
+                top: 0,
+                fontFamily: "var(--font-mono)",
+                fontSize: 10,
+                textTransform: "uppercase",
+                color: KZ.coral,
               }}
             >
               today
@@ -421,49 +438,50 @@ function LifecycleTimeline({ program }: { program: ProgramLike }) {
           </>
         ) : null}
 
-        {/* Milestone ticks along the bottom. Labels stack vertically-offset to
-            avoid overlap when two milestones are close in time. */}
-        {milestones.map((m, i) => (
+        {milestones.map((m) => (
           <div
             key={`ms-${m.date}-${m.label}`}
-            className="absolute"
-            style={{ left: `${pct(m.date)}%`, bottom: 0 }}
+            style={{ position: "absolute", left: `${pct(m.date)}%`, bottom: AXIS_BAND - 24 }}
+            title={`${m.label} · ${shortDate(m.date)}`}
           >
             <div
               style={{
-                width: 2,
-                height: 24,
-                backgroundColor: "#3a5a40",
+                width: 1,
+                height: 22,
+                background: KZ.ink,
                 position: "absolute",
                 left: -1,
-                bottom: 16,
+                bottom: 0,
               }}
             />
             <div
-              className="absolute whitespace-nowrap text-[10px] font-medium"
               style={{
-                color: "#3a5a40",
-                bottom: -2 + (i % 2 === 0 ? 0 : 12),
-                left: 4,
+                position: "absolute",
+                bottom: -14,
+                transform: "translateX(-50%)",
+                whiteSpace: "nowrap",
+                fontFamily: "var(--font-mono)",
+                fontSize: 10,
+                color: KZ.ink,
               }}
-              title={`${m.label} · ${m.date}`}
             >
-              {m.label} · {shortDate(m.date)}
+              {shortMilestoneKey(m.label)}
             </div>
           </div>
         ))}
 
-        {/* Bottom axis: month labels aligned to the tick lines. */}
         {monthTicks.map((t) => (
           <div
             key={`ml-${t.iso}`}
-            className="absolute text-[10px]"
             style={{
+              position: "absolute",
               left: `${pct(t.iso)}%`,
-              bottom: -18,
-              color: "#8a8a80",
+              bottom: 0,
               transform: "translateX(-50%)",
               whiteSpace: "nowrap",
+              fontFamily: "var(--font-mono)",
+              fontSize: 10,
+              color: KZ.muted,
             }}
           >
             {t.label}
@@ -471,41 +489,42 @@ function LifecycleTimeline({ program }: { program: ProgramLike }) {
         ))}
       </div>
 
-      <div className="mt-2 flex items-center gap-4 text-[10px]" style={{ color: "#8a8a80" }}>
-        <span className="inline-flex items-center gap-1">
-          <span className="inline-block h-2 w-2 rounded" style={{ backgroundColor: STATUS_STYLE.complete.bar }} /> complete
+      <div
+        style={{
+          marginTop: 16,
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 16,
+        }}
+      >
+        {(["complete", "in_progress", "upcoming"] as PhaseStatus[]).map((k) => (
+          <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <Square tone={STATUS_TONE[k].tone} filled={k === "in_progress"} />
+            <Mono size={10}>{STATUS_TONE[k].label.toLowerCase()}</Mono>
+          </span>
+        ))}
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <Square tone={KZ.coral} filled />
+          <Mono size={10}>today</Mono>
         </span>
-        <span className="inline-flex items-center gap-1">
-          <span className="inline-block h-2 w-2 rounded" style={{ backgroundColor: STATUS_STYLE.in_progress.bar }} /> in progress
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <span
-            className="inline-block h-2 w-2 rounded"
-            style={{ backgroundColor: STATUS_STYLE.upcoming.bar, opacity: 0.55 }}
-          />{" "}
-          upcoming
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <span className="inline-block h-2 w-2" style={{ backgroundColor: "#b3261e" }} /> today
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <span className="inline-block h-2 w-2" style={{ backgroundColor: "#3a5a40" }} /> milestone
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <Square tone={KZ.ink} filled />
+          <Mono size={10}>milestone</Mono>
         </span>
       </div>
-    </section>
+    </Panel>
   );
 }
 
 /**
  * Month boundaries within a window, for axis labels. Emits the first of each
- * month falling in [startIso, endIso], plus the window start if it isn't
- * itself the first — this keeps the leftmost label anchored.
+ * month falling inside it, which keeps the leftmost label anchored.
  */
 function monthMarkers(startIso: string, endIso: string): { iso: string; label: string }[] {
   const out: { iso: string; label: string }[] = [];
   const start = localDate(startIso);
   const end = localDate(endIso);
-  // Start at the first of the month at or after startIso.
   let cursor = new Date(start.getFullYear(), start.getMonth(), 1);
   if (cursor.getTime() < start.getTime()) {
     cursor = new Date(start.getFullYear(), start.getMonth() + 1, 1);
@@ -520,31 +539,4 @@ function monthMarkers(startIso: string, endIso: string): { iso: string; label: s
     cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
   }
   return out;
-}
-
-// Kept-legacy note: LifecyclePhase type is imported for the timeline helpers
-// even though it's only structurally used here — importing keeps the intent
-// obvious to a reader following the phase-shape.
-type _KeepLifecyclePhase = LifecyclePhase;
-
-function Kpi({ label, value, sub }: { label: string; value: string; sub: string }) {
-  return (
-    <div className="rounded-md bg-white p-3" style={{ border: "1px solid #dfe1e2" }}>
-      <div
-        className="text-[10px] font-semibold uppercase tracking-wide"
-        style={{ color: "#565c65" }}
-      >
-        {label}
-      </div>
-      <div
-        className="mt-1 text-[15px] font-semibold"
-        style={{ fontFamily: "Public Sans, system-ui, sans-serif", color: "#3a5a40" }}
-      >
-        {value}
-      </div>
-      <div className="mt-0.5 text-[11px]" style={{ color: "#565c65" }}>
-        {sub}
-      </div>
-    </div>
-  );
 }

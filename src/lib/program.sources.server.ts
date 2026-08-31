@@ -14,10 +14,13 @@
 //     exists, spans two teams (REC and DEP), and is the team's actual issue
 //     register. Corrected below. The lesson kept: verify a source is absent
 //     rather than inferring absence from the program type.
-//  2. Granola is not scoped the same way twice. The VA program is a folder.
-//     Ventura is identified by participant email domain, because that is how the
-//     meetings actually cohere — six Ventura calls in the last 30 days all carry
-//     venturacounty.gov or ventura.org attendees and belong to no shared folder.
+//  2. Granola cannot be scoped by folder. The VA program has one
+//     (fol_QyIIASIUKJmme3, "VA Project") but a folder-scoped read is refused at
+//     the workspace-policy level, and listing folders returns an empty set for
+//     this account — so the folder id is reference-only and every read is scoped
+//     by time first, then narrowed by attendee domain and note title. Ventura
+//     was already scoped that way: its six calls in the last 30 days cohere by
+//     venturacounty.gov / ventura.org attendees and belong to no shared folder.
 
 export interface LinearSource {
   projectId: string;
@@ -27,10 +30,32 @@ export interface LinearSource {
   itemNoun: string;
 }
 
-/** Granola scoping. Exactly one of these forms, never both. */
-export type GranolaSource =
-  | { kind: "folder"; folderId: string; label: string; itemNoun: string }
-  | { kind: "participantDomains"; domains: string[]; label: string; itemNoun: string };
+/**
+ * Granola scoping.
+ *
+ * Granola has no concept of a program, and the one structural handle it does
+ * offer — folders — is not readable for this account. So the cut is: a time
+ * window first (the API's own primary filter), then narrowing on what the notes
+ * actually carry. A program that narrows on nothing gets every note in the
+ * window, which is honest but rarely what you want, so both narrowing fields are
+ * required rather than optional.
+ */
+export interface GranolaSource {
+  /** How far back to read. The first and cheapest cut. */
+  windowDays: number;
+  /** Attendee email domains that identify this program. Empty = no narrowing. */
+  domains: string[];
+  /** Note-title pattern for this program. Null = no narrowing. */
+  titleMatch: RegExp | null;
+  /**
+   * The program's Granola folder, for reference only. Folder-scoped reads are
+   * refused for this account, so nothing sends this — it is kept so the id is
+   * not lost, and so a future account with folder access has it to hand.
+   */
+  folderId: string | null;
+  label: string;
+  itemNoun: string;
+}
 
 export interface NotionSource {
   rootPageId: string;
@@ -97,9 +122,15 @@ const VA_SOURCES: ProgramSources = {
     itemNoun: process.env.LINEAR_ITEM_NOUN ?? "DEP issues",
   },
   granola: {
-    kind: "folder",
+    windowDays: Number(process.env.GRANOLA_WINDOW_DAYS ?? 30),
+    // The calls that constitute this program: VA and GovCIO attendees, plus
+    // Kaizen's own people on VA calls — which is why the title pattern carries
+    // the load and the domains only confirm.
+    domains: ["va.gov", "govcio.com", "soldierpoint.com"],
+    // Measured against a real 30-day pull: 52 of 55 notes match this.
+    titleMatch: /\bVA\b|veteran|govcio|\bWS[1-5]\b|my ?va|cross-?workstream|DEP-/i,
     folderId: process.env.GRANOLA_FOLDER_ID ?? "fol_QyIIASIUKJmme3",
-    label: process.env.GRANOLA_FOLDER_LABEL ?? "VA Project",
+    label: process.env.GRANOLA_LABEL ?? "VA calls (last 30 days)",
     itemNoun: process.env.GRANOLA_ITEM_NOUN ?? "VA notes",
   },
   notion: {
@@ -124,9 +155,12 @@ const VENTURA_SOURCES: ProgramSources = {
     itemNoun: "Ventura issues",
   },
   granola: {
-    kind: "participantDomains",
+    windowDays: Number(process.env.VENTURA_GRANOLA_WINDOW_DAYS ?? 30),
     domains: ["venturacounty.gov", "ventura.org"],
-    label: "Ventura County (by participant domain)",
+    titleMatch: /ventura|zion|campground|parks/i,
+    // This account keeps no Ventura folder — the calls cohere by attendee.
+    folderId: null,
+    label: "Ventura calls (last 30 days)",
     itemNoun: "Ventura notes",
   },
   notion: {
@@ -158,19 +192,7 @@ export function sourcesFor(programId: string): ProgramSources {
   return hit;
 }
 
-/**
- * Back-compat alias for the active program's sources. Existing call sites in
- * sync.server.ts read SOURCES.linear.projectId and friends; keeping this means
- * the multi-program registry lands without rewriting the sync layer in the same
- * change.
- */
-export const SOURCES = {
-  gatewayUrl: GATEWAY_URL,
-  linear: VA_SOURCES.linear!,
-  granola: {
-    folderId: (VA_SOURCES.granola as { folderId: string }).folderId,
-    folderLabel: VA_SOURCES.granola!.label,
-    itemNoun: VA_SOURCES.granola!.itemNoun,
-  },
-  notion: VA_SOURCES.notion!,
-} as const;
+// The SOURCES back-compat alias is gone with sync.server.ts, its only caller.
+// It pinned VA's sources at module scope and encoded the folder-only Granola
+// shape, so leaving it would have been a second, stale answer to "what does this
+// program read from".

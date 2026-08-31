@@ -22,7 +22,7 @@ export const ARTIFACTS: ArtifactMeta[] = [
     kind: "rollup",
     title: "Weekly status rollup",
     description:
-      "Where the program stands, what gates are coming, and the open risk register. Markdown, for pasting into Notion or an email.",
+      "Where the program stands, the gates coming up, and every open risk. Markdown, so it pastes straight into Notion or an email.",
     filename: "weekly-rollup.md",
     mime: "text/markdown",
   },
@@ -30,7 +30,7 @@ export const ARTIFACTS: ArtifactMeta[] = [
     kind: "sprint-rollup",
     title: "Sprint status rollup",
     description:
-      "Task-oriented, checkbox-driven view of the current sprint (or phase). Grouped by workstream, includes a waiting-on-external table and an in-flight watch list. Markdown, drops cleanly into Notion.",
+      "The current sprint as checkboxes, grouped by workstream, with a table of what you are waiting on from outside and a watch list of what is in flight. Markdown, drops cleanly into Notion.",
     filename: "sprint-rollup.md",
     mime: "text/markdown",
   },
@@ -38,7 +38,7 @@ export const ARTIFACTS: ArtifactMeta[] = [
     kind: "project-plan",
     title: "Project plan",
     description:
-      "Lifecycle phases with their Definition of Done and stage gates, the milestone schedule, workstream owners, and gate readiness.",
+      "Every lifecycle phase with its Definition of Done and stage gates, plus the milestone schedule and who owns each workstream.",
     filename: "project-plan.docx",
     mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   },
@@ -46,7 +46,7 @@ export const ARTIFACTS: ArtifactMeta[] = [
     kind: "poam",
     title: "POA&M",
     description:
-      "The risk register on the 26 FedRAMP columns. Columns with no source are marked, never inferred.",
+      "The risk register mapped onto the 26 FedRAMP columns. A column with no source says so, and nothing is inferred to fill it.",
     filename: "poam.xlsx",
     mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   },
@@ -133,5 +133,72 @@ export const generateArtifact = createServerFn({ method: "POST" })
       data: Buffer.from(out.bytes).toString("base64"),
       emptyColumns: out.emptyColumns,
       rowCount: out.rowCount,
+    };
+  });
+
+/**
+ * What the sources look like before you generate anything.
+ *
+ * Provenance used to appear only after a document had already been written and
+ * downloaded — you learned it had three unsourced sections once it was in your
+ * Downloads folder, which is the wrong order for something that goes to a
+ * customer. This is the same assembly, reported rather than rendered: no bytes
+ * are produced and nothing is written.
+ */
+export interface SourceReadiness {
+  asOf: string;
+  sources: Array<{ key: string; ok: boolean; message: string }>;
+  /** Sections the model knows it has no source for. */
+  unsourced: string[];
+  freshestSourceAt: string | null;
+  counts: { workItems: number; risks: number; milestones: number; phases: number };
+  /** Which artifacts this program declares itself able to produce. */
+  applicable: ArtifactKind[];
+}
+
+export const getSourceReadiness = createServerFn({ method: "GET" })
+  .inputValidator((programId: string) => programId)
+  .handler(async ({ data: programId }): Promise<SourceReadiness> => {
+    const { assembleProgramModel } = await import("./program-model.server");
+    const { programById } = await import("./program.config");
+    const { model, sources } = await assembleProgramModel(programId);
+    const program = programById(programId);
+    return {
+      asOf: new Date().toISOString().slice(0, 10),
+      sources,
+      unsourced: model.meta.unsourced,
+      freshestSourceAt: model.meta.freshestSourceAt,
+      counts: {
+        workItems: model.workItems.length,
+        risks: model.risks.length,
+        milestones: model.milestones.length,
+        phases: model.phases.length,
+      },
+      applicable: program.artifacts as ArtifactKind[],
+    };
+  });
+
+/**
+ * Generate without downloading, for preview.
+ *
+ * Markdown artifacts return their text so the page can show the actual document
+ * before it lands on disk. Binary ones (.docx, .xlsx) return null text — there
+ * is no honest way to render OOXML inline, and faking a preview of a document
+ * you cannot actually display would be worse than saying so.
+ */
+export interface ArtifactPreview {
+  artifact: GeneratedArtifact;
+  /** Decoded document text, or null when the format is binary. */
+  text: string | null;
+}
+
+export const previewArtifact = createServerFn({ method: "POST" })
+  .inputValidator((input: GenerateArtifactInput) => input)
+  .handler(async ({ data }): Promise<ArtifactPreview> => {
+    const artifact = await generateArtifact({ data });
+    const isText = artifact.mime === "text/markdown";
+    return {
+      artifact,
+      text: isText ? Buffer.from(artifact.data, "base64").toString("utf8") : null,
     };
   });

@@ -5,27 +5,74 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Design system definition.
+ * Design system definition — Kaizen Labs, light mode.
  *
- * The @theme inline block maps CSS custom properties to Tailwind utility
- * classes (e.g. --color-primary -> bg-primary, text-primary).
+ * Two layers:
  *
- * The :root and .dark blocks define the actual color values using oklch.
- * All colors MUST use oklch format.
+ * 1. The --kz-* tokens below are the Kaizen palette, held as exact hex. They
+ *    are the source of truth for this UI: the handoff specifies exact values,
+ *    and a round-trip through oklch would only blur them.
+ * 2. The shadcn/Tailwind semantic vars (--background, --border, …) are mapped
+ *    onto those tokens so the vendored ui/* primitives inherit the same look
+ *    instead of carrying a second palette.
  *
- * To add a new semantic color:
- * 1. Add the variable to :root (light value) and .dark (dark value)
- * 2. Register it in @theme inline as --color-<name>: var(--<name>)
+ * Geometry is flat by rule: --radius is 0 everywhere, no shadows, 1px borders.
+ * Only three border weights exist — #DBDBD9 for panel frames, #161616 for a
+ * panel's own header rule and the header/KPI separators, #ECECEC for row
+ * dividers inside a panel.
  */
 
+@theme {
+  /* Suisse Int'l is licensed and not vendored here, so both families fall back
+     to the closest system faces. Dropping the woff2 files into public/ and
+     adding @font-face is the only change needed to get the real thing. */
+  --font-sans: "Suisse Int'l", Inter, "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+  --font-mono: "Suisse Int'l Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+  /* The Cedar shell had a third, display family (Poppins). This design has two,
+     so --font-display is kept only as an alias for the customer-facing routes
+     that still reference it, and resolves to the same sans. */
+  --font-display: "Suisse Int'l", Inter, "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+
+  /* Ground and ink */
+  --color-kz-graphite: #202020;
+  --color-kz-ink: #161616;
+  --color-kz-white: #ffffff;
+
+  /* Hairlines and fills */
+  --color-kz-bone: #dbdbd9;
+  --color-kz-grey-200: #ececec;
+  --color-kz-grey-050: #f6f7f7;
+  --color-kz-grey-400: #b7b7b7;
+
+  /* Text greys */
+  --color-kz-grey-700: #7c7878;
+  --color-kz-grey-800: #4b4b4b;
+  --color-kz-mono-date: #646464;
+
+  /* Semantics — the only colour in the design */
+  --color-kz-blue-700: #325aac;
+  --color-kz-blue-t-500: #5f9fff;
+  --color-kz-coral-900: #fb4938;
+  --color-kz-amber: #8a5a00;
+  --color-kz-green: #2e8540;
+
+  /* Workstream identity (badge border + text) */
+  --color-kz-ws1: #325aac;
+  --color-kz-ws2: #4b4b4b;
+  --color-kz-ws3: #183e71;
+  --color-kz-ws4: #8a5a00;
+  --color-kz-ws5: #2e8540;
+  --color-kz-ws-admin: #7c7878;
+}
+
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
+  --radius-xl: var(--radius);
+  --radius-2xl: var(--radius);
+  --radius-3xl: var(--radius);
+  --radius-4xl: var(--radius);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -62,85 +109,81 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.984 0.003 247.858);
-  --sidebar-foreground: oklch(0.129 0.042 264.695);
-  --sidebar-primary: oklch(0.208 0.042 265.755);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.968 0.007 247.896);
-  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
-  --sidebar-border: oklch(0.929 0.013 255.508);
-  --sidebar-ring: oklch(0.704 0.04 256.788);
+  /* Radius 0 everywhere. No exceptions in this design: inputs, buttons, cards,
+     badges and checkboxes are all square. */
+  --radius: 0px;
+
+  /* Page gutter. 40px is the design's measure at ~1440px; on a phone that
+     would spend a fifth of the viewport on margin, so it narrows. Every page
+     body, header and filter strip reads this rather than hardcoding 40px. */
+  --kz-pad-x: 40px;
+
+  --background: #ffffff;
+  --foreground: #161616;
+  --card: #ffffff;
+  --card-foreground: #161616;
+  --popover: #ffffff;
+  --popover-foreground: #161616;
+  --primary: #161616;
+  --primary-foreground: #ffffff;
+  --secondary: #f6f7f7;
+  --secondary-foreground: #161616;
+  --muted: #f6f7f7;
+  --muted-foreground: #7c7878;
+  --accent: #f6f7f7;
+  --accent-foreground: #161616;
+  --destructive: #fb4938;
+  --destructive-foreground: #ffffff;
+  --border: #dbdbd9;
+  --input: #dbdbd9;
+  --ring: #161616;
+  --chart-1: #325aac;
+  --chart-2: #2e8540;
+  --chart-3: #8a5a00;
+  --chart-4: #183e71;
+  --chart-5: #fb4938;
+  --sidebar: #202020;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #5f9fff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(255, 255, 255, 0.14);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(255, 255, 255, 0.14);
+  --sidebar-ring: #5f9fff;
 }
 
+/*
+ * No dark theme. This is a light-mode identity; the graphite rail is the dark
+ * surface and it is dark in every theme. The block is kept so the `dark:`
+ * variant and the vendored ui/* primitives resolve to something sane if a
+ * component ever renders inside a .dark subtree.
+ */
 .dark {
-  --background: oklch(0.129 0.042 264.695);
-  --foreground: oklch(0.984 0.003 247.858);
-  --card: oklch(0.208 0.042 265.755);
-  --card-foreground: oklch(0.984 0.003 247.858);
-  --popover: oklch(0.208 0.042 265.755);
-  --popover-foreground: oklch(0.984 0.003 247.858);
-  --primary: oklch(0.929 0.013 255.508);
-  --primary-foreground: oklch(0.208 0.042 265.755);
-  --secondary: oklch(0.279 0.041 260.031);
-  --secondary-foreground: oklch(0.984 0.003 247.858);
-  --muted: oklch(0.279 0.041 260.031);
-  --muted-foreground: oklch(0.704 0.04 256.788);
-  --accent: oklch(0.279 0.041 260.031);
-  --accent-foreground: oklch(0.984 0.003 247.858);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.551 0.027 264.364);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.208 0.042 265.755);
-  --sidebar-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.279 0.041 260.031);
-  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.551 0.027 264.364);
+  --background: #ffffff;
+  --foreground: #161616;
+  --card: #ffffff;
+  --card-foreground: #161616;
+  --popover: #ffffff;
+  --popover-foreground: #161616;
+  --primary: #161616;
+  --primary-foreground: #ffffff;
+  --secondary: #f6f7f7;
+  --secondary-foreground: #161616;
+  --muted: #f6f7f7;
+  --muted-foreground: #7c7878;
+  --accent: #f6f7f7;
+  --accent-foreground: #161616;
+  --destructive: #fb4938;
+  --destructive-foreground: #ffffff;
+  --border: #dbdbd9;
+  --input: #dbdbd9;
+  --ring: #161616;
 }
 
-@theme {
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
-  --font-display: "Poppins", "Inter", system-ui, sans-serif;
-  --color-kaizen-forest: #3a5a40;
-  --color-kaizen-forest-deep: #2d4a33;
-  /* Internal-tool nav chrome (green) — mirrors Cedar's admin shell,
-     kept green to signal internal vs. the external product. */
-  --color-nav: #1f3d2b;
-  --color-nav-deep: #18301f;
+@media (max-width: 900px) {
+  :root {
+    --kz-pad-x: 16px;
+  }
 }
 
 @layer base {
@@ -148,102 +191,124 @@
     border-color: var(--color-border);
   }
 
-  html, body {
-    font-family: "Inter", system-ui, -apple-system, sans-serif;
-    background-color: var(--color-background);
-    color: var(--color-foreground);
+  html,
+  body {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    background-color: var(--color-kz-white);
+    color: var(--color-kz-ink);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a {
+    color: var(--color-kz-blue-700);
+    text-decoration: none;
+  }
+  a:hover {
+    opacity: 0.7;
+  }
+
+  ::selection {
+    background: #febdb8;
+  }
+
+  /* Focus is a 1px offset hairline in ink. No rings, no glows, no scale. */
+  :focus-visible {
+    outline: 1px solid var(--color-kz-ink);
+    outline-offset: 1px;
+  }
+
+  /* Square by default, including the vendored primitives. */
+  input,
+  textarea,
+  select,
+  button {
+    border-radius: 0;
+    font-family: inherit;
   }
 }
 
 /*
- * Cedar-style component classes — opt-in look/feel matching the admin
- * dashboard (search bars, action buttons, data tables). Content pages can
- * adopt these incrementally; the shell (sidebar/header) already uses them.
+ * Kaizen component classes.
+ *
+ * Deliberately few: the design is hairlines, mono labels and square edges, so
+ * most of it is expressed by the primitives in components/kz.tsx rather than by
+ * utility classes. What lives here is the handful of things that need a real
+ * CSS rule — transitions, hover, and the mono-label recipe used everywhere.
  */
 @layer components {
-  .cedar-title {
-    font-family: var(--font-display);
-    font-weight: 600;
-    letter-spacing: -0.01em;
-    color: #1b1b1b;
+  /* Motion is on background and opacity only. */
+  .kz-transition {
+    transition: background 160ms cubic-bezier(0.2, 0, 0, 1),
+      opacity 160ms cubic-bezier(0.2, 0, 0, 1);
   }
 
-  .cedar-search {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  .kz-hover-fade:hover {
+    opacity: 0.7;
+  }
+
+  /* Mono label: eyebrows, panel headers, badges, counts, dates, IDs. */
+  .kz-mono {
+    font-family: var(--font-mono);
+    font-variant-ligatures: none;
+  }
+
+  .kz-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--color-kz-grey-700);
+  }
+
+  /* The one tinted panel fill. */
+  .kz-tint {
+    background: var(--color-kz-grey-050);
+  }
+
+  /*
+   * KPI strip. Four cells with ink dividers at width; two rows of two below
+   * 900px, where four 46px numbers cannot share a line. Dividers are CSS rather
+   * than inline so the wrapped layout drops the one that would otherwise hang
+   * at the right edge.
+   */
+  .kz-kpi {
+    display: grid;
+    grid-template-columns: repeat(var(--kz-kpi-cols, 4), 1fr);
+    border-bottom: 1px solid var(--color-kz-ink);
+  }
+  .kz-kpi > * {
+    border-right: 1px solid var(--color-kz-ink);
+  }
+  .kz-kpi > *:last-child {
+    border-right: none;
+  }
+  @media (max-width: 900px) {
+    .kz-kpi {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .kz-kpi > *:nth-child(2n) {
+      border-right: none;
+    }
+    .kz-kpi > *:not(:nth-last-child(-n + 2)) {
+      border-bottom: 1px solid var(--color-kz-ink);
+    }
+  }
+
+  .kz-input {
     width: 100%;
-    max-width: 420px;
-    padding: 9px 12px;
-    border: 1px solid #d7dbdf;
-    border-radius: 8px;
-    background: #fff;
-    color: #1b1b1b;
+    padding: 12px 14px;
+    border: 1px solid var(--color-kz-bone);
+    border-radius: 0;
+    background: var(--color-kz-white);
+    color: var(--color-kz-ink);
+    font-family: var(--font-sans);
+    font-size: 13.5px;
+    outline: none;
   }
-  .cedar-search:focus-within {
-    border-color: #3a5a40;
-    box-shadow: 0 0 0 3px rgba(58, 90, 64, 0.12);
+  .kz-input::placeholder {
+    color: var(--color-kz-grey-700);
   }
-  .cedar-search input {
-    flex: 1;
-    border: 0;
-    outline: 0;
-    background: transparent;
-    font-size: 14px;
-    color: inherit;
+  .kz-input:focus {
+    border-color: var(--color-kz-ink);
   }
-  .cedar-search input::placeholder { color: #8a9099; }
-
-  .cedar-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
-    border: 1px solid #d7dbdf;
-    border-radius: 8px;
-    background: #fff;
-    color: #1b1b1b;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background 0.12s, border-color 0.12s;
-  }
-  .cedar-btn:hover { background: #f5f6f7; }
-  .cedar-btn:disabled { opacity: 0.6; cursor: default; }
-  .cedar-btn-primary {
-    background: #3a5a40;
-    border-color: #3a5a40;
-    color: #fff;
-  }
-  .cedar-btn-primary:hover { background: #33513a; }
-  .cedar-link {
-    background: transparent;
-    border: 0;
-    padding: 0;
-    color: #2f6b41;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-  }
-
-  .cedar-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 14px;
-  }
-  .cedar-table thead th {
-    padding: 12px 16px;
-    text-align: left;
-    background: #f4f5f6;
-    color: #3d4551;
-    font-weight: 600;
-    font-size: 13px;
-    border-bottom: 1px solid #e6e7e9;
-  }
-  .cedar-table tbody td {
-    padding: 14px 16px;
-    border-bottom: 1px solid #edeef0;
-    color: #1b1b1b;
-  }
-  .cedar-table tbody tr:hover { background: #fafbfb; }
 }
