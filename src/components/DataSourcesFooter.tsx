@@ -1,17 +1,24 @@
 import { useProgramData, relativeTime, absoluteTime } from "@/hooks/use-program-data";
 import { useStoredData } from "@/hooks/use-stored-data";
 import { useProgram } from "@/routes/p/$programId/route";
+import { Eyebrow, KZ, RAIL, Square } from "./kz";
 
 /**
- * Two sources, not three. Granola is gone: its content sync was never wired
- * (the VA folder returns 403 at the workspace-policy level), so the row sat
- * permanently at "not synced" and told a reader nothing except that we had
- * listed something we don't read. Granola-derived follow-up candidates still
- * flow through the captured follow-ups snapshot and are cited there.
+ * Three sources, in the order they carry weight: Notion holds the register,
+ * Linear holds the board, Granola holds the calls.
+ *
+ * Granola was out of this list for a while, and for a good reason — the sync it
+ * had tried to mirror note content through a folder-scoped read the workspace
+ * refuses, so the row read "not synced" forever and told a reader nothing. It is
+ * back on a narrower, truthful promise: note metadata inside a time window,
+ * scoped by attendee and title. The row says which of the two keys that path
+ * needs is missing, because "set GRANOLA_API_KEY" is the wrong instruction when
+ * the key that is actually absent is the gateway's.
  */
 const SOURCES = [
   { key: "notion", label: "Notion" },
   { key: "linear", label: "Linear" },
+  { key: "granola", label: "Granola" },
 ] as const;
 
 export function DataSourcesFooter() {
@@ -21,27 +28,29 @@ export function DataSourcesFooter() {
   const statusFor = (k: string) => sources.find((s) => s.key === k);
 
   return (
-    <div
-      className="px-4 py-3 text-xs"
-      style={{ borderTop: "1px solid rgba(255,255,255,0.15)", color: "#a9aeb1" }}
-    >
-      <div className="mb-2 text-xs uppercase tracking-wide" style={{ color: "#8a9099" }}>
+    <div style={{ padding: "16px 20px 20px 20px", borderTop: `1px solid ${RAIL.rule}` }}>
+      <Eyebrow size={10} tone={RAIL.meta}>
         Data sources
-      </div>
-      <ul className="space-y-1">
+      </Eyebrow>
+      <ul
+        style={{
+          listStyle: "none",
+          margin: "10px 0 0 0",
+          padding: 0,
+          display: "flex",
+          flexDirection: "column",
+          gap: 6,
+          fontFamily: "var(--font-mono)",
+          fontSize: 11,
+        }}
+      >
         {SOURCES.map(({ key, label }) => {
           const s = statusFor(key);
-          // Linear rows are what the pages actually render, so its dot follows
-          // the render origin rather than the probe: amber when the rows are a
-          // captured snapshot, green on a live read.
+          // Linear rows are what the pages actually render, so its swatch
+          // follows the render origin rather than the probe: amber when the
+          // rows are a captured snapshot, green on a live read.
           const isLinearSnapshot = key === "linear" && origin === "snapshot";
-          const color = isLinearSnapshot
-            ? "#8a5a00"
-            : !s
-              ? "#8a9099"
-              : s.ok
-                ? "#2e8540"
-                : "#e52207";
+          const color = isLinearSnapshot ? KZ.amber : !s ? KZ.muted : s.ok ? KZ.green : KZ.coral;
           const text = isLinearSnapshot
             ? `${linear.length} snapshot`
             : !s
@@ -50,57 +59,68 @@ export function DataSourcesFooter() {
                 ? `${s.count} live`
                 : shortReason(s.message);
           return (
-            <li key={key} className="flex items-center gap-2" title={s ? `${s.scope} — ${s.message}` : undefined}>
+            <li
+              key={key}
+              style={{ display: "flex", alignItems: "center", gap: 8 }}
+              title={s ? `${s.scope} — ${s.message}` : undefined}
+            >
+              {/* A square, not a dot: nothing in this design is round. */}
+              <Square tone={color} filled />
+              <span style={{ color: RAIL.text }}>{label}</span>
               <span
-                aria-hidden
-                className="inline-block h-1.5 w-1.5 rounded-full"
-                style={{ backgroundColor: color }}
-              />
-              <span style={{ color: "#dfe1e2" }}>{label}</span>
-              <span className="ml-auto truncate" style={{ color: "#8a9099", maxWidth: 100 }}>
+                className="truncate"
+                style={{ marginLeft: "auto", color: RAIL.meta, maxWidth: 104 }}
+              >
                 {text}
               </span>
             </li>
           );
         })}
       </ul>
+
       <div
-        className="mt-3"
-        style={{ color: "#dfe1e2" }}
+        style={{
+          marginTop: 10,
+          fontFamily: "var(--font-mono)",
+          fontSize: 10,
+          color: RAIL.meta,
+        }}
         title={lastSyncedAt ? absoluteTime(lastSyncedAt) : undefined}
       >
         Last read · {relativeTime(lastSyncedAt)}
       </div>
+
+      {/* The three states keep their copy verbatim. Which one shows is the
+          honesty rule the whole app turns on: a snapshot must never read as a
+          live source, and a failure must name the actual reason. */}
       {origin === "snapshot" ? (
-        <div
-          className="mt-2 rounded px-2 py-1.5 text-xs leading-snug"
-          style={{ backgroundColor: "rgba(138,90,0,0.22)", color: "#f2d9a8" }}
-          title={capturedFrom ?? undefined}
-        >
-          {/* Name the actual reason. This said "Set LINEAR_API_KEY" regardless,
-              which was wrong and actively misleading when the key was set and
-              Linear was rejecting it — the fix for a 401 is a new token, not a
-              variable that is already there. */}
-          <strong>Captured snapshot, not a live read.</strong> Taken{" "}
+        <Disclosure title={capturedFrom}>
+          <strong style={{ fontWeight: 500 }}>Captured snapshot, not a live read.</strong> Taken{" "}
           {capturedAt ? relativeTime(capturedAt) : "unknown"}.{" "}
           {liveError
             ? liveError.includes("not set")
               ? "LINEAR_API_KEY is not set."
               : `Linear refused the live read — ${liveError}`
             : "Set LINEAR_API_KEY for a live read."}
-        </div>
+        </Disclosure>
       ) : null}
+
       {origin === "live" ? (
-        <div
-          className="mt-2 rounded px-2 py-1.5 text-xs leading-snug"
-          style={{ backgroundColor: "rgba(46,133,64,0.20)", color: "#c8e6c9" }}
-          title={capturedFrom ?? undefined}
-        >
-          <strong>Live read from Linear.</strong> {linear.length} issues, read{" "}
-          {capturedAt ? relativeTime(capturedAt) : "just now"}.
-        </div>
+        <Disclosure title={capturedFrom}>
+          <strong style={{ fontWeight: 500 }}>Live read from Linear.</strong> {linear.length}{" "}
+          issues, read {capturedAt ? relativeTime(capturedAt) : "just now"}.
+        </Disclosure>
       ) : null}
-      <div className="mt-2" style={{ color: "#8a9099" }}>
+
+      <div
+        style={{
+          marginTop: 10,
+          fontFamily: "var(--font-mono)",
+          fontSize: 10,
+          color: RAIL.dim,
+          lineHeight: 1.5,
+        }}
+      >
         {[
           program.contract.displayNumber ? `Contract ${program.contract.displayNumber}` : null,
           program.keyDates.launchLabel,
@@ -112,12 +132,36 @@ export function DataSourcesFooter() {
   );
 }
 
+/** The snapshot / live disclosure box on the rail: hairline, mono, no fill. */
+function Disclosure({ children, title }: { children: React.ReactNode; title?: string | null }) {
+  return (
+    <div
+      title={title ?? undefined}
+      style={{
+        marginTop: 12,
+        padding: 10,
+        border: `1px solid ${RAIL.box}`,
+        fontFamily: "var(--font-mono)",
+        fontSize: 10,
+        lineHeight: 1.5,
+        color: RAIL.disclosure,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 /**
- * Squeeze a failure reason into the footer's narrow column. The full message
- * stays on the row's title attribute — "not configured" and "read failed" need
+ * Squeeze a failure reason into the rail's narrow column. The full message stays
+ * on the row's title attribute — "not configured" and "read failed" need
  * different fixes, so the distinction survives even at this width.
  */
 function shortReason(message: string): string {
+  // Order matters: the gateway case also matches /not set/, and "no token" would
+  // send someone to rotate a Granola key that is already there.
+  if (/LOVABLE_API_KEY/i.test(message)) return "no gateway key";
+  if (/policy refused/i.test(message)) return "policy refused";
   if (/not set/i.test(message)) return "no token";
   if (/not configured/i.test(message)) return "not configured";
   if (/not shared/i.test(message)) return "not shared";

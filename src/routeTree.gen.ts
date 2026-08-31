@@ -24,6 +24,7 @@ import { Route as PProgramIdRisksRouteImport } from './routes/p/$programId/risks
 import { Route as PProgramIdProgramOverviewRouteImport } from './routes/p/$programId/program-overview'
 import { Route as PProgramIdLifecycleRouteImport } from './routes/p/$programId/lifecycle'
 import { Route as PProgramIdFollowUpsRouteImport } from './routes/p/$programId/follow-ups'
+import { Route as PProgramIdDustRouteImport } from './routes/p/$programId/dust'
 import { Route as PProgramIdDependenciesRouteImport } from './routes/p/$programId/dependencies'
 import { Route as PProgramIdCustomerHealthRouteImport } from './routes/p/$programId/customer-health'
 import { Route as PProgramIdBriefRouteImport } from './routes/p/$programId/brief'
@@ -107,6 +108,11 @@ const PProgramIdFollowUpsRoute = PProgramIdFollowUpsRouteImport.update({
   path: '/follow-ups',
   getParentRoute: () => PProgramIdRouteRoute,
 } as any)
+const PProgramIdDustRoute = PProgramIdDustRouteImport.update({
+  id: '/dust',
+  path: '/dust',
+  getParentRoute: () => PProgramIdRouteRoute,
+} as any)
 const PProgramIdDependenciesRoute = PProgramIdDependenciesRouteImport.update({
   id: '/dependencies',
   path: '/dependencies',
@@ -151,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/p/$programId/brief': typeof PProgramIdBriefRoute
   '/p/$programId/customer-health': typeof PProgramIdCustomerHealthRoute
   '/p/$programId/dependencies': typeof PProgramIdDependenciesRoute
+  '/p/$programId/dust': typeof PProgramIdDustRoute
   '/p/$programId/follow-ups': typeof PProgramIdFollowUpsRoute
   '/p/$programId/lifecycle': typeof PProgramIdLifecycleRoute
   '/p/$programId/program-overview': typeof PProgramIdProgramOverviewRoute
@@ -172,6 +179,7 @@ export interface FileRoutesByTo {
   '/p/$programId/brief': typeof PProgramIdBriefRoute
   '/p/$programId/customer-health': typeof PProgramIdCustomerHealthRoute
   '/p/$programId/dependencies': typeof PProgramIdDependenciesRoute
+  '/p/$programId/dust': typeof PProgramIdDustRoute
   '/p/$programId/follow-ups': typeof PProgramIdFollowUpsRoute
   '/p/$programId/lifecycle': typeof PProgramIdLifecycleRoute
   '/p/$programId/program-overview': typeof PProgramIdProgramOverviewRoute
@@ -196,6 +204,7 @@ export interface FileRoutesById {
   '/p/$programId/brief': typeof PProgramIdBriefRoute
   '/p/$programId/customer-health': typeof PProgramIdCustomerHealthRoute
   '/p/$programId/dependencies': typeof PProgramIdDependenciesRoute
+  '/p/$programId/dust': typeof PProgramIdDustRoute
   '/p/$programId/follow-ups': typeof PProgramIdFollowUpsRoute
   '/p/$programId/lifecycle': typeof PProgramIdLifecycleRoute
   '/p/$programId/program-overview': typeof PProgramIdProgramOverviewRoute
@@ -221,6 +230,7 @@ export interface FileRouteTypes {
     | '/p/$programId/brief'
     | '/p/$programId/customer-health'
     | '/p/$programId/dependencies'
+    | '/p/$programId/dust'
     | '/p/$programId/follow-ups'
     | '/p/$programId/lifecycle'
     | '/p/$programId/program-overview'
@@ -242,6 +252,7 @@ export interface FileRouteTypes {
     | '/p/$programId/brief'
     | '/p/$programId/customer-health'
     | '/p/$programId/dependencies'
+    | '/p/$programId/dust'
     | '/p/$programId/follow-ups'
     | '/p/$programId/lifecycle'
     | '/p/$programId/program-overview'
@@ -265,6 +276,7 @@ export interface FileRouteTypes {
     | '/p/$programId/brief'
     | '/p/$programId/customer-health'
     | '/p/$programId/dependencies'
+    | '/p/$programId/dust'
     | '/p/$programId/follow-ups'
     | '/p/$programId/lifecycle'
     | '/p/$programId/program-overview'
@@ -392,6 +404,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PProgramIdFollowUpsRouteImport
       parentRoute: typeof PProgramIdRouteRoute
     }
+    '/p/$programId/dust': {
+      id: '/p/$programId/dust'
+      path: '/dust'
+      fullPath: '/p/$programId/dust'
+      preLoaderRoute: typeof PProgramIdDustRouteImport
+      parentRoute: typeof PProgramIdRouteRoute
+    }
     '/p/$programId/dependencies': {
       id: '/p/$programId/dependencies'
       path: '/dependencies'
@@ -443,6 +462,7 @@ interface PProgramIdRouteRouteChildren {
   PProgramIdBriefRoute: typeof PProgramIdBriefRoute
   PProgramIdCustomerHealthRoute: typeof PProgramIdCustomerHealthRoute
   PProgramIdDependenciesRoute: typeof PProgramIdDependenciesRoute
+  PProgramIdDustRoute: typeof PProgramIdDustRoute
   PProgramIdFollowUpsRoute: typeof PProgramIdFollowUpsRoute
   PProgramIdLifecycleRoute: typeof PProgramIdLifecycleRoute
   PProgramIdProgramOverviewRoute: typeof PProgramIdProgramOverviewRoute
@@ -460,6 +480,7 @@ const PProgramIdRouteRouteChildren: PProgramIdRouteRouteChildren = {
   PProgramIdBriefRoute: PProgramIdBriefRoute,
   PProgramIdCustomerHealthRoute: PProgramIdCustomerHealthRoute,
   PProgramIdDependenciesRoute: PProgramIdDependenciesRoute,
+  PProgramIdDustRoute: PProgramIdDustRoute,
   PProgramIdFollowUpsRoute: PProgramIdFollowUpsRoute,
   PProgramIdLifecycleRoute: PProgramIdLifecycleRoute,
   PProgramIdProgramOverviewRoute: PProgramIdProgramOverviewRoute,

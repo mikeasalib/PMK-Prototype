@@ -1,11 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { classifyWorkstream, type ProgramConfig } from "@/lib/program.config";
-import {
-  getStoredData,
-  type StoredLinearIssue,
-  type StoredNotionPage,
-} from "@/lib/sync.functions";
+import { getStoredData, type StoredLinearIssue, type StoredNotionPage } from "@/lib/sync.functions";
 
 export type { StoredLinearIssue, StoredNotionPage };
 
@@ -57,18 +53,23 @@ export function priorityLabel(p: number | null): string {
   }
 }
 
+/**
+ * Priority in the Kaizen palette. Coral and amber are the only two that carry
+ * an alarm; medium and below are blue and grey, so a row full of Mediums does
+ * not read as a row full of problems.
+ */
 export function priorityColor(p: number | null): string {
   switch (p) {
     case 1:
-      return "#b3261e";
+      return "#FB4938";
     case 2:
-      return "#8a5a00";
+      return "#8A5A00";
     case 3:
-      return "#1a6fa8";
+      return "#325AAC";
     case 4:
-      return "#565c65";
+      return "#7C7878";
     default:
-      return "#888";
+      return "#7C7878";
   }
 }
 

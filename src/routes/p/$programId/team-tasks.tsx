@@ -1,21 +1,34 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
-import { SectionTabs } from "@/components/SectionTabs";
-import { UrgencyDot } from "@/components/va-ui";
-import { PROGRAMS, pageTitle } from "@/lib/program.config";
-import { useProgram } from "./route";
+import { WsTag } from "@/components/va-ui";
+import {
+  Chip,
+  Disclosure,
+  KZ,
+  List,
+  Mono,
+  Panel,
+  PanelHead,
+  SectionTitle,
+  Tag,
+  pad2,
+} from "@/components/kz";
+import { PROGRAMS, pageTitle, workstreamKeys, workstreamOf } from "@/lib/program.config";
 import { useNotionTasks } from "@/hooks/use-notion-tasks";
 import { summarizeTask, tidySection } from "@/lib/task-summary";
 import { relativeTime } from "@/hooks/use-program-data";
 import {
   useStoredData,
   bucketOf,
+  priorityColor,
   priorityLabel,
+  inferWorkstream,
   type StoredLinearIssue,
   type LinearBucket,
-  inferWorkstream,
 } from "@/hooks/use-stored-data";
+import type { WorkstreamKey } from "@/lib/va-data";
+import { useProgram } from "./route";
 
 export const Route = createFileRoute("/p/$programId/team-tasks")({
   head: ({ params }) => ({
@@ -27,27 +40,21 @@ export const Route = createFileRoute("/p/$programId/team-tasks")({
   component: TeamTasks,
 });
 
-// Normalize Linear assignee (email or full name) → short display name
 const UNASSIGNED = "Unassigned";
 type Person = string;
 
 /**
  * Display name for an assignee.
  *
- * There used to be a hardcoded OWNER_MAP and TEAM of four VA people here, so
- * every program showed VA's roster as its filter buckets and filed everyone
- * outside it as unassigned — on Ventura that was all 25 issues. Names are now
- * derived from whoever actually appears in the data.
- *
  * Linear returns a mix of display names ("Daman Chatha") and raw emails
- * ("nico@kaizenlabs.co"), so both have to reduce to the same short form.
+ * ("nico@kaizenlabs.co"), so both have to reduce to the same short form. Names
+ * are derived from whoever actually appears in the data — a hardcoded roster
+ * showed one program's people as every program's filter buckets.
  */
 function ownerOf(issue: StoredLinearIssue): Person {
   const raw = (issue.assignee ?? "").trim();
   if (!raw) return UNASSIGNED;
-  // A real display name: keep the given name.
   if (!raw.includes("@")) return raw.split(/\s+/)[0];
-  // An email: take the local part before any dot, and capitalise it.
   const first = raw.split("@")[0].split(".")[0];
   return first.charAt(0).toUpperCase() + first.slice(1);
 }
@@ -60,59 +67,31 @@ const BUCKET_LABEL: Record<LinearBucket, string> = {
   canceled: "Canceled",
 };
 
-function bucketStyle(b: LinearBucket): { color: string; bg: string } {
+/** Only three buckets are worth an accent: moving, done, dropped. */
+function bucketTone(b: LinearBucket): string {
   switch (b) {
     case "in_progress":
-      return { color: "#1a6fa8", bg: "#e6f0f7" };
-    case "todo":
-      return { color: "#1b1b1b", bg: "#f0f0f0" };
-    case "backlog":
-      return { color: "#565c65", bg: "#f8f9fa" };
+      return KZ.amber;
     case "done":
-      return { color: "#1b6e2f", bg: "#e6f4ea" };
+      return KZ.green;
     case "canceled":
-      return { color: "#7a1414", bg: "#fbeaea" };
-  }
-}
-
-function priorityStyle(p: number | null): { color: string; bg: string } {
-  switch (p) {
-    case 1:
-      return { color: "#b3261e", bg: "#fbeaea" };
-    case 2:
-      return { color: "#8a5a00", bg: "#fdf3d8" };
-    case 3:
-      return { color: "#1a6fa8", bg: "#e6f0f7" };
-    case 4:
-      return { color: "#565c65", bg: "#f0f0f0" };
+      return KZ.coral;
     default:
-      return { color: "#888", bg: "#f0f0f0" };
+      return KZ.muted;
   }
 }
 
 /**
- * Work, by person.
+ * Every tracked issue, grouped by workstream.
  *
- * Rebuilt around a default working set. It used to render the whole dataset
- * three times over — the Notion tracker fully expanded, a "Right this second"
- * list, per-person cards, and then a table of everything — which measured 6.5
- * screens of scroll and 107 rows, with all 43 tickets appearing in more than
- * one section. The reader was left to do the reduction.
+ * Two controls above the list: scope, which decides how much you are being
+ * shown, and owner. Both are chip rows rather than cards, because that is what
+ * they always were. The rows themselves are flat — mono identifier, title,
+ * bucket, priority, owner, when it last moved — so a section reads as a list
+ * rather than as a table with a frame around it.
  *
- * The principle borrowed from the nav collapse: grouping is a control, not a
- * destination. One level down, volume is a control too. So this shows what
- * needs attention now, and everything else is one click away:
- *
- *   - The scope selector replaces the "Right this second" section. That list
- *     was a filter of the table rendered as its own inventory; now it IS the
- *     default filter, so the same tickets are not printed twice.
- *   - Tracker sections start collapsed. 47 open checkboxes across six
- *     headings is a page on its own; the counts are the summary.
- *   - Owner chips are a filter row, styled as controls rather than as cards,
- *     because that is what they always were.
- *   - The table lost the Priority and Workstream columns. Priority is a dot
- *     against the title; workstream has an entire tab of its own, which is the
- *     point of the tab grouping.
+ * Follow-ups are the child route: the things caught between calls that never
+ * became an issue.
  */
 type Scope = "attention" | "open" | "all";
 
@@ -125,47 +104,49 @@ const SCOPES: Array<{ key: Scope; label: string; hint: string }> = [
 function TeamTasks() {
   const program = useProgram();
   const { isLoading, linear, origin } = useStoredData(program.id);
-  const todayIso = new Date().toISOString().slice(0, 10);
-  const currentWindow =
-    program.sprintStrip.find((w) => w.start <= todayIso && todayIso <= w.end) ?? null;
 
   const [scope, setScope] = useState<Scope>("attention");
   const [owner, setOwner] = useState<Person | "All">("All");
 
-  const withOwner = useMemo(
-    () => linear.map((i) => ({ ...i, _owner: ownerOf(i), _bucket: bucketOf(i) })),
-    [linear],
+  const enriched = useMemo(
+    () =>
+      linear.map((i) => ({
+        ...i,
+        _owner: ownerOf(i),
+        _bucket: bucketOf(i),
+        _ws: inferWorkstream(i, program),
+      })),
+    [linear, program],
   );
 
   const team = useMemo(() => {
-    const names = new Set(withOwner.map((t) => t._owner));
+    const names = new Set(enriched.map((t) => t._owner));
     const real = [...names].filter((n) => n !== UNASSIGNED).sort();
     return names.has(UNASSIGNED) ? [...real, UNASSIGNED] : real;
-  }, [withOwner]);
+  }, [enriched]);
 
   const countsByOwner = useMemo(() => {
     const m: Record<string, number> = {};
-    for (const t of withOwner) {
+    for (const t of enriched) {
       if (t._bucket === "done" || t._bucket === "canceled") continue;
       m[t._owner] = (m[t._owner] ?? 0) + 1;
     }
     return m;
-  }, [withOwner]);
+  }, [enriched]);
+
+  const inScope = (t: (typeof enriched)[number]) => {
+    if (scope === "attention") {
+      return (
+        t._bucket !== "done" &&
+        t._bucket !== "canceled" &&
+        (t._bucket === "in_progress" || t.priority === 1 || t.priority === 2)
+      );
+    }
+    if (scope === "open") return t._bucket !== "done" && t._bucket !== "canceled";
+    return true;
+  };
 
   const rows = useMemo(() => {
-    let out = withOwner;
-    if (scope === "attention") {
-      out = out.filter(
-        (t) =>
-          t._bucket !== "done" &&
-          t._bucket !== "canceled" &&
-          (t._bucket === "in_progress" || t.priority === 1 || t.priority === 2),
-      );
-    } else if (scope === "open") {
-      out = out.filter((t) => t._bucket !== "done" && t._bucket !== "canceled");
-    }
-    if (owner !== "All") out = out.filter((t) => t._owner === owner);
-
     const bucketOrder: Record<LinearBucket, number> = {
       in_progress: 0,
       todo: 1,
@@ -173,204 +154,212 @@ function TeamTasks() {
       done: 3,
       canceled: 4,
     };
-    return [...out].sort((a, b) => {
-      const bo = bucketOrder[a._bucket] - bucketOrder[b._bucket];
-      if (bo !== 0) return bo;
-      const pa = a.priority && a.priority > 0 ? a.priority : 99;
-      const pb = b.priority && b.priority > 0 ? b.priority : 99;
-      if (pa !== pb) return pa - pb;
-      return a.identifier.localeCompare(b.identifier);
-    });
-  }, [withOwner, scope, owner]);
+    return enriched
+      .filter((t) => inScope(t) && (owner === "All" || t._owner === owner))
+      .sort((a, b) => {
+        const bo = bucketOrder[a._bucket] - bucketOrder[b._bucket];
+        if (bo !== 0) return bo;
+        const pa = a.priority && a.priority > 0 ? a.priority : 99;
+        const pb = b.priority && b.priority > 0 ? b.priority : 99;
+        if (pa !== pb) return pa - pb;
+        return a.identifier.localeCompare(b.identifier);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enriched, scope, owner]);
 
-  const openTotal = withOwner.filter(
-    (t) => t._bucket !== "done" && t._bucket !== "canceled",
-  ).length;
+  // One section per workstream, in the program's own display order, plus a
+  // trailing group for anything the classifier could not place.
+  const wsOrder = workstreamKeys(program);
+  const groups = [
+    ...wsOrder.map((ws) => ({
+      key: ws,
+      items: rows.filter((t) => t._ws === ws),
+    })),
+    { key: "—", items: rows.filter((t) => !wsOrder.includes(t._ws)) },
+  ].filter((g) => g.items.length > 0);
+
+  const openTotal = enriched.filter((t) => t._bucket !== "done" && t._bucket !== "canceled").length;
   const activeScope = SCOPES.find((sc) => sc.key === scope)!;
+
+  const scopeCount = (key: Scope) =>
+    key === "attention"
+      ? enriched.filter(
+          (t) =>
+            t._bucket !== "done" &&
+            t._bucket !== "canceled" &&
+            (t._bucket === "in_progress" || t.priority === 1 || t.priority === 2),
+        ).length
+      : key === "open"
+        ? openTotal
+        : enriched.length;
 
   return (
     <AppLayout>
       <PageHeader
-        title={currentWindow ? `Work — ${currentWindow.label}` : "Work"}
+        eyebrow="Delivery"
+        title="Team tasks"
         subtitle={
           origin === "snapshot"
-            ? "From a captured snapshot · assignees, statuses and priorities are as of the capture"
-            : "Live from Linear · assignees, statuses, and priorities update on sync"
+            ? "Every tracked issue, grouped by workstream — from a captured snapshot, so assignees, statuses and priorities are as of the capture."
+            : "Every tracked issue, grouped by workstream — live from Linear."
         }
       />
-      <SectionTabs group="work" />
-      <div className="space-y-5 px-4 py-5 sm:px-6">
-        {/* Scope. The page's one real control: it decides how much you are
-            being shown, which is the thing that was previously not adjustable
-            because everything was always shown. */}
-        <div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {SCOPES.map((sc) => {
-              const active = sc.key === scope;
-              const count =
-                sc.key === "attention"
-                  ? withOwner.filter(
-                      (t) =>
-                        t._bucket !== "done" &&
-                        t._bucket !== "canceled" &&
-                        (t._bucket === "in_progress" || t.priority === 1 || t.priority === 2),
-                    ).length
-                  : sc.key === "open"
-                    ? openTotal
-                    : withOwner.length;
-              return (
-                <button
-                  key={sc.key}
-                  type="button"
-                  onClick={() => setScope(sc.key)}
-                  aria-pressed={active}
-                  className="rounded-full px-3 py-1.5 text-sm font-medium transition-colors"
-                  style={{
-                    backgroundColor: active ? "#1b1b1b" : "#fff",
-                    color: active ? "#fff" : "#565c65",
-                    border: `1px solid ${active ? "#1b1b1b" : "#dfe1e2"}`,
-                  }}
-                >
-                  {sc.label} · {count}
-                </button>
-              );
-            })}
-          </div>
-          <div className="mt-1.5 text-xs" style={{ color: "#8a8a80" }}>
-            {activeScope.hint}.
-          </div>
-        </div>
 
-        {/* Owner filter. A row of chips, not a grid of cards: these were always
-            controls, and card styling made them read as content to be read. */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <FilterChip label="Everyone" active={owner === "All"} onClick={() => setOwner("All")} />
-          {team.map((p) => (
-            <FilterChip
-              key={p}
-              label={`${p} · ${countsByOwner[p] ?? 0}`}
-              active={owner === p}
-              onClick={() => setOwner(p)}
-            />
-          ))}
-        </div>
+      {/* Scope and owner. Two chip rows, sharing the header's hairline. */}
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 8,
+          padding: "16px var(--kz-pad-x)",
+          borderBottom: `1px solid ${KZ.bone}`,
+        }}
+      >
+        <Mono size={10} tone={KZ.muted} style={{ textTransform: "uppercase", marginRight: 6 }}>
+          Scope
+        </Mono>
+        {SCOPES.map((sc) => (
+          <Chip
+            key={sc.key}
+            label={`${sc.label} · ${pad2(scopeCount(sc.key))}`}
+            active={sc.key === scope}
+            onClick={() => setScope(sc.key)}
+            title={sc.hint}
+          />
+        ))}
+        <Mono size={10.5} tone={KZ.muted} style={{ marginLeft: "auto" }}>
+          {activeScope.hint}
+        </Mono>
+      </div>
 
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 8,
+          padding: "12px var(--kz-pad-x)",
+          borderBottom: `1px solid ${KZ.bone}`,
+        }}
+      >
+        <Mono size={10} tone={KZ.muted} style={{ textTransform: "uppercase", marginRight: 6 }}>
+          Owner
+        </Mono>
+        <Chip label="Everyone" active={owner === "All"} onClick={() => setOwner("All")} />
+        {team.map((p) => (
+          <Chip
+            key={p}
+            label={`${p} · ${countsByOwner[p] ?? 0}`}
+            active={owner === p}
+            onClick={() => setOwner(p)}
+          />
+        ))}
+      </div>
+
+      <div style={{ padding: "28px var(--kz-pad-x) 60px var(--kz-pad-x)" }}>
         {isLoading ? (
-          <div className="text-sm" style={{ color: "#565c65" }}>
-            Loading…
-          </div>
-        ) : rows.length === 0 ? (
+          <Mono size={11}>Loading…</Mono>
+        ) : groups.length === 0 ? (
           <div
-            className="rounded-md border border-dashed p-6 text-center text-sm"
-            style={{ borderColor: "#dcdcd6", color: "#565c65" }}
+            style={{
+              border: `1px solid ${KZ.grey400}`,
+              padding: 40,
+              textAlign: "center",
+              fontSize: 13.5,
+              color: KZ.body,
+              maxWidth: 720,
+            }}
           >
             Nothing in this scope.
             {scope === "attention" ? " Nothing in progress and nothing urgent — try All open." : ""}
           </div>
         ) : (
-          <div
-            className="overflow-hidden rounded-md bg-white"
-            style={{ border: "1px solid #e5e5e2" }}
-          >
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[520px] text-sm" style={{ borderCollapse: "collapse" }}>
-                <thead>
-                  <tr
-                    className="text-left uppercase tracking-wide"
-                    style={{ color: "#8a8a80", fontSize: 12, borderBottom: "1px solid #e5e5e2" }}
-                  >
-                    <th className="px-3 py-2 font-medium">Ticket</th>
-                    <th className="px-3 py-2 font-medium">Title</th>
-                    <th className="px-3 py-2 font-medium">Owner</th>
-                    <th className="px-3 py-2 font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((t) => (
-                    <tr key={t.id} style={{ borderTop: "1px solid #f0f0ec" }}>
-                      <td className="px-3 py-2 align-top">
-                        <a
-                          href={t.url ?? undefined}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-mono text-xs hover:underline"
-                          style={{ color: "#565c65" }}
-                        >
+          groups.map((g) => {
+            const ws = workstreamOf(g.key, program);
+            return (
+              <section key={g.key} style={{ marginBottom: 34 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    alignItems: "baseline",
+                    gap: 12,
+                    borderBottom: `1px solid ${KZ.ink}`,
+                    paddingBottom: 10,
+                  }}
+                >
+                  <WsTag ws={g.key as WorkstreamKey} />
+                  <SectionTitle size={16}>{ws.label}</SectionTitle>
+                  {ws.owner ? <Mono size={10.5}>{ws.owner}</Mono> : null}
+                  <Mono size={11} style={{ marginLeft: "auto" }}>
+                    {pad2(g.items.length)}
+                  </Mono>
+                </div>
+                <List>
+                  {g.items.map((t) => (
+                    <li
+                      key={t.identifier}
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                        gap: 14,
+                        padding: "13px 0",
+                        borderBottom: `1px solid ${KZ.grey200}`,
+                      }}
+                    >
+                      <a
+                        href={t.url ?? undefined}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ width: 76, flex: "0 0 76px" }}
+                      >
+                        <Mono size={11} tone={KZ.blue}>
                           {t.identifier}
-                        </a>
-                      </td>
-                      <td className="px-3 py-2 align-top" style={{ color: "#1b1b1b" }}>
-                        <span className="flex items-start gap-2">
-                          {/* One accent, spent on the only thing that is
-                              actually wrong: urgent or high priority. Medium,
-                              low and none get no colour at all, because a row
-                              carrying four coloured tokens tells you nothing
-                              about which row to read first. */}
-                          <UrgencyDot priority={t.priority} />
-                          <span>{t.title}</span>
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 align-top" style={{ color: "#565c65" }}>
+                        </Mono>
+                      </a>
+                      <span style={{ flex: 1, minWidth: 220, fontSize: 14, lineHeight: 1.35 }}>
+                        {t.title}
+                      </span>
+                      <Tag tone={bucketTone(t._bucket)}>{BUCKET_LABEL[t._bucket]}</Tag>
+                      {/* Priority only where it means something. Medium and
+                          below get no tag: a row carrying four coloured tokens
+                          tells you nothing about which row to read first. */}
+                      {t.priority === 1 || t.priority === 2 ? (
+                        <Tag tone={priorityColor(t.priority)}>{priorityLabel(t.priority)}</Tag>
+                      ) : null}
+                      <Mono size={10.5} style={{ width: 110 }} title={t.assignee ?? UNASSIGNED}>
                         {t._owner}
-                      </td>
-                      <td className="px-3 py-2 align-top text-xs" style={{ color: "#565c65" }}>
-                        {BUCKET_LABEL[t._bucket]}
-                      </td>
-                    </tr>
+                      </Mono>
+                      <Mono size={10.5} style={{ width: 60, textAlign: "right" }}>
+                        {relativeTime(t.source_updated_at)}
+                      </Mono>
+                    </li>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                </List>
+              </section>
+            );
+          })
         )}
 
-        {/* Tracker below the ticket table and collapsed by default: it is the
-            larger population but the less structured one, and 47 expanded
-            checkboxes was most of the page's height. */}
+        {/* The tracker sits below the tickets and collapsed: it is the larger
+            population but the less structured one, and forty-seven expanded
+            checkboxes was most of this page's height. */}
         <NotionTrackerSection programId={program.id} />
 
-        <p className="text-xs" style={{ color: "#8a8a80" }}>
-          Tickets live in Linear; the checkbox tracker lives in Notion. Edit either
-          at source and hit Refresh — nothing typed here is written back.
-        </p>
+        <Disclosure style={{ marginTop: 24 }}>
+          Tickets live in Linear; the checkbox tracker lives in Notion. Edit either at source and
+          hit Refresh — nothing typed here is written back
+        </Disclosure>
       </div>
     </AppLayout>
   );
 }
 
-function FilterChip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className="rounded px-2 py-1 text-xs font-medium transition-colors"
-      style={{
-        backgroundColor: active ? "#eef2ee" : "transparent",
-        color: active ? "#1b1b1b" : "#8a8a80",
-        border: `1px solid ${active ? "#c3d3c3" : "#e5e5e2"}`,
-      }}
-    >
-      {label}
-    </button>
-  );
-}
-
-
 function NotionTrackerSection({ programId }: { programId: string }) {
   const { isLoading, open, done, bySection, readAt, status } = useNotionTasks(programId);
   const [showDone, setShowDone] = useState(false);
-  // Sections start collapsed. Forty-seven open checkboxes across six headings
-  // was most of this page's height, and the counts on the headers are the
-  // summary a reader actually wanted first.
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const toggleSection = (key: string) =>
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -378,60 +367,59 @@ function NotionTrackerSection({ programId }: { programId: string }) {
   if (status === "not-configured") return null;
 
   return (
-    <section
-      style={{
-        border: "1px solid #dfe1e2",
-        borderLeft: "4px solid #2e6b2f",
-        backgroundColor: "#fff",
-        padding: 16,
-      }}
-    >
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <div
-            className="text-[13px] font-semibold uppercase tracking-wide"
-            style={{ color: "#2e6b2f", fontFamily: "Public Sans, system-ui, sans-serif" }}
-          >
-            Notion tracker{status === "ok" ? ` — ${open.length} open` : ""}
-          </div>
-          <div className="mt-1 text-xs" style={{ color: "#565c65" }}>
-            Hand-maintained checkboxes that never became Linear tickets.
-            {status === "ok" && readAt ? ` Read ${relativeTime(readAt)}.` : ""}
-          </div>
-        </div>
-        {status === "ok" && done.length > 0 ? (
-          <button
-            type="button"
-            onClick={() => setShowDone((v) => !v)}
-            className="rounded px-2 py-1 text-xs font-semibold uppercase tracking-wide"
-            style={{ border: "1px solid #dfe1e2", backgroundColor: "#fff", color: "#3a5a40" }}
-          >
-            {showDone ? "Hide" : "Show"} {done.length} done
-          </button>
-        ) : null}
+    <Panel style={{ marginTop: 10 }}>
+      <PanelHead
+        label={`Notion tracker${status === "ok" ? ` · ${pad2(open.length)} open` : ""}`}
+        right={
+          status === "ok" && done.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setShowDone((v) => !v)}
+              style={{
+                border: 0,
+                background: "transparent",
+                fontFamily: "var(--font-mono)",
+                fontSize: 11,
+                textTransform: "uppercase",
+                color: KZ.blue,
+                cursor: "pointer",
+                padding: 0,
+              }}
+            >
+              {showDone ? "Hide" : "Show"} {done.length} done
+            </button>
+          ) : undefined
+        }
+      />
+
+      <div style={{ marginTop: 10 }}>
+        <Mono size={10.5}>
+          Hand-maintained checkboxes that never became Linear tickets.
+          {status === "ok" && readAt ? ` Read ${relativeTime(readAt)}.` : ""}
+        </Mono>
       </div>
 
       {isLoading ? (
-        <div className="mt-3 text-[13px]" style={{ color: "#565c65" }}>
+        <Mono size={11} style={{ display: "block", marginTop: 14 }}>
           Reading the tracker…
-        </div>
+        </Mono>
       ) : status === "no-token" ? (
-        <div className="mt-3 text-[13px]" style={{ color: "#8a5a00" }}>
-          NOTION_API_KEY is not set, so the tracker cannot be read. The Linear
-          sections below are unaffected.
+        <div style={{ marginTop: 14, fontSize: 13, color: KZ.amber }}>
+          NOTION_API_KEY is not set, so the tracker cannot be read. The Linear sections above are
+          unaffected.
         </div>
       ) : status === "read-failed" ? (
-        <div className="mt-3 text-[13px]" style={{ color: "#8a5a00" }}>
-          Could not read the tracker page. Most often this means the page is not
-          shared with the Notion integration — Notion answers 404 rather than 403
-          for that, so it looks like a missing page.
+        <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: KZ.amber }}>
+          Could not read the tracker page. Most often this means the page is not shared with the
+          Notion integration — Notion answers 404 rather than 403 for that, so it looks like a
+          missing page.
         </div>
       ) : open.length === 0 && done.length === 0 ? (
-        <div className="mt-3 text-[13px]" style={{ color: "#565c65" }}>
+        <div style={{ marginTop: 14, fontSize: 13, color: KZ.body }}>
           The tracker page has no checkbox items.
         </div>
       ) : (
-        <div className="mt-4 space-y-4">
+        <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 18 }}>
           {bySection.map((group) => {
             const rows = showDone ? [...group.open, ...group.done] : group.open;
             if (rows.length === 0) return null;
@@ -442,83 +430,106 @@ function NotionTrackerSection({ programId }: { programId: string }) {
                   type="button"
                   onClick={() => toggleSection(group.section)}
                   aria-expanded={expanded}
-                  className="mb-1.5 flex w-full items-baseline gap-2 text-left text-xs font-semibold uppercase tracking-wide"
-                  style={{ color: "#565c65" }}
+                  style={{
+                    display: "flex",
+                    alignItems: "baseline",
+                    gap: 8,
+                    width: "100%",
+                    border: 0,
+                    borderBottom: `1px solid ${KZ.grey200}`,
+                    paddingBottom: 8,
+                    background: "transparent",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 11,
+                    textTransform: "uppercase",
+                    color: KZ.ink,
+                  }}
                 >
-                  <span aria-hidden style={{ width: 10, display: "inline-block" }}>
-                    {expanded ? "▾" : "▸"}
+                  <span aria-hidden style={{ width: 10 }}>
+                    {expanded ? "−" : "+"}
                   </span>
-                  <span className="min-w-0 flex-1">
-                    {tidySection(group.section)} · {group.open.length} open
+                  <span style={{ minWidth: 0, flex: 1 }}>{tidySection(group.section)}</span>
+                  <span style={{ color: KZ.muted }}>
+                    {pad2(group.open.length)} open
                     {group.done.length ? ` · ${group.done.length} done` : ""}
                   </span>
                 </button>
                 {expanded ? (
-                <ul className="space-y-1">
-                  {rows.map((t) => {
-                    const sum = summarizeTask(t.text);
-                    const refs = t.ticketRefs.filter((r) => !t.text.includes(r));
-                    return (
-                      <li
-                        key={t.id}
-                        className="flex items-start gap-2 text-[13px]"
-                        style={{ paddingLeft: t.depth * 16 }}
-                      >
-                        <span
-                          aria-hidden
-                          className="mt-0.5 shrink-0 font-mono text-xs"
-                          style={{ color: t.checked ? "#2e8540" : "#8a8a80" }}
+                  <List style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+                    {rows.map((t) => {
+                      const sum = summarizeTask(t.text);
+                      const refs = t.ticketRefs.filter((r) => !t.text.includes(r));
+                      return (
+                        <li
+                          key={t.id}
+                          style={{
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: 10,
+                            paddingLeft: t.depth * 16,
+                          }}
                         >
-                          {t.checked ? "\u2713" : "\u25a2"}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          {/* Headline carries the link and the emphasis. Full
-                              original stays on the title attribute so nothing
-                              the author wrote is unreachable from the row. */}
-                          <a
-                            href={t.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-medium hover:underline"
-                            title={t.text}
+                          <span
+                            aria-hidden
                             style={{
-                              color: t.checked ? "#8a8a80" : "#1b1b1b",
-                              textDecoration: t.checked ? "line-through" : undefined,
+                              marginTop: 4,
+                              width: 10,
+                              flex: "0 0 10px",
+                              fontFamily: "var(--font-mono)",
+                              fontSize: 11,
+                              color: t.checked ? KZ.green : KZ.muted,
                             }}
                           >
-                            {sum.headline}
-                          </a>
-                          {refs.length ? (
-                            <span
-                              className="ml-2 font-mono text-xs"
-                              style={{ color: "#4a3fb5" }}
+                            {t.checked ? "✓" : "▫"}
+                          </span>
+                          <span style={{ minWidth: 0, flex: 1 }}>
+                            {/* Headline carries the link; the full original
+                                stays on the title attribute so nothing the
+                                author wrote is unreachable from the row. */}
+                            <a
+                              href={t.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              title={t.text}
+                              style={{
+                                fontSize: 13.5,
+                                fontWeight: 500,
+                                color: t.checked ? KZ.muted : KZ.ink,
+                                textDecoration: t.checked ? "line-through" : undefined,
+                              }}
                             >
-                              {refs.join(" ")}
-                            </span>
-                          ) : null}
-                          {/* Detail on its own muted line rather than inline.
-                              Sixty lines of running prose is the wall this
-                              page had; a headline column with the specifics
-                              underneath is scannable at the same density. */}
-                          {sum.detail && !t.checked ? (
-                            <div
-                              className="mt-0.5 text-xs leading-snug"
-                              style={{ color: "#6b7280" }}
-                            >
-                              {sum.detail}
-                            </div>
-                          ) : null}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
+                              {sum.headline}
+                            </a>
+                            {refs.length ? (
+                              <Mono size={10.5} tone={KZ.blue} style={{ marginLeft: 8 }}>
+                                {refs.join(" ")}
+                              </Mono>
+                            ) : null}
+                            {sum.detail && !t.checked ? (
+                              <div
+                                style={{
+                                  marginTop: 4,
+                                  fontSize: 12.5,
+                                  lineHeight: 1.45,
+                                  color: KZ.body,
+                                }}
+                              >
+                                {sum.detail}
+                              </div>
+                            ) : null}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </List>
                 ) : null}
               </div>
             );
           })}
         </div>
       )}
-    </section>
+    </Panel>
   );
 }

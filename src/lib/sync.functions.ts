@@ -1,11 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 
-// Granola is deliberately absent from this union. Its content sync was never
-// wired (the VA folder returns 403 at the workspace-policy level), so it sat in
-// the footer permanently reading "not synced" — a row that told the reader
-// nothing except that we had listed something we don't read.
+// Granola is back in this union, on a narrower promise than the sync it left
+// with. That sync tried to mirror note *content* through a folder-scoped read
+// the workspace refuses, so the row sat permanently at "not synced". What the
+// probe reports now is reachability of note metadata inside a time window —
+// enough to say the calls are there and link to them, never enough to source a
+// claim about what was said.
 export type SyncSourceStatus = {
-  key: "notion" | "linear";
+  key: "notion" | "linear" | "granola";
   ok: boolean;
   count: number;
   scope: string;
@@ -34,7 +36,7 @@ export const syncAll = createServerFn({ method: "POST" })
 export type SyncedSnapshot = {
   syncedAt: string | null;
   sources: SyncSourceStatus[];
-  counts: { linear: number; notion: number };
+  counts: { linear: number; notion: number; granola: number };
 };
 
 /**
@@ -51,6 +53,8 @@ export const getSyncedSnapshot = createServerFn({ method: "GET" })
     const counts = {
       linear: sources.find((s) => s.key === "linear")?.count ?? 0,
       notion: sources.find((s) => s.key === "notion")?.count ?? 0,
+      // Notes in the window, not note content: see readGranolaNotes.
+      granola: sources.find((s) => s.key === "granola")?.count ?? 0,
     };
     const anyOk = sources.some((s) => s.ok);
     return {
@@ -167,9 +171,8 @@ export const getStoredData = createServerFn({ method: "GET" })
     // never succeed — there is no Supabase instance behind this app, so every
     // "live" read failed and silently fell back, which is why setting
     // NOTION_API_KEY changed nothing.
-    const { readLinearIssues, linearConfigured, linearLastError } = await import(
-      "./sources.direct.server"
-    );
+    const { readLinearIssues, linearConfigured, linearLastError } =
+      await import("./sources.direct.server");
     const live = await readLinearIssues(programId);
     if (live && live.rows.length > 0) {
       return {

@@ -102,9 +102,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "stylesheet", href: appCss },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      // Suisse Int'l is licensed and not vendored, so Inter stands in as the
+      // closest available neo-grotesk. Poppins is gone with the Cedar shell —
+      // the Kaizen system has two families, not three.
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
       },
       // Both offered on purpose: the .ico carries 16/32/48/64/128 for older
       // browsers and Windows pinning, the PNG is what modern browsers prefer.

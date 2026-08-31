@@ -1,8 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
-import { SectionTabs } from "@/components/SectionTabs";
 import { WsTag } from "@/components/va-ui";
+import {
+  Chip,
+  Disclosure,
+  KZ,
+  List,
+  Mono,
+  Panel,
+  PanelHead,
+  SectionTitle,
+  Tag,
+  pad2,
+} from "@/components/kz";
 import type { WorkstreamKey } from "@/lib/va-data";
 import {
   useStoredData,
@@ -18,6 +29,7 @@ import { relativeTime } from "@/hooks/use-program-data";
 import { HEALTH_COLOR, HEALTH_LABEL } from "@/lib/workstream-updates";
 import { PROGRAMS, pageTitle, workstreamKeys, workstreamOf } from "@/lib/program.config";
 import { seedFor } from "@/lib/program-seed";
+import { shortDate } from "@/lib/local-date";
 import { useProgram } from "./route";
 
 export const Route = createFileRoute("/p/$programId/dependencies")({
@@ -26,17 +38,27 @@ export const Route = createFileRoute("/p/$programId/dependencies")({
       { title: pageTitle("Dependency map", PROGRAMS[params.programId]) },
       {
         name: "description",
-        content: "Live view of open work grouped by workstream and blockers pinned on top.",
+        content: "What each workstream is waiting on from another, and the blockers behind it.",
       },
     ],
   }),
   component: Dependencies,
 });
 
+/**
+ * Dependency map.
+ *
+ * The tiles at the top are the cross-workstream dependencies as the sync stated
+ * them: who is waiting on whom, how bad it is, who owns it, when it is due. They
+ * tile rather than stack because each one is a self-contained fact, and adjacent
+ * cards collapse their borders into a single hairline grid.
+ *
+ * Below: the blockers Linear itself is flagging, and then the open work by
+ * workstream — the same "what is waiting" question asked of the board rather
+ * than of the meeting.
+ */
 function Dependencies() {
   const program = useProgram();
-  // Per-program. Was a module-level constant, frozen to whichever program the
-  // module happened to import — the third instance of that bug in these files.
   const WS_ORDER: WorkstreamKey[] = workstreamKeys(program);
   const seed = seedFor(program.id);
   const { linear, isLoading } = useStoredData(program.id);
@@ -57,13 +79,13 @@ function Dependencies() {
         .filter((i) => bucketOf(i) !== "done" && bucketOf(i) !== "canceled")
         .filter((i) => ws === "all" || inferWorkstream(i, program) === ws)
         .filter((i) => owner === "all" || i.assignee === owner),
-    [linear, ws, owner],
+    [linear, ws, owner, program],
   );
 
   const blockers = useMemo(
     () =>
-      // Blocked-or-urgent. Kept as two named predicates rather than one fused
-      // condition so "blocked" means the same thing here as on the landing
+      // Blocked-or-urgent. Two named predicates rather than one fused
+      // condition, so "blocked" means the same thing here as on the landing
       // page; the urgent arm is this page's own addition, stated as such.
       linear.filter((i) => isBlocked(i) || (isOpen(i) && i.priority === 1)),
     [linear],
@@ -74,197 +96,210 @@ function Dependencies() {
     items: open.filter((i) => inferWorkstream(i, program) === k),
   })).filter((g) => g.items.length > 0);
 
+  const deps =
+    ws === "all" ? seed.crossDeps : seed.crossDeps.filter((d) => d.from === ws || d.to === ws);
+
   return (
     <AppLayout>
       <PageHeader
+        eyebrow="Between streams"
         title="Dependency map"
-        subtitle="Open Linear work grouped by workstream. Blockers pinned below."
+        subtitle="What each workstream is waiting on from another, consolidated from the cross-workstream sync — with the blockers Linear is flagging underneath."
       />
-      <SectionTabs group="work" />
+
       <div
-        className="flex flex-wrap items-center gap-3 px-6 py-3"
-        style={{ borderBottom: "1px solid #dfe1e2", backgroundColor: "#f0f0f0" }}
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 8,
+          padding: "16px var(--kz-pad-x)",
+          borderBottom: `1px solid ${KZ.bone}`,
+        }}
       >
-        <span
-          className="text-xs font-semibold uppercase tracking-wide"
-          style={{ color: "#3a5a40" }}
-        >
+        <Mono size={10} tone={KZ.muted} style={{ textTransform: "uppercase", marginRight: 6 }}>
           Workstream
-        </span>
-        <select
-          value={ws}
-          onChange={(e) => setWs(e.target.value as WorkstreamKey | "all")}
-          className="rounded border px-2 py-1 text-xs"
-          style={{ borderColor: "#a9aeb1" }}
-        >
-          <option value="all">All workstreams</option>
-          {WS_ORDER.map((k) => (
-            <option key={k} value={k}>
-              {workstreamOf(k, program).label}
-            </option>
-          ))}
-        </select>
-        <span
-          className="text-xs font-semibold uppercase tracking-wide"
-          style={{ color: "#3a5a40" }}
-        >
-          Assignee
-        </span>
-        <select
-          value={owner}
-          onChange={(e) => setOwner(e.target.value)}
-          className="rounded border px-2 py-1 text-xs"
-          style={{ borderColor: "#a9aeb1" }}
-        >
-          <option value="all">All</option>
-          {allOwners.map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </select>
-        <span className="ml-auto text-xs" style={{ color: "#565c65" }}>
-          {open.length} open issues
-        </span>
+        </Mono>
+        <Chip label="All" active={ws === "all"} onClick={() => setWs("all")} />
+        {WS_ORDER.map((k) => (
+          <Chip
+            key={k}
+            label={k}
+            active={ws === k}
+            tone={workstreamOf(k, program).color}
+            onClick={() => setWs(k)}
+            title={workstreamOf(k, program).label}
+          />
+        ))}
+
+        <label style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 18 }}>
+          <Mono size={10} tone={KZ.muted} style={{ textTransform: "uppercase" }}>
+            Assignee
+          </Mono>
+          <select
+            value={owner}
+            onChange={(e) => setOwner(e.target.value)}
+            style={{
+              border: `1px solid ${KZ.bone}`,
+              borderRadius: 0,
+              background: KZ.white,
+              color: KZ.ink,
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              padding: "6px 8px",
+            }}
+          >
+            <option value="all">All</option>
+            {allOwners.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <Mono size={11} tone={KZ.muted} style={{ marginLeft: "auto" }}>
+          {pad2(open.length)} open issues
+        </Mono>
       </div>
 
-      {isLoading ? (
-        <div className="p-6 text-[13px]" style={{ color: "#565c65" }}>
-          Loading live data…
-        </div>
-      ) : (
-        <div className="p-6 space-y-6">
-          {/* Blockers pinned */}
-          <section
-            className="overflow-hidden rounded-xl"
-            style={{
-              backgroundColor: "#ffffff",
-              border: "1px solid #f1c9c4",
-              boxShadow:
-                "0 1px 2px rgba(179, 38, 30, 0.06), 0 12px 28px -14px rgba(179, 38, 30, 0.22)",
-            }}
-          >
-            <div
-              className="flex items-center justify-between px-5 py-3"
+      <div style={{ padding: "28px var(--kz-pad-x) 60px var(--kz-pad-x)" }}>
+        {/* Tiled dependency cards. margin:-0.5px so adjacent borders collapse
+            into one hairline instead of doubling up. */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit,minmax(420px,1fr))",
+            gap: 0,
+          }}
+        >
+          {deps.map((d) => (
+            <section
+              key={d.id}
               style={{
-                borderBottom: "1px solid #f1c9c4",
-                background: "linear-gradient(180deg, #fff5f4 0%, #fdeceb 100%)",
+                border: `1px solid ${KZ.bone}`,
+                margin: -0.5,
+                padding: "20px 24px",
               }}
             >
-              <h2 className="text-sm font-semibold" style={{ color: "#b3261e" }}>
-                Blockers &amp; urgent · {blockers.length}
-              </h2>
-              <span className="text-xs" style={{ color: "#565c65" }}>
-                Titles/labels containing "block" or priority = Urgent
-              </span>
-            </div>
-            {blockers.length === 0 ? (
-              <div className="p-4 text-center text-xs" style={{ color: "#565c65" }}>
-                No blockers currently flagged in Linear.
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+                <WsTag ws={d.from} />
+                <Mono size={11}>blocks</Mono>
+                <WsTag ws={d.to} />
+                <Tag tone={HEALTH_COLOR[d.severity]} style={{ marginLeft: "auto" }}>
+                  {HEALTH_LABEL[d.severity]}
+                </Tag>
               </div>
-            ) : (
-              <ul className="divide-y" style={{ borderColor: "#f1c9c4" }}>
-                {blockers.map((b) => (
-                  <IssueRow key={b.id} issue={b} />
-                ))}
-              </ul>
-            )}
-          </section>
-
-          {/* Cross-workstream dependencies (meeting truth) */}
-          <section
-            className="overflow-hidden rounded-xl"
-            style={{
-              backgroundColor: "#ffffff",
-              border: "1px solid #dfe1e2",
-              boxShadow:
-                "0 1px 2px rgba(17, 47, 78, 0.04), 0 12px 28px -14px rgba(17, 47, 78, 0.18)",
-            }}
-          >
-            <div
-              className="flex items-center justify-between px-5 py-3"
-              style={{
-                borderBottom: "1px solid #dfe1e2",
-                background: "linear-gradient(180deg, #f5f8fc 0%, #eef2f7 100%)",
-              }}
-            >
-              <h2 className="text-sm font-semibold" style={{ color: "#3a5a40" }}>
-                Cross-workstream dependencies · {seed.crossDeps.length}
-              </h2>
-              <span className="text-xs" style={{ color: "#565c65" }}>
-                From Mon 7/13 cross-functional sync
-              </span>
-            </div>
-            <ul className="divide-y" style={{ borderColor: "#eef1f4" }}>
-              {seed.crossDeps.map((d) => (
-                <li key={d.id} className="px-5 py-3">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <div className="text-[13px] font-medium" style={{ color: "#1b1b1b" }}>
-                      <span className="mr-2 font-mono text-xs" style={{ color: "#565c65" }}>
-                        {d.from} → {d.to}
-                      </span>
-                      {d.title}
-                    </div>
-                    <span
-                      className="rounded px-1.5 py-0.5 text-xs font-semibold uppercase"
-                      style={{
-                        color: HEALTH_COLOR[d.severity],
-                        backgroundColor: `${HEALTH_COLOR[d.severity]}14`,
-                        border: `1px solid ${HEALTH_COLOR[d.severity]}44`,
-                      }}
-                    >
-                      {HEALTH_LABEL[d.severity]}
-                    </span>
-                  </div>
-                  <div className="mt-1 text-xs" style={{ color: "#3d3d3d" }}>
-                    {d.detail}
-                  </div>
-                  <div
-                    className="mt-1 flex flex-wrap gap-3 text-xs"
-                    style={{ color: "#565c65" }}
-                  >
-                    <span>Owner: {d.owner}</span>
-                    {d.due && <span>Due: {d.due}</span>}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          {/* Grouped by workstream */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {grouped.map((g) => (
-              <section
-                key={g.ws}
-                className="rounded-xl p-5"
+              <div
                 style={{
-                  backgroundColor: "#f7f7f5",
-                  border: "1px solid #e0e2e0",
-                  boxShadow:
-                    "0 1px 2px rgba(17, 47, 78, 0.04), 0 8px 24px -12px rgba(17, 47, 78, 0.12)",
+                  marginTop: 12,
+                  fontSize: 15,
+                  fontWeight: 500,
+                  lineHeight: 1.35,
+                  letterSpacing: "-0.01em",
                 }}
               >
-                <div className="mb-4 flex items-baseline justify-between">
-                  <h2
-                    className="text-sm font-semibold"
-                    style={{ color: "#3a5a40", fontFamily: "Public Sans, system-ui, sans-serif" }}
-                  >
-                    {workstreamOf(g.ws, program).label}
-                  </h2>
-                  <span className="text-xs" style={{ color: "#565c65" }}>
-                    {g.items.length} open
-                  </span>
-                </div>
-                <ul className="space-y-2">
-                  {g.items.map((i) => (
-                    <IssueRow key={i.id} issue={i} />
-                  ))}
-                </ul>
-              </section>
-            ))}
-          </div>
+                {d.title}
+              </div>
+              <p
+                style={{
+                  margin: "8px 0 0 0",
+                  fontSize: 13,
+                  lineHeight: 1.5,
+                  color: KZ.body,
+                  textWrap: "pretty",
+                }}
+              >
+                {d.detail}
+              </p>
+              <div style={{ marginTop: 12 }}>
+                <Mono size={10.5}>
+                  {d.owner}
+                  {d.due ? ` · due ${shortDate(d.due)}` : " · no date stated"}
+                </Mono>
+              </div>
+            </section>
+          ))}
         </div>
-      )}
+        {deps.length === 0 ? (
+          <div style={{ fontSize: 13.5, color: KZ.body }}>
+            No cross-workstream dependency is recorded for this filter.
+          </div>
+        ) : (
+          <Disclosure style={{ marginTop: 14 }}>
+            As stated in the cross-workstream sync — a dependency with no date says so rather than
+            inventing one
+          </Disclosure>
+        )}
+
+        {isLoading ? (
+          <div style={{ marginTop: 34 }}>
+            <Mono size={11}>Loading…</Mono>
+          </div>
+        ) : (
+          <>
+            <div style={{ marginTop: 34 }}>
+              <Panel>
+                <PanelHead
+                  label="Blockers & urgent"
+                  right={pad2(blockers.length)}
+                  rightTone={blockers.length ? KZ.coral : undefined}
+                />
+                {blockers.length === 0 ? (
+                  <div style={{ marginTop: 14, fontSize: 13, color: KZ.body }}>
+                    No blockers currently flagged in Linear.
+                  </div>
+                ) : (
+                  <List>
+                    {blockers.map((b) => (
+                      <IssueRow key={b.identifier} issue={b} />
+                    ))}
+                  </List>
+                )}
+                <Disclosure>
+                  Titles or labels containing "block", plus anything open at Urgent
+                </Disclosure>
+              </Panel>
+            </div>
+
+            <div
+              style={{
+                marginTop: 34,
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit,minmax(440px,1fr))",
+                gap: 24,
+                alignItems: "start",
+              }}
+            >
+              {grouped.map((g) => (
+                <Panel key={g.ws}>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      alignItems: "baseline",
+                      gap: 12,
+                      borderBottom: `1px solid ${KZ.bone}`,
+                      paddingBottom: 10,
+                    }}
+                  >
+                    <WsTag ws={g.ws} />
+                    <SectionTitle size={16}>{workstreamOf(g.ws, program).label}</SectionTitle>
+                    <Mono size={11} style={{ marginLeft: "auto" }}>
+                      {pad2(g.items.length)} open
+                    </Mono>
+                  </div>
+                  <List>
+                    {g.items.map((i) => (
+                      <IssueRow key={i.identifier} issue={i} />
+                    ))}
+                  </List>
+                </Panel>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </AppLayout>
   );
 }
@@ -274,42 +309,40 @@ function IssueRow({ issue }: { issue: StoredLinearIssue }) {
   const ws = inferWorkstream(issue, program) as WorkstreamKey;
   return (
     <li
-      className="rounded bg-white p-2.5"
       style={{
-        border: "1px solid #eee",
-        borderLeft: `3px solid ${workstreamOf(ws, program).color}`,
+        padding: "14px 0",
+        borderBottom: `1px solid ${KZ.grey200}`,
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
       }}
     >
-      <div className="flex items-baseline gap-2">
-        <a
-          href={issue.url ?? "#"}
-          target="_blank"
-          rel="noreferrer"
-          className="font-mono text-xs underline"
-          style={{ color: "#565c65" }}
-        >
-          {issue.identifier}
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+        <a href={issue.url ?? undefined} target="_blank" rel="noreferrer">
+          <Mono size={11} tone={KZ.blue}>
+            {issue.identifier}
+          </Mono>
         </a>
-        <span className="text-[13px] font-medium">{issue.title}</span>
+        <span style={{ fontSize: 14, lineHeight: 1.35 }}>{issue.title}</span>
       </div>
       <div
-        className="mt-1 flex flex-wrap items-center gap-2 text-xs"
-        style={{ color: "#565c65" }}
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 10,
+          fontFamily: "var(--font-mono)",
+          fontSize: 10.5,
+          color: KZ.monoDate,
+        }}
       >
         <WsTag ws={ws} />
         <span>{issue.assignee ?? "unassigned"}</span>
         <span>· {issue.state_name ?? "—"}</span>
-        <span
-          className="rounded px-1 py-0.5 font-semibold uppercase"
-          style={{
-            color: priorityColor(issue.priority),
-            backgroundColor: `${priorityColor(issue.priority)}14`,
-            border: `1px solid ${priorityColor(issue.priority)}44`,
-          }}
-        >
-          {priorityLabel(issue.priority)}
-        </span>
-        <span className="ml-auto">{relativeTime(issue.source_updated_at)}</span>
+        {issue.priority === 1 || issue.priority === 2 ? (
+          <Tag tone={priorityColor(issue.priority)}>{priorityLabel(issue.priority)}</Tag>
+        ) : null}
+        <span style={{ marginLeft: "auto" }}>{relativeTime(issue.source_updated_at)}</span>
       </div>
     </li>
   );

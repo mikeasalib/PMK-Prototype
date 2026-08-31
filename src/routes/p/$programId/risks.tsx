@@ -2,8 +2,20 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppLayout, PageHeader } from "@/components/AppLayout";
 import { WsTag } from "@/components/va-ui";
+import {
+  Chip,
+  Disclosure,
+  KZ,
+  KpiStrip,
+  Mono,
+  TableFrame,
+  Tag,
+  Td,
+  Th,
+  pad2,
+} from "@/components/kz";
 import { type RiskSeverity, type RiskStatus, type WorkstreamKey } from "@/lib/va-data";
-import { PROGRAMS, pageTitle, workstreamKeys } from "@/lib/program.config";
+import { PROGRAMS, pageTitle, workstreamKeys, workstreamOf } from "@/lib/program.config";
 import { seedFor } from "@/lib/program-seed";
 import { useProgram } from "./route";
 
@@ -21,34 +33,30 @@ export const Route = createFileRoute("/p/$programId/risks")({
 });
 
 /**
- * Colour only at the top of the scale.
- *
- * Severity is the thing that is actually wrong on this page, so it keeps the
- * accent — but only where it means something. Low and medium going neutral is
- * what lets critical and high read as alarming; when all four levels carried a
- * distinct colour, none of them did. Same rule as the urgency dot on the work
- * views.
+ * Severity carries the accent, because severity is the thing that is actually
+ * wrong on this page. Low stays grey and medium stays blue so that high and
+ * critical read as alarming — when all four levels carry a hot colour, none of
+ * them does.
  */
 const SEV_COLOR: Record<RiskSeverity, string> = {
-  low: "#8a8a80",
-  medium: "#8a8a80",
-  high: "#d98324",
-  critical: "#b3261e",
+  low: KZ.muted,
+  medium: KZ.blue,
+  high: KZ.amber,
+  critical: KZ.coral,
 };
 
 /**
- * Status is a label, not an alarm.
- *
- * It was red / amber / green, which put a second competing traffic light on
- * every row and made an *open* low-severity risk shout as loudly as a critical
- * one. Neutral throughout: the word already says which state it is, and
- * severity is what ranks the row.
+ * Status is the register's own word for where the risk stands, so it gets the
+ * same tag treatment: open is the alarm, mitigating is in hand, resolved is the
+ * one green thing in this design.
  */
 const STATUS_COLOR: Record<RiskStatus, string> = {
-  open: "#565c65",
-  mitigating: "#565c65",
-  resolved: "#8a8a80",
+  open: KZ.coral,
+  mitigating: KZ.amber,
+  resolved: KZ.green,
 };
+
+const AGING_DAYS = 5;
 
 function daysBetween(a: string, b: string) {
   return Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000);
@@ -63,7 +71,7 @@ function RisksPage() {
   const [sev, setSev] = useState<RiskSeverity | "all">("all");
   const [status, setStatus] = useState<RiskStatus | "all">("all");
 
-  const owners = useMemo(() => Array.from(new Set(seed.risks.map((r) => r.owner))).sort(), []);
+  const owners = useMemo(() => Array.from(new Set(seed.risks.map((r) => r.owner))).sort(), [seed]);
 
   const rows = useMemo(
     () =>
@@ -74,7 +82,7 @@ function RisksPage() {
           (sev === "all" || r.severity === sev) &&
           (status === "all" || r.status === status),
       ),
-    [ws, owner, sev, status],
+    [seed, ws, owner, sev, status],
   );
 
   const openedThisWeek = seed.risks.filter((r) => daysBetween(r.opened, today) <= 7).length;
@@ -82,53 +90,112 @@ function RisksPage() {
     (r) => r.closed && daysBetween(r.closed, today) <= 7,
   ).length;
   const openTotal = seed.risks.filter((r) => r.status !== "resolved").length;
+  const net = openedThisWeek - closedThisWeek;
 
   return (
     <AppLayout>
       <PageHeader
+        eyebrow="Register"
         title="Risks & blockers"
-        subtitle="Program risk register. Aging highlighted after 5 business days."
+        subtitle={`Program risk register, read from the Notion table under this program's hub. Aging highlighted after ${AGING_DAYS} business days.`}
       />
 
-      <div
-        className="grid grid-cols-2 gap-3 px-4 py-4 sm:px-6 md:grid-cols-4"
-        style={{ borderBottom: "1px solid #dfe1e2", backgroundColor: "#f7f7f5" }}
-      >
-        {/* One accent, on the count that means something. Opened / closed /
-            net are arithmetic, not alarms — colouring each of them a different
-            hue put a four-way traffic light above a table that already ranks
-            itself by severity. */}
-        <Kpi label="Open" value={openTotal} color={openTotal > 0 ? "#b3261e" : "#565c65"} />
-        <Kpi label="Opened this week" value={openedThisWeek} color="#1b1b1b" />
-        <Kpi label="Closed this week" value={closedThisWeek} color="#1b1b1b" />
-        <Kpi label="Net this week" value={openedThisWeek - closedThisWeek} color="#1b1b1b" />
-      </div>
+      <KpiStrip
+        items={[
+          {
+            label: "Open",
+            value: pad2(openTotal),
+            sub: `of ${seed.risks.length} in register`,
+            danger: openTotal > 0,
+          },
+          { label: "Opened this week", value: pad2(openedThisWeek), sub: "new entries" },
+          { label: "Closed this week", value: pad2(closedThisWeek), sub: "resolved" },
+          {
+            label: "Net this week",
+            value: `${net > 0 ? "+" : ""}${net}`,
+            sub: "opened minus closed",
+          },
+        ]}
+      />
 
+      {/* The four filters, as the chip row the sprint board uses. Owner keeps a
+          select: on VA it has eleven values, and eleven chips is a paragraph. */}
       <div
-        className="flex flex-wrap items-center gap-2 px-6 py-3"
-        style={{ borderBottom: "1px solid #e5e5e2" }}
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 8,
+          padding: "16px var(--kz-pad-x)",
+          borderBottom: `1px solid ${KZ.bone}`,
+        }}
       >
-        <Filter label="Workstream">
-          <select
-            value={ws}
-            onChange={(e) => setWs(e.target.value as WorkstreamKey | "all")}
-            className="rounded border px-2 py-1 text-xs"
-            style={{ borderColor: "#d5d5d0" }}
-          >
-            <option value="all">All</option>
-            {workstreamKeys(program).map((k) => (
-              <option key={k} value={k}>
-                {k}
-              </option>
-            ))}
-          </select>
-        </Filter>
-        <Filter label="Owner">
+        <Mono size={10} tone={KZ.muted} style={{ textTransform: "uppercase", marginRight: 6 }}>
+          Workstream
+        </Mono>
+        <Chip label="All" active={ws === "all"} onClick={() => setWs("all")} />
+        {workstreamKeys(program).map((k) => (
+          <Chip
+            key={k}
+            label={k}
+            active={ws === k}
+            tone={workstreamOf(k, program).color}
+            onClick={() => setWs(k as WorkstreamKey)}
+          />
+        ))}
+
+        <Mono
+          size={10}
+          tone={KZ.muted}
+          style={{ textTransform: "uppercase", marginLeft: 18, marginRight: 6 }}
+        >
+          Severity
+        </Mono>
+        <Chip label="All" active={sev === "all"} onClick={() => setSev("all")} />
+        {(["critical", "high", "medium", "low"] as RiskSeverity[]).map((s) => (
+          <Chip
+            key={s}
+            label={s}
+            active={sev === s}
+            tone={SEV_COLOR[s]}
+            onClick={() => setSev(s)}
+          />
+        ))}
+
+        <Mono
+          size={10}
+          tone={KZ.muted}
+          style={{ textTransform: "uppercase", marginLeft: 18, marginRight: 6 }}
+        >
+          Status
+        </Mono>
+        <Chip label="All" active={status === "all"} onClick={() => setStatus("all")} />
+        {(["open", "mitigating", "resolved"] as RiskStatus[]).map((s) => (
+          <Chip
+            key={s}
+            label={s}
+            active={status === s}
+            tone={STATUS_COLOR[s]}
+            onClick={() => setStatus(s)}
+          />
+        ))}
+
+        <label style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 18 }}>
+          <Mono size={10} tone={KZ.muted} style={{ textTransform: "uppercase" }}>
+            Owner
+          </Mono>
           <select
             value={owner}
             onChange={(e) => setOwner(e.target.value)}
-            className="rounded border px-2 py-1 text-xs"
-            style={{ borderColor: "#d5d5d0" }}
+            style={{
+              border: `1px solid ${KZ.bone}`,
+              borderRadius: 0,
+              background: KZ.white,
+              color: KZ.ink,
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              padding: "6px 8px",
+            }}
           >
             <option value="all">All</option>
             {owners.map((o) => (
@@ -137,144 +204,99 @@ function RisksPage() {
               </option>
             ))}
           </select>
-        </Filter>
-        <Filter label="Severity">
-          <select
-            value={sev}
-            onChange={(e) => setSev(e.target.value as RiskSeverity | "all")}
-            className="rounded border px-2 py-1 text-xs"
-            style={{ borderColor: "#d5d5d0" }}
-          >
-            <option value="all">All</option>
-            {(["critical", "high", "medium", "low"] as RiskSeverity[]).map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </Filter>
-        <Filter label="Status">
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as RiskStatus | "all")}
-            className="rounded border px-2 py-1 text-xs"
-            style={{ borderColor: "#d5d5d0" }}
-          >
-            <option value="all">All</option>
-            {(["open", "mitigating", "resolved"] as RiskStatus[]).map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </Filter>
-        <span className="ml-auto text-xs" style={{ color: "#565c65" }}>
-          {rows.length} of {seed.risks.length}
-        </span>
+        </label>
+
+        <Mono size={11} tone={KZ.muted} style={{ marginLeft: "auto" }}>
+          {pad2(rows.length)} of {pad2(seed.risks.length)}
+        </Mono>
       </div>
 
-      <div className="p-6">
-        <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] text-xs" style={{ border: "1px solid #e5e5e2" }}>
-          <thead style={{ backgroundColor: "#f7f7f5" }}>
-            <tr
-              className="text-left uppercase tracking-wide"
-              style={{ color: "#565c65", fontSize: 12 }}
-            >
-              <th className="px-3 py-2 font-medium">ID</th>
-              <th className="px-3 py-2 font-medium">Risk</th>
-              <th className="px-3 py-2 font-medium">WS</th>
-              <th className="px-3 py-2 font-medium">Owner</th>
-              <th className="px-3 py-2 font-medium">Opened</th>
-              <th className="px-3 py-2 font-medium">Age</th>
-              <th className="px-3 py-2 font-medium">Severity</th>
-              <th className="px-3 py-2 font-medium">Status</th>
-              <th className="px-3 py-2 font-medium">Ticket</th>
-              <th className="px-3 py-2 font-medium">Next action</th>
+      <div style={{ padding: "28px var(--kz-pad-x) 60px var(--kz-pad-x)" }}>
+        <TableFrame>
+          <thead>
+            <tr style={{ borderBottom: `1px solid ${KZ.ink}` }}>
+              <Th>ID</Th>
+              <Th>Risk</Th>
+              <Th>WS</Th>
+              <Th>Owner</Th>
+              <Th>Age</Th>
+              <Th>Severity</Th>
+              <Th>Status</Th>
+              <Th>Ticket</Th>
+              <Th>Next action</Th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => {
               const age = daysBetween(r.opened, r.closed ?? today);
-              const aging = r.status !== "resolved" && age > 5;
+              const aging = r.status !== "resolved" && age > AGING_DAYS;
               return (
-                <tr key={r.id} style={{ borderTop: "1px solid #eee" }}>
-                  <td className="px-3 py-2 font-mono">{r.id}</td>
-                  <td className="px-3 py-2 font-medium">{r.title}</td>
-                  <td className="px-3 py-2">
-                    <WsTag ws={r.ws} />
-                  </td>
-                  <td className="px-3 py-2">{r.owner}</td>
-                  <td className="px-3 py-2 font-mono" style={{ color: "#565c65" }}>
-                    {r.opened}
-                  </td>
-                  <td
-                    className="px-3 py-2 font-mono"
-                    style={{ color: aging ? "#b3261e" : "#565c65", fontWeight: aging ? 700 : 400 }}
-                    title={aging ? "Aging — open >5 days" : undefined}
+                <tr key={r.id} style={{ borderBottom: `1px solid ${KZ.grey200}` }}>
+                  <Td
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 11,
+                      whiteSpace: "nowrap",
+                    }}
                   >
-                    {age}d{aging ? " ⚠" : ""}
-                  </td>
-                  <td className="px-3 py-2">
-                    <Pill color={SEV_COLOR[r.severity]} label={r.severity} />
-                  </td>
-                  <td className="px-3 py-2">
-                    <Pill color={STATUS_COLOR[r.status]} label={r.status} />
-                  </td>
-                  <td className="px-3 py-2 font-mono" style={{ color: "#565c65" }}>
+                    {r.id}
+                  </Td>
+                  <Td style={{ fontWeight: 500 }}>{r.title}</Td>
+                  <Td>
+                    <WsTag ws={r.ws} />
+                  </Td>
+                  <Td style={{ color: KZ.body, whiteSpace: "nowrap" }}>{r.owner}</Td>
+                  {/* Aging is the one thing the age column can be wrong about
+                      quietly, so it carries the accent — and the opened date
+                      stays on the tooltip rather than taking a column. */}
+                  <Td
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 11,
+                      color: aging ? KZ.coral : KZ.monoDate,
+                      whiteSpace: "nowrap",
+                    }}
+                    title={
+                      aging
+                        ? `Opened ${r.opened} — open longer than ${AGING_DAYS} days`
+                        : `Opened ${r.opened}`
+                    }
+                  >
+                    {age}d
+                  </Td>
+                  <Td>
+                    <Tag tone={SEV_COLOR[r.severity]}>{r.severity}</Tag>
+                  </Td>
+                  <Td>
+                    <Tag tone={STATUS_COLOR[r.status]}>{r.status}</Tag>
+                  </Td>
+                  <Td
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 11,
+                      color: r.linkedTicket ? KZ.blue : KZ.muted,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
                     {r.linkedTicket ?? "—"}
-                  </td>
-                  <td className="px-3 py-2" style={{ color: "#1b1b1b" }}>
-                    {r.nextAction}
-                  </td>
+                  </Td>
+                  <Td style={{ color: KZ.body, maxWidth: 280 }}>{r.nextAction}</Td>
                 </tr>
               );
             })}
+            {rows.length === 0 ? (
+              <tr>
+                <Td colSpan={9} style={{ color: KZ.body }}>
+                  No risk in the register matches these filters.
+                </Td>
+              </tr>
+            ) : null}
           </tbody>
-        </table>
-            </div>
+        </TableFrame>
+        <Disclosure>
+          Age counts from the register's own opened date, or to the closed date where one is set
+        </Disclosure>
       </div>
     </AppLayout>
-  );
-}
-
-function Kpi({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div
-      className="rounded-md bg-white px-3 py-2"
-      style={{ border: "1px solid #e5e5e2", borderLeft: `3px solid ${color}` }}
-    >
-      <div className="text-xs uppercase tracking-wide" style={{ color: "#565c65" }}>
-        {label}
-      </div>
-      <div
-        className="text-xl font-bold"
-        style={{ color, fontFamily: "Public Sans, system-ui, sans-serif" }}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function Filter({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="flex items-center gap-1.5">
-      <span className="text-xs uppercase tracking-wide" style={{ color: "#565c65" }}>
-        {label}
-      </span>
-      {children}
-    </label>
-  );
-}
-
-function Pill({ color, label }: { color: string; label: string }) {
-  return (
-    <span
-      className="rounded px-1.5 py-0.5 text-xs font-semibold uppercase"
-      style={{ color, backgroundColor: `${color}14`, border: `1px solid ${color}44` }}
-    >
-      {label}
-    </span>
   );
 }

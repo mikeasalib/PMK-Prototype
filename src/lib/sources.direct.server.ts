@@ -15,7 +15,7 @@
 // caller gets `null` for that source and decides whether to use a snapshot —
 // the origin travels with the rows exactly as before.
 
-import { sourcesFor } from "./program.sources.server";
+import { GATEWAY_URL, sourcesFor } from "./program.sources.server";
 
 const CACHE_TTL_MS = 60_000;
 
@@ -274,14 +274,16 @@ export async function readLinearMilestones(
         };
       } | null;
     }>(LINEAR_MILESTONES_QUERY, { projectId });
-    const rows: DirectLinearMilestone[] = (data.project?.projectMilestones.nodes ?? []).map((m) => ({
-      source_id: m.id,
-      name: m.name,
-      target_date: m.targetDate ? m.targetDate.slice(0, 10) : null,
-      progress: m.progress ?? null,
-      url: data.project?.url ?? null,
-      synced_at: readAt,
-    }));
+    const rows: DirectLinearMilestone[] = (data.project?.projectMilestones.nodes ?? []).map(
+      (m) => ({
+        source_id: m.id,
+        name: m.name,
+        target_date: m.targetDate ? m.targetDate.slice(0, 10) : null,
+        progress: m.progress ?? null,
+        url: data.project?.url ?? null,
+        synced_at: readAt,
+      }),
+    );
     const out = { rows, readAt };
     store(cacheKey, out);
     return out;
@@ -464,4 +466,149 @@ export async function notionChildren(blockId: string): Promise<NotionBlock[]> {
     cursor = d.has_more ? d.next_cursor : undefined;
   } while (cursor);
   return out;
+}
+
+// -------------------------------------------------------------- Granola
+
+/**
+ * Granola notes.
+ *
+ * Granola is the odd source out. Linear and Notion take a personal token and
+ * answer on their own public APIs; Granola's notes are reachable for this
+ * account only through the connector gateway, which needs LOVABLE_API_KEY on
+ * top of GRANOLA_API_KEY. That is exactly the two-key requirement that made the
+ * old sync report a confusing auth failure, so the two are reported separately
+ * here: a missing gateway key and a missing Granola key have different fixes.
+ *
+ * Metadata only, deliberately. The gateway returns note titles, ids and
+ * timestamps — not bodies — so this can tell you a call happened and link to it,
+ * and it must never be used as the source of a claim about what was *said*.
+ * Anything quoting a call still has to come from a human or from Granola
+ * directly.
+ *
+ * Scope is time first, then narrowing (see GranolaSource): folder-scoped reads
+ * are refused for this account, so a folder id is not sent.
+ */
+export interface DirectGranolaNote {
+  source_id: string;
+  title: string;
+  url: string;
+  attendees: string[];
+  source_created_at: string | null;
+  source_updated_at: string | null;
+  synced_at: string;
+}
+
+let lastGranolaError: string | null = null;
+
+export function granolaLastError(): string | null {
+  return lastGranolaError;
+}
+
+/** True when both keys the gateway path needs are present. */
+export function granolaConfigured(): boolean {
+  return Boolean(process.env.GRANOLA_API_KEY) && Boolean(process.env.LOVABLE_API_KEY);
+}
+
+/** Which of the two keys is missing, for a message that names the actual fix. */
+export function granolaMissingKey(): "granola" | "gateway" | null {
+  if (!process.env.GRANOLA_API_KEY) return "granola";
+  if (!process.env.LOVABLE_API_KEY) return "gateway";
+  return null;
+}
+
+type GatewayNote = {
+  id: string;
+  title?: string;
+  created_at?: string;
+  updated_at?: string;
+  attendees?: Array<{ email?: string } | string>;
+  participants?: Array<{ email?: string } | string>;
+};
+
+/** Attendee emails, whichever field the payload uses. */
+function attendeesOf(n: GatewayNote): string[] {
+  const raw = n.attendees ?? n.participants ?? [];
+  return raw
+    .map((a) => (typeof a === "string" ? a : (a.email ?? "")))
+    .filter((e) => e.includes("@"))
+    .map((e) => e.toLowerCase());
+}
+
+export async function readGranolaNotes(
+  programId: string,
+): Promise<DirectReadResult<DirectGranolaNote> | null> {
+  const src = sourcesFor(programId);
+  if (!src.granola) return null;
+  if (!granolaConfigured()) return null;
+
+  const key = `granola:${programId}`;
+  const hit = cached<DirectReadResult<DirectGranolaNote>>(key);
+  if (hit) return hit;
+
+  const since = new Date(Date.now() - src.granola.windowDays * 86400000).toISOString();
+
+  try {
+    const u = new URL(`${GATEWAY_URL}/granola/v1/notes`);
+    u.searchParams.set("limit", "100");
+    u.searchParams.set("since", since);
+    const res = await fetch(u.toString(), {
+      headers: {
+        Authorization: `Bearer ${process.env.LOVABLE_API_KEY}`,
+        "X-Connection-Api-Key": process.env.GRANOLA_API_KEY as string,
+        "Content-Type": "application/json",
+      },
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(
+        `HTTP ${res.status}` +
+          (res.status === 403
+            ? " — the workspace's policy refused the read"
+            : body
+              ? ` — ${body.slice(0, 160)}`
+              : ""),
+      );
+    }
+    const data = (await res.json()) as { notes?: GatewayNote[] };
+    const all = data.notes ?? [];
+
+    // Narrowing. A note counts for this program if its title matches or one of
+    // its attendees is on a program domain — either is sufficient, because
+    // Granola's attendee metadata is frequently incomplete and a "VA Sync Up"
+    // with no attendee list still belongs to the VA program.
+    const { domains, titleMatch } = src.granola;
+    const narrowing = domains.length > 0 || titleMatch !== null;
+    const seen = new Set<string>();
+    const rows: DirectGranolaNote[] = [];
+    for (const n of all) {
+      if (!n.id || seen.has(n.id)) continue;
+      const title = n.title ?? "(untitled)";
+      const attendees = attendeesOf(n);
+      const titleHit = titleMatch ? titleMatch.test(title) : false;
+      const domainHit = attendees.some((e) => domains.some((d) => e.endsWith(`@${d}`)));
+      if (narrowing && !titleHit && !domainHit) continue;
+      seen.add(n.id);
+      rows.push({
+        source_id: n.id,
+        title,
+        url: `https://notes.granola.ai/d/${n.id}`,
+        attendees,
+        source_created_at: n.created_at ?? null,
+        source_updated_at: n.updated_at ?? null,
+        synced_at: new Date().toISOString(),
+      });
+    }
+
+    lastGranolaError = null;
+    const out: DirectReadResult<DirectGranolaNote> = {
+      rows,
+      readAt: new Date().toISOString(),
+    };
+    store(key, out);
+    return out;
+  } catch (e) {
+    lastGranolaError = (e as Error).message;
+    return null;
+  }
 }

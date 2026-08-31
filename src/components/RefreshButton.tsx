@@ -1,7 +1,7 @@
 import { toast } from "sonner";
-import { RefreshCw } from "lucide-react";
 import { useProgramData, relativeTime, absoluteTime } from "@/hooks/use-program-data";
 import { useProgram } from "@/routes/p/$programId/route";
+import { Button, KZ, Mono } from "./kz";
 
 export function RefreshButton() {
   const program = useProgram();
@@ -25,23 +25,19 @@ export function RefreshButton() {
   };
 
   return (
-    <div className="flex items-center gap-3">
-      <span
-        className="text-xs"
-        style={{ color: "#565c65" }}
+    <div className="flex items-center gap-[10px]">
+      {/* When the data was last read stays next to the control that re-reads
+          it — mono, because it is a timestamp, not prose. */}
+      <Mono
+        size={10.5}
+        tone={KZ.muted}
         title={lastSyncedAt ? absoluteTime(lastSyncedAt) : undefined}
       >
         Updated {relativeTime(lastSyncedAt)}
-      </span>
-      <button
-        onClick={onClick}
-        disabled={isRefreshing}
-        className="cedar-btn"
-        style={{ cursor: isRefreshing ? "wait" : "pointer" }}
-      >
-        <RefreshCw size={14} className={isRefreshing ? "animate-spin" : undefined} />
+      </Mono>
+      <Button onClick={onClick} disabled={isRefreshing} style={{ borderColor: KZ.bone }}>
         {isRefreshing ? "Refreshing…" : "Refresh"}
-      </button>
+      </Button>
     </div>
   );
 }

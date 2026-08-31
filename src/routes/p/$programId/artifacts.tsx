@@ -2,11 +2,20 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { FileText, FileSpreadsheet, FileType, Download, Loader2, Eye, X } from "lucide-react";
-import { AppLayout, PageHeader } from "@/components/AppLayout";
-import { PROGRAMS, pageTitle } from "@/lib/program.config";
-import { useProgram } from "./route";
 import { useQuery } from "@tanstack/react-query";
+import { AppLayout, PageHeader } from "@/components/AppLayout";
+import {
+  Button,
+  Disclosure,
+  KZ,
+  Mono,
+  NoteBox,
+  PanelHead,
+  SectionTitle,
+  Square,
+  Tag,
+} from "@/components/kz";
+import { PROGRAMS, pageTitle } from "@/lib/program.config";
 import {
   ARTIFACTS,
   previewArtifact,
@@ -16,6 +25,7 @@ import {
   type ArtifactPreview,
   type SourceReadiness,
 } from "@/lib/artifacts.functions";
+import { useProgram } from "./route";
 
 export const Route = createFileRoute("/p/$programId/artifacts")({
   head: ({ params }) => ({
@@ -31,12 +41,20 @@ export const Route = createFileRoute("/p/$programId/artifacts")({
   component: Artifacts,
 });
 
-const ICON: Record<ArtifactKind, typeof FileText> = {
-  rollup: FileText,
-  "sprint-rollup": FileText,
-  "project-plan": FileType,
-  poam: FileSpreadsheet,
-};
+/** The format, from the filename rather than an icon set. */
+function formatOf(filename: string): string {
+  const ext = filename.split(".").pop()?.toLowerCase();
+  switch (ext) {
+    case "md":
+      return "Markdown";
+    case "docx":
+      return "DOCX";
+    case "xlsx":
+      return "XLSX";
+    default:
+      return ext?.toUpperCase() ?? "File";
+  }
+}
 
 /** Turn the base64 payload into a file the browser saves. */
 function download(a: GeneratedArtifact) {
@@ -48,25 +66,19 @@ function download(a: GeneratedArtifact) {
   el.href = url;
   el.download = a.filename;
   el.click();
-  // Revoke on the next tick, not synchronously. Some browsers have not yet
-  // begun reading the blob when click() returns, and revoking underneath them
-  // produced an empty or failed download.
+  // Revoke on the next tick, not synchronously. Some browsers have not begun
+  // reading the blob when click() returns, and revoking underneath them
+  // produced an empty download.
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 /**
  * Artifacts, with the provenance shown before you commit rather than after.
  *
- * Two things were the wrong way round. Source readiness only appeared once a
- * document had been generated AND written to disk, so you learned it had three
- * unsourced sections after it was in your Downloads folder. And generate()
- * called download() unconditionally, so there was no way to look at a client
- * deliverable before it landed.
- *
- * Now: a readiness panel reads the same assembly up front and says what each
- * source is contributing; Preview is the primary action and shows the actual
- * document; Download is a button inside the preview. Nothing reaches disk
- * without being looked at first.
+ * Readiness reads the same assembly the document will and says what each source
+ * is contributing; Preview is the primary action and shows the real document;
+ * Download sits inside the preview. Nothing reaches disk without being looked
+ * at first.
  */
 function Artifacts() {
   const program = useProgram();
@@ -103,53 +115,66 @@ function Artifacts() {
   return (
     <AppLayout>
       <PageHeader
+        eyebrow="Output"
         title="Artifacts"
         subtitle={`Formal documents generated from the ${program.domainLabel} program model. Every one is a draft to review, not a finished deliverable.`}
       />
 
-      <div className="px-4 pb-10 pt-2 sm:px-6">
-        <SourceReadinessPanel readiness={readiness} loading={readinessLoading} />
+      <div style={{ padding: "28px var(--kz-pad-x) 60px var(--kz-pad-x)" }}>
+        <NoteBox>
+          Facts are read from Linear, Notion, and Granola at generation time and never stored here.
+          Anything without a wired source is marked in the output as a gap rather than left blank,
+          so a reader can tell the difference between <em>zero</em> and <em>unknown</em>.
+        </NoteBox>
 
-        <div className="mt-5 space-y-3">
-          {applicable.map((a) => {
-            const Icon = ICON[a.kind];
+        <div style={{ marginTop: 24, maxWidth: 900 }}>
+          <ReadinessPanel readiness={readiness} loading={readinessLoading} />
+        </div>
+
+        {/* Stacked rows sharing borders, one per artifact. */}
+        <div style={{ marginTop: 24, maxWidth: 900 }}>
+          {applicable.map((a, idx) => {
             const isBusy = busy === a.kind;
             return (
               <div
                 key={a.kind}
-                className="rounded-lg bg-white p-4"
-                style={{ border: "1px solid #e5e7e4" }}
+                style={{
+                  border: `1px solid ${KZ.bone}`,
+                  borderTop: idx === 0 ? `1px solid ${KZ.bone}` : "none",
+                  padding: "24px 28px",
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "space-between",
+                  gap: 24,
+                }}
               >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <div
-                      className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded"
-                      style={{ backgroundColor: "#1f3d2b14", color: program.navColor }}
-                    >
-                      <Icon size={18} strokeWidth={2} />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-[14px] font-semibold">{a.title}</div>
-                      <p className="mt-0.5 text-xs" style={{ color: "#565c65" }}>
-                        {a.description}
-                      </p>
-                    </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+                    <SectionTitle size={18}>{a.title}</SectionTitle>
+                    <Mono size={10.5}>{formatOf(a.filename)}</Mono>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => show(a.kind)}
-                    disabled={isBusy}
-                    className="flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-[13px] font-medium text-white transition-opacity disabled:opacity-60"
-                    style={{ backgroundColor: program.navColor }}
+                  <p
+                    style={{
+                      margin: "8px 0 0 0",
+                      fontSize: 13.5,
+                      lineHeight: 1.5,
+                      color: KZ.body,
+                      maxWidth: "60ch",
+                    }}
                   >
-                    {isBusy ? (
-                      <Loader2 size={15} className="animate-spin" />
-                    ) : (
-                      <Eye size={15} />
-                    )}
-                    {isBusy ? "Generating…" : "Preview"}
-                  </button>
+                    {a.description}
+                  </p>
+                  <Disclosure style={{ marginTop: 12 }}>
+                    Unsourced sections are marked in the output, never left blank
+                  </Disclosure>
                 </div>
+                <Button
+                  onClick={() => show(a.kind)}
+                  disabled={isBusy}
+                  style={{ padding: "12px 14px", flexShrink: 0 }}
+                >
+                  {isBusy ? "Generating…" : "Generate"}
+                </Button>
               </div>
             );
           })}
@@ -164,10 +189,10 @@ function Artifacts() {
 /**
  * What each source is contributing, before anything is generated.
  *
- * Deliberately states counts rather than a green tick: "19 risks" and "0 risks"
- * are both successful reads, and only one of them produces a usable POA&M.
+ * States counts rather than a green tick: "19 risks" and "0 risks" are both
+ * successful reads, and only one of them produces a usable POA&M.
  */
-function SourceReadinessPanel({
+function ReadinessPanel({
   readiness,
   loading,
 }: {
@@ -176,11 +201,8 @@ function SourceReadinessPanel({
 }) {
   if (loading) {
     return (
-      <div
-        className="rounded-md p-3 text-xs"
-        style={{ backgroundColor: "#f7f7f5", border: "1px solid #e5e5e2", color: "#565c65" }}
-      >
-        Checking what the sources are returning…
+      <div style={{ border: `1px solid ${KZ.bone}`, padding: "16px 18px" }}>
+        <Mono size={11}>Checking what the sources are returning…</Mono>
       </div>
     );
   }
@@ -189,36 +211,51 @@ function SourceReadinessPanel({
   const gaps = readiness.unsourced.length;
   return (
     <div
-      className="rounded-md p-3 text-xs"
       style={{
-        backgroundColor: gaps > 0 ? "#fdf5e6" : "#f7f7f5",
-        border: `1px solid ${gaps > 0 ? "#e8dfb8" : "#e5e5e2"}`,
-        color: gaps > 0 ? "#7a5a00" : "#565c65",
+        border: `1px solid ${KZ.bone}`,
+        background: gaps > 0 ? KZ.grey050 : KZ.white,
+        padding: "20px 24px",
       }}
     >
-      <div className="font-semibold">
-        {gaps > 0
-          ? `Sources read — ${gaps} section${gaps === 1 ? "" : "s"} will generate as a gap`
-          : "Sources read — every section has a source"}
-      </div>
-      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
+      <PanelHead
+        label="Source readiness"
+        right={
+          gaps > 0
+            ? `${gaps} section${gaps === 1 ? "" : "s"} will generate as a gap`
+            : "every section has a source"
+        }
+        rightTone={gaps > 0 ? KZ.amber : KZ.green}
+      />
+      <div
+        style={{
+          marginTop: 14,
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "8px 24px",
+        }}
+      >
         {readiness.sources.map((s) => (
-          <span key={s.key}>
-            <span style={{ color: s.ok ? "#2e8540" : "#b3261e" }}>{s.ok ? "●" : "○"}</span>{" "}
-            {s.key}: {s.message}
+          <span key={s.key} style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <Square tone={s.ok ? KZ.green : KZ.coral} filled />
+            <Mono size={10.5} tone={KZ.ink}>
+              {s.key}
+            </Mono>
+            <Mono size={10.5}>{s.message}</Mono>
           </span>
         ))}
       </div>
-      <div className="mt-1.5">
-        {readiness.counts.workItems} work items · {readiness.counts.risks} risks ·{" "}
-        {readiness.counts.milestones} milestones · {readiness.counts.phases} phases
-        {readiness.freshestSourceAt ? ` · freshest read ${readiness.freshestSourceAt}` : ""}
+      <div style={{ marginTop: 12 }}>
+        <Mono size={10.5}>
+          {readiness.counts.workItems} work items · {readiness.counts.risks} risks ·{" "}
+          {readiness.counts.milestones} milestones · {readiness.counts.phases} phases
+          {readiness.freshestSourceAt ? ` · freshest read ${readiness.freshestSourceAt}` : ""}
+        </Mono>
       </div>
       {gaps > 0 ? (
-        <div className="mt-1.5">
-          Unsourced: {readiness.unsourced.join(", ")}. These render as an explicit
-          gap in the output, never as zero.
-        </div>
+        <Disclosure style={{ color: KZ.amber }}>
+          Unsourced: {readiness.unsourced.join(", ")}. These render as an explicit gap in the
+          output, never as zero
+        </Disclosure>
       ) : null}
     </div>
   );
@@ -228,16 +265,10 @@ function SourceReadinessPanel({
  * The document, before it reaches disk.
  *
  * Markdown renders as text. The OOXML artifacts cannot be displayed inline
- * honestly, so instead of faking a preview they state what was produced and
+ * honestly, so rather than faking a preview they state what was produced and
  * what to check — and the download is right there either way.
  */
-function PreviewModal({
-  preview,
-  onClose,
-}: {
-  preview: ArtifactPreview;
-  onClose: () => void;
-}) {
+function PreviewModal({ preview, onClose }: { preview: ArtifactPreview; onClose: () => void }) {
   const { artifact, text } = preview;
   const gaps = artifact.unsourced.length + (artifact.emptyColumns?.length ?? 0);
 
@@ -248,26 +279,27 @@ function PreviewModal({
         aria-label="Close preview"
         onClick={onClose}
         className="fixed inset-0 z-50"
-        style={{ backgroundColor: "rgba(0,0,0,0.35)" }}
+        style={{ background: "rgba(0,0,0,0.35)" }}
       />
       <div
         role="dialog"
         aria-label={`Preview ${artifact.filename}`}
-        className="fixed left-1/2 top-[6vh] z-50 flex max-h-[88vh] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
+        className="fixed left-1/2 top-[6vh] z-50 flex max-h-[88vh] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 flex-col overflow-hidden"
+        style={{ background: KZ.white, border: `1px solid ${KZ.ink}` }}
       >
         <div
-          className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3"
-          style={{ borderColor: "#e5e5e2" }}
+          className="flex shrink-0 items-center justify-between gap-3"
+          style={{ padding: "16px 20px", borderBottom: `1px solid ${KZ.ink}` }}
         >
-          <div className="min-w-0">
-            <div className="truncate text-sm font-semibold">{artifact.filename}</div>
-            <div className="text-xs" style={{ color: "#565c65" }}>
-              Draft — review before sending
+          <div style={{ minWidth: 0 }}>
+            <div className="truncate" style={{ fontSize: 14, fontWeight: 500 }}>
+              {artifact.filename}
             </div>
+            <Mono size={10.5}>Draft — review before sending</Mono>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
+          <div className="flex shrink-0 items-center gap-[10px]">
+            <Button
+              variant="solid"
               onClick={() => {
                 download(artifact);
                 const label =
@@ -277,66 +309,68 @@ function PreviewModal({
                 if (gaps > 0) toast.warning(label);
                 else toast.success(label);
               }}
-              className="flex items-center gap-2 rounded-md px-3 py-1.5 text-[13px] font-medium text-white"
-              style={{ backgroundColor: "#1f3d2b" }}
             >
-              <Download size={14} />
               Download
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close"
-              className="rounded p-1 hover:bg-neutral-100"
-              style={{ color: "#565c65" }}
-            >
-              <X size={16} />
-            </button>
+            </Button>
+            <Button onClick={onClose}>Close</Button>
           </div>
         </div>
 
         {gaps > 0 ? (
           <div
-            className="shrink-0 px-4 py-2 text-xs"
-            style={{ backgroundColor: "#fdf5e6", color: "#7a5a00" }}
+            className="shrink-0"
+            style={{
+              padding: "10px 20px",
+              background: KZ.grey050,
+              borderBottom: `1px solid ${KZ.bone}`,
+            }}
           >
-            {artifact.unsourced.length > 0
-              ? `Unsourced sections: ${artifact.unsourced.join(", ")}. `
-              : ""}
-            {artifact.emptyColumns?.length
-              ? `Columns with no source: ${artifact.emptyColumns.join(", ")}.`
-              : ""}
+            <Mono size={10.5} tone={KZ.amber}>
+              {artifact.unsourced.length > 0
+                ? `Unsourced sections: ${artifact.unsourced.join(", ")}. `
+                : ""}
+              {artifact.emptyColumns?.length
+                ? `Columns with no source: ${artifact.emptyColumns.join(", ")}.`
+                : ""}
+            </Mono>
           </div>
         ) : null}
 
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto" style={{ padding: 20 }}>
           {text !== null ? (
             <pre
-              className="whitespace-pre-wrap font-mono text-xs leading-relaxed"
-              style={{ color: "#1b1b1b" }}
+              className="whitespace-pre-wrap"
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 11.5,
+                lineHeight: 1.6,
+                color: KZ.ink,
+                margin: 0,
+              }}
             >
               {text}
             </pre>
           ) : (
-            <div className="text-sm" style={{ color: "#565c65" }}>
-              <p>
-                This is a binary Office document, so there is no honest way to render
-                it here — a mock-up of its contents would be a different document
-                from the one you are about to send.
+            <div style={{ fontSize: 13.5, lineHeight: 1.55, color: KZ.body }}>
+              <p style={{ margin: 0 }}>
+                This is a binary Office document, so there is no honest way to render it here — a
+                mock-up of its contents would be a different document from the one you are about to
+                send.
               </p>
-              <p className="mt-3">
+              <p style={{ marginTop: 14 }}>
                 Generated {artifact.assembledAt}
                 {artifact.rowCount !== undefined ? ` · ${artifact.rowCount} rows` : ""}. Download
                 and open it to check.
               </p>
-              <div className="mt-3">
+              <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
                 {artifact.sources.map((s) => (
-                  <div key={s.key}>
-                    <span style={{ color: s.ok ? "#2e8540" : "#b3261e" }}>
-                      {s.ok ? "●" : "○"}
-                    </span>{" "}
-                    {s.key}: {s.message}
-                  </div>
+                  <span
+                    key={s.key}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
+                  >
+                    <Tag tone={s.ok ? KZ.green : KZ.coral}>{s.key}</Tag>
+                    <Mono size={10.5}>{s.message}</Mono>
+                  </span>
                 ))}
               </div>
             </div>

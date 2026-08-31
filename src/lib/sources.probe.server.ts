@@ -25,6 +25,10 @@ export async function probeSources(
     linearConfigured,
     notionConfigured,
     notionChildren,
+    granolaConfigured,
+    granolaMissingKey,
+    granolaLastError,
+    readGranolaNotes,
   } = await import("./sources.direct.server");
 
   if (opts.bustCache) {
@@ -108,6 +112,53 @@ export async function probeSources(
         message: (e as Error).message.slice(0, 120),
       });
     }
+  }
+
+  // ---- Granola. Back after a spell out of the footer, on a different scope:
+  //      the read is by time window and attendee/title, never by folder, because
+  //      a folder-scoped read is refused for this account and listing folders
+  //      returns nothing. Metadata only — titles, ids, timestamps — so the row
+  //      answers "are the calls reachable", not "what was said".
+  if (!src.granola) {
+    out.push({
+      key: "granola",
+      ok: false,
+      count: 0,
+      scope: "no Granola scope configured for this program",
+      message: "not configured",
+    });
+  } else if (!granolaConfigured()) {
+    out.push({
+      key: "granola",
+      ok: false,
+      count: 0,
+      scope: src.granola.label,
+      // Two keys, two different fixes. The old sync collapsed them and told
+      // people to set a Granola token that was already set.
+      message:
+        granolaMissingKey() === "granola"
+          ? "GRANOLA_API_KEY not set"
+          : "LOVABLE_API_KEY not set — the gateway needs it too",
+    });
+  } else {
+    const read = await readGranolaNotes(programId);
+    out.push(
+      read
+        ? {
+            key: "granola",
+            ok: true,
+            count: read.rows.length,
+            scope: src.granola.label,
+            message: `${read.rows.length} ${src.granola.itemNoun}`,
+          }
+        : {
+            key: "granola",
+            ok: false,
+            count: 0,
+            scope: src.granola.label,
+            message: (granolaLastError() ?? "read failed").slice(0, 120),
+          },
+    );
   }
 
   return out;
