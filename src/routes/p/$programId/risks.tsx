@@ -97,7 +97,7 @@ function RisksPage() {
       <PageHeader
         eyebrow="Register"
         title="Risks & blockers"
-        subtitle={`Program risk register, read from the Notion table under this program's hub. Aging highlighted after ${AGING_DAYS} business days.`}
+        subtitle={`Program risk register, read from the Notion table under this program's hub. Anything open more than ${AGING_DAYS} business days shows its age in coral.`}
       />
 
       <KpiStrip
@@ -258,7 +258,7 @@ function RisksPage() {
                     }}
                     title={
                       aging
-                        ? `Opened ${r.opened} — open longer than ${AGING_DAYS} days`
+                        ? `Opened ${r.opened}. Open longer than ${AGING_DAYS} days`
                         : `Opened ${r.opened}`
                     }
                   >

@@ -117,14 +117,14 @@ function Artifacts() {
       <PageHeader
         eyebrow="Output"
         title="Artifacts"
-        subtitle={`Formal documents generated from the ${program.domainLabel} program model. Every one is a draft to review, not a finished deliverable.`}
+        subtitle={`Formal documents built from the ${program.domainLabel} program model. Read every one as a draft before it leaves the building.`}
       />
 
       <div style={{ padding: "28px var(--kz-pad-x) 60px var(--kz-pad-x)" }}>
         <NoteBox>
-          Facts are read from Linear, Notion, and Granola at generation time and never stored here.
-          Anything without a wired source is marked in the output as a gap rather than left blank,
-          so a reader can tell the difference between <em>zero</em> and <em>unknown</em>.
+          Every fact is read from Linear, Notion, and Granola when you generate, and none of it is
+          kept here. Where a source is missing, the output says so instead of leaving a blank, so
+          you can tell <em>zero</em> from <em>unknown</em>.
         </NoteBox>
 
         <div style={{ marginTop: 24, maxWidth: 900 }}>
@@ -165,7 +165,7 @@ function Artifacts() {
                     {a.description}
                   </p>
                   <Disclosure style={{ marginTop: 12 }}>
-                    Unsourced sections are marked in the output, never left blank
+                    Unsourced sections say so in the output instead of going blank
                   </Disclosure>
                 </div>
                 <Button
@@ -202,7 +202,7 @@ function ReadinessPanel({
   if (loading) {
     return (
       <div style={{ border: `1px solid ${KZ.bone}`, padding: "16px 18px" }}>
-        <Mono size={11}>Checking what the sources are returning…</Mono>
+        <Mono size={11}>Checking what each source returns…</Mono>
       </div>
     );
   }
@@ -253,8 +253,8 @@ function ReadinessPanel({
       </div>
       {gaps > 0 ? (
         <Disclosure style={{ color: KZ.amber }}>
-          Unsourced: {readiness.unsourced.join(", ")}. These render as an explicit gap in the
-          output, never as zero
+          Unsourced: {readiness.unsourced.join(", ")}. Each one renders as a gap in the output,
+          never as zero
         </Disclosure>
       ) : null}
     </div>
@@ -295,7 +295,7 @@ function PreviewModal({ preview, onClose }: { preview: ArtifactPreview; onClose:
             <div className="truncate" style={{ fontSize: 14, fontWeight: 500 }}>
               {artifact.filename}
             </div>
-            <Mono size={10.5}>Draft — review before sending</Mono>
+            <Mono size={10.5}>Draft. Review before sending</Mono>
           </div>
           <div className="flex shrink-0 items-center gap-[10px]">
             <Button
@@ -353,7 +353,7 @@ function PreviewModal({ preview, onClose }: { preview: ArtifactPreview; onClose:
           ) : (
             <div style={{ fontSize: 13.5, lineHeight: 1.55, color: KZ.body }}>
               <p style={{ margin: 0 }}>
-                This is a binary Office document, so there is no honest way to render it here — a
+                This is a binary Office document, so there is no honest way to render it here. A
                 mock-up of its contents would be a different document from the one you are about to
                 send.
               </p>

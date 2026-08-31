@@ -22,7 +22,7 @@ export const ARTIFACTS: ArtifactMeta[] = [
     kind: "rollup",
     title: "Weekly status rollup",
     description:
-      "Where the program stands, what gates are coming, and the open risk register. Markdown, for pasting into Notion or an email.",
+      "Where the program stands, the gates coming up, and every open risk. Markdown, so it pastes straight into Notion or an email.",
     filename: "weekly-rollup.md",
     mime: "text/markdown",
   },
@@ -30,7 +30,7 @@ export const ARTIFACTS: ArtifactMeta[] = [
     kind: "sprint-rollup",
     title: "Sprint status rollup",
     description:
-      "Task-oriented, checkbox-driven view of the current sprint (or phase). Grouped by workstream, includes a waiting-on-external table and an in-flight watch list. Markdown, drops cleanly into Notion.",
+      "The current sprint as checkboxes, grouped by workstream, with a table of what you are waiting on from outside and a watch list of what is in flight. Markdown, drops cleanly into Notion.",
     filename: "sprint-rollup.md",
     mime: "text/markdown",
   },
@@ -38,7 +38,7 @@ export const ARTIFACTS: ArtifactMeta[] = [
     kind: "project-plan",
     title: "Project plan",
     description:
-      "Lifecycle phases with their Definition of Done and stage gates, the milestone schedule, workstream owners, and gate readiness.",
+      "Every lifecycle phase with its Definition of Done and stage gates, plus the milestone schedule and who owns each workstream.",
     filename: "project-plan.docx",
     mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   },
@@ -46,7 +46,7 @@ export const ARTIFACTS: ArtifactMeta[] = [
     kind: "poam",
     title: "POA&M",
     description:
-      "The risk register on the 26 FedRAMP columns. Columns with no source are marked, never inferred.",
+      "The risk register mapped onto the 26 FedRAMP columns. A column with no source says so, and nothing is inferred to fill it.",
     filename: "poam.xlsx",
     mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   },

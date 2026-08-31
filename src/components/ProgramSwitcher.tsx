@@ -98,7 +98,7 @@ export function ProgramSwitcher() {
           {hydrated && user ? (
             <div style={{ padding: "12px 16px", borderBottom: `1px solid ${KZ.grey200}` }}>
               <div style={{ fontSize: 13.5, fontWeight: 500 }}>
-                {user.name} — {user.role}
+                {user.name} · {user.role}
               </div>
               <Mono size={10.5} tone={KZ.muted}>
                 Signed in via {user.provider === "okta" ? "Okta" : "static demo"}

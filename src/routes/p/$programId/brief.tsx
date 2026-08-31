@@ -200,7 +200,7 @@ function Brief() {
               </List>
             ) : (
               <div style={{ marginTop: 12, fontSize: 13, color: KZ.body }}>
-                No open critical or high risk in the register — nothing is waiting on a call.
+                No open critical or high risk in the register. Nothing is waiting on a call.
               </div>
             )}
             <Disclosure>
@@ -220,9 +220,9 @@ function Synthesis({ result }: { result: BriefResult }) {
       "no-api-key":
         "ANTHROPIC_API_KEY is not set in this environment, so the brief writer isn't wired up. This is expected in local dev; a deployed instance with the key will render the synthesis here.",
       "no-program-data":
-        "No work items or risks are reaching this route — nothing for the writer to summarise. Check the data sources on the rail.",
+        "No work items or risks are reaching this route, so the writer has nothing to summarize. Check the data sources on the rail.",
       "api-error":
-        "The Anthropic API returned an error. This is usually transient; try again in a moment.",
+        "The Anthropic API returned an error. Usually transient, so try again in a moment.",
       unparseable:
         "The model returned text that could not be parsed as the expected {paragraph, watchList} JSON. The prompt may need tightening.",
     };

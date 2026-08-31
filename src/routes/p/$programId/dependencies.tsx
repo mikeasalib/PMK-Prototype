@@ -104,7 +104,7 @@ function Dependencies() {
       <PageHeader
         eyebrow="Between streams"
         title="Dependency map"
-        subtitle="What each workstream is waiting on from another, consolidated from the cross-workstream sync — with the blockers Linear is flagging underneath."
+        subtitle="What each workstream is waiting on from another, taken from the cross-workstream sync. The blockers Linear is flagging sit underneath."
       />
 
       <div
@@ -227,7 +227,7 @@ function Dependencies() {
           </div>
         ) : (
           <Disclosure style={{ marginTop: 14 }}>
-            As stated in the cross-workstream sync — a dependency with no date says so rather than
+            As stated in the cross-workstream sync. A dependency with no date says so instead of
             inventing one
           </Disclosure>
         )}

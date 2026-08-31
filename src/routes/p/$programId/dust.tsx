@@ -37,7 +37,7 @@ export const Route = createFileRoute("/p/$programId/dust")({
       {
         name: "description",
         content:
-          "Federated query across the program's sources — Dust in a wired deployment, the local index here.",
+          "Federated query across the program's sources. Dust in a wired deployment, the local index here.",
       },
     ],
   }),
@@ -105,11 +105,11 @@ function Dust() {
             connection that does not exist. */}
         <NoteBox style={{ marginBottom: 24 }}>
           <strong style={{ color: KZ.ink, fontWeight: 500 }}>Not connected to Dust yet.</strong> In
-          a wired deployment this input queries the Dust platform, which already indexes the
-          program's Granola calls, Notion pages and Linear issues alongside the rest of Kaizen's
-          internal knowledge. What runs here is the local matcher over this program's captured index
-          — Linear issues, follow-ups and milestones — so results are narrower than Dust's and carry
-          no answer synthesis.
+          a wired deployment this input queries Dust, which already indexes the program's Granola
+          calls, Notion pages and Linear issues alongside the rest of Kaizen's internal knowledge.
+          What runs here is a plain match over this program's captured index: Linear issues,
+          follow-ups and milestones. Results are narrower than Dust's, and nothing is synthesized
+          into an answer.
         </NoteBox>
 
         <input
@@ -183,11 +183,11 @@ function Dust() {
               </List>
             )}
             <Disclosure>
-              Local matcher, pending the Dust connection: case-insensitive substring match on
-              identifier, title, assignee, labels and state (Linear); title, detail, owner and
-              source (follow-ups); name (milestones). The Notion risk register and Granola call
-              content are not in this index — the register is read live by server function, and
-              Granola is metadata-only here. Dust reaches all of them
+              Until Dust is connected: case-insensitive substring match on identifier, title,
+              assignee, labels and state (Linear); title, detail, owner and source (follow-ups);
+              name (milestones). The Notion risk register and Granola call content sit outside this
+              index. The register is read live by server function, and Granola is metadata only
+              here. Dust reaches all of them
             </Disclosure>
           </div>
         ) : null}

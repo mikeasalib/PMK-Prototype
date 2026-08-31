@@ -94,7 +94,7 @@ function CustomerHealth() {
         subtitle={
           subtitleTail
             ? `Live Hex project · ${subtitleTail}${projectLabel ? ` · ${projectLabel}` : ""} · ${program.domainLabel} sentiment.`
-            : `Not configured — no Hex project is wired to ${program.domainLabel} yet.`
+            : `No Hex project is wired to ${program.domainLabel} yet.`
         }
         actions={
           openInHexUrl ? (
@@ -128,8 +128,8 @@ function CustomerHealth() {
             {mode.kind === "session" && mode.note ? (
               <div style={{ marginTop: 12 }}>
                 <Mono size={10.5} tone={KZ.amber}>
-                  Signed embed unavailable — {mode.note}. Falling back to session auth, so this
-                  renders only for viewers already signed in to Hex.
+                  Signed embed unavailable: {mode.note}. This falls back to session auth, so only
+                  viewers already signed in to Hex will see it.
                 </Mono>
               </div>
             ) : null}
@@ -200,8 +200,8 @@ function Placeholder({ children }: { children: React.ReactNode }) {
 function NotConfigured() {
   return (
     <Placeholder>
-      Customer-health sentiment renders as a live Hex embed, minted server-side per program. This
-      program has not been wired to one — set <Code>hex.customerHealth</Code> in{" "}
+      Sentiment renders as a live Hex embed, signed server-side per program. This program has not
+      been wired to one. Set <Code>hex.customerHealth</Code> in{" "}
       <Code>src/lib/program.config.ts</Code> with either an <Code>embedUrl</Code> (session-auth
       fallback) or a <Code>projectId</Code> plus <Code>HEX_API_KEY</Code> for signed embeds.
     </Placeholder>

@@ -43,7 +43,7 @@ function Stakeholders() {
       <PageHeader
         eyebrow="Who and what"
         title="Stakeholders & Glossary"
-        subtitle={`The roster across ${seed.orgs.length} organizations, and the acronym glossary that makes the program notes readable.`}
+        subtitle={`The roster across ${seed.orgs.length} organizations, plus the acronym glossary for reading the program notes.`}
       />
 
       <div style={{ padding: "28px var(--kz-pad-x) 60px var(--kz-pad-x)" }}>
@@ -248,7 +248,7 @@ function GlossarySection() {
                         </Mono>
                         <span style={{ fontSize: 13, lineHeight: 1.45, color: KZ.body }}>
                           {e.meaning.replace(/\s*\(unconfirmed\)\s*/i, " ").trim()}
-                          {e.lead ? <span style={{ color: KZ.ink }}> — {e.lead}</span> : null}
+                          {e.lead ? <span style={{ color: KZ.ink }}> · {e.lead}</span> : null}
                           {/* "Unconfirmed" is the glossary's own honesty
                               marker: a term nobody has verified reads
                               differently from one that is settled. */}

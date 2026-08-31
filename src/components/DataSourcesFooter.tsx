@@ -62,7 +62,7 @@ export function DataSourcesFooter() {
             <li
               key={key}
               style={{ display: "flex", alignItems: "center", gap: 8 }}
-              title={s ? `${s.scope} — ${s.message}` : undefined}
+              title={s ? `${s.scope} · ${s.message}` : undefined}
             >
               {/* A square, not a dot: nothing in this design is round. */}
               <Square tone={color} filled />
@@ -100,7 +100,7 @@ export function DataSourcesFooter() {
           {liveError
             ? liveError.includes("not set")
               ? "LINEAR_API_KEY is not set."
-              : `Linear refused the live read — ${liveError}`
+              : `Linear refused the live read: ${liveError}`
             : "Set LINEAR_API_KEY for a live read."}
         </Disclosure>
       ) : null}

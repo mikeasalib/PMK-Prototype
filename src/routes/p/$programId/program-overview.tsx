@@ -58,7 +58,7 @@ export const Route = createFileRoute("/p/$programId/program-overview")({
       { title: pageTitle("Command centre", PROGRAMS[params.programId]) },
       {
         name: "description",
-        content: `${PROGRAMS[params.programId].domainLabel} program status — milestones, sprint progress, workstream burn-down.`,
+        content: `${PROGRAMS[params.programId].domainLabel} program status: milestones, sprint progress, workstream burn-down.`,
       },
     ],
   }),
@@ -168,8 +168,8 @@ function Overview() {
         eyebrow="Program"
         title="Command centre"
         subtitle={[
-          `Where the ${program.domainLabel} program stands this morning: the phase in flight, what is owed either way, and the dates that do not move.`,
-          origin === "snapshot" ? "Read from a captured snapshot, not a live read." : null,
+          `Where the ${program.domainLabel} program stands right now: what is in flight, what each side owes, and the dates that do not move.`,
+          origin === "snapshot" ? "Read from a captured snapshot." : null,
         ]
           .filter(Boolean)
           .join(" ")}
@@ -243,7 +243,8 @@ function Overview() {
             })}
           </List>
           <Disclosure style={{ marginTop: 14 }}>
-            Dated milestones read from the program plan; Linear where a ticket carries the date
+            Dated milestones come from the program plan, or from Linear where a ticket carries the
+            date
           </Disclosure>
         </Panel>
 
@@ -582,7 +583,7 @@ function FollowUpsPanel({ program }: { program: ProgramConfig }) {
         </Mono>
       ) : open.length === 0 ? (
         <div style={{ marginTop: 14, fontSize: 13, color: KZ.body }}>
-          Nothing open — all follow-ups are done or dismissed.
+          Nothing open. Every follow-up is done or dismissed.
         </div>
       ) : (
         <List
@@ -649,7 +650,7 @@ function FollowUpsPanel({ program }: { program: ProgramConfig }) {
       )}
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
         <Disclosure>
-          Checkmarks are your working notes — saved in this browser only, never written back
+          Checkmarks are your working notes, saved in this browser only and never written back
         </Disclosure>
         <Link to="/p/$programId/follow-ups" params={{ programId: program.id }}>
           <Mono size={10.5} tone={KZ.blue}>
@@ -688,7 +689,7 @@ function NotionTrackerPanel({ program }: { program: ProgramConfig }) {
         <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: KZ.amber }}>
           {status === "no-token"
             ? "NOTION_API_KEY is not set, so the hand-maintained tracker is not being read. Open counts on this page reflect Linear only."
-            : "Could not read the tracker page — usually it has not been shared with the Notion integration. Open counts on this page reflect Linear only."}
+            : "Could not read the tracker page. Usually that means it has not been shared with the Notion integration, so open counts on this page reflect Linear only."}
         </div>
       ) : open.length === 0 ? (
         <div style={{ marginTop: 14, fontSize: 13, color: KZ.body }}>
@@ -718,7 +719,7 @@ function NotionTrackerPanel({ program }: { program: ProgramConfig }) {
               ))}
           </List>
           <Disclosure>
-            Checkbox tasks from the sprint tracker page. Separate from the Linear board — most never
+            Checkbox tasks from the sprint tracker page, separate from the Linear board. Most never
             became tickets, which is why the two counts do not add up
           </Disclosure>
         </>
@@ -801,8 +802,8 @@ function StalledPanel({
       )}
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
         <Disclosure>
-          Days since Linear last saw a change on the issue — any field, any comment. Not opened_at:
-          an item created months ago but nudged this week is not stale
+          Days since Linear last saw a change on the issue: any field, any comment. An item created
+          months ago but nudged this week is not stale
           {items.length > top.length ? ` · +${items.length - top.length} more` : ""}
         </Disclosure>
         <Link to="/p/$programId/sprint-board" params={{ programId: program.id }}>

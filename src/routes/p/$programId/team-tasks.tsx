@@ -200,8 +200,8 @@ function TeamTasks() {
         title="Team tasks"
         subtitle={
           origin === "snapshot"
-            ? "Every tracked issue, grouped by workstream — from a captured snapshot, so assignees, statuses and priorities are as of the capture."
-            : "Every tracked issue, grouped by workstream — live from Linear."
+            ? "Every tracked issue, grouped by workstream. Read from a captured snapshot, so assignees, statuses and priorities are as of the capture."
+            : "Every tracked issue, grouped by workstream, live from Linear."
         }
       />
 
@@ -272,7 +272,7 @@ function TeamTasks() {
             }}
           >
             Nothing in this scope.
-            {scope === "attention" ? " Nothing in progress and nothing urgent — try All open." : ""}
+            {scope === "attention" ? " Nothing is in progress and nothing is urgent. Try All open." : ""}
           </div>
         ) : (
           groups.map((g) => {
@@ -349,8 +349,8 @@ function TeamTasks() {
         <NotionTrackerSection programId={program.id} />
 
         <Disclosure style={{ marginTop: 24 }}>
-          Tickets live in Linear; the checkbox tracker lives in Notion. Edit either at source and
-          hit Refresh — nothing typed here is written back
+          Tickets live in Linear, the checkbox tracker lives in Notion. Edit either at source and
+          hit Refresh. Nothing typed here is written back
         </Disclosure>
       </div>
     </AppLayout>
@@ -410,9 +410,8 @@ function NotionTrackerSection({ programId }: { programId: string }) {
         </div>
       ) : status === "read-failed" ? (
         <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: KZ.amber }}>
-          Could not read the tracker page. Most often this means the page is not shared with the
-          Notion integration — Notion answers 404 rather than 403 for that, so it looks like a
-          missing page.
+          Could not read the tracker page. Most often the page is not shared with the Notion
+          integration. Notion answers 404 rather than 403 for that, so it looks like a missing page.
         </div>
       ) : open.length === 0 && done.length === 0 ? (
         <div style={{ marginTop: 14, fontSize: 13, color: KZ.body }}>

@@ -26,7 +26,7 @@ export const Route = createFileRoute("/p/$programId/follow-ups")({
       {
         name: "description",
         content:
-          "Call-to-call follow-ups below the threshold of a Linear issue — proposed from calls and issues, curated by the strategist.",
+          "Follow-ups too small for a Linear issue, proposed from calls and issues and curated by the strategist.",
       },
     ],
   }),
@@ -64,7 +64,7 @@ function FollowUps() {
       <PageHeader
         eyebrow="Curation"
         title="Follow-ups"
-        subtitle="The small things caught between calls — proposed from your calls and issues, kept or waved off by you."
+        subtitle="The small things caught between calls. Proposed from your calls and issues, kept or waved off by you."
       />
 
       <div style={{ padding: "28px var(--kz-pad-x) 60px var(--kz-pad-x)" }}>
@@ -266,7 +266,7 @@ function AddForm({
         className="kz-input"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder="Add a follow-up you caught — email X, remember Y…"
+        placeholder="Add a follow-up you caught: email X, remember Y…"
         style={{ flex: 1, minWidth: 240 }}
       />
       <select
@@ -345,7 +345,7 @@ function Collapsible({
         </Mono>
       </button>
       {open ? <List>{children}</List> : null}
-      {open ? <Disclosure>Both states are reversible — nothing here is deleted</Disclosure> : null}
+      {open ? <Disclosure>Both states are reversible. Nothing here is deleted</Disclosure> : null}
     </section>
   );
 }

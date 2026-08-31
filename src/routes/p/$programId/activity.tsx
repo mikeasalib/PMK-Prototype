@@ -97,8 +97,8 @@ function ActivityFeed() {
         title="Activity"
         subtitle={
           origin === "snapshot"
-            ? "What moved, in order, across Linear and Notion — from a captured snapshot."
-            : "What moved, in order, across Linear and Notion — live."
+            ? "What moved, in order, across Linear and Notion. Read from a captured snapshot."
+            : "What moved, in order, across Linear and Notion, live."
         }
       />
 
@@ -197,7 +197,7 @@ function ActivityFeed() {
           </List>
         )}
         <Disclosure>
-          Ordered by the source's own last-updated timestamp — not by when this app read it
+          Ordered by each source's own last-updated timestamp, not by when this app read it
         </Disclosure>
       </div>
     </AppLayout>

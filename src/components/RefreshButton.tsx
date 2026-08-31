@@ -15,7 +15,7 @@ export function RefreshButton() {
         .join(" · ");
       const anyFail = result.sources.some((s) => !s.ok);
       (anyFail ? toast.warning : toast.success)("Data refreshed", {
-        description: `${absoluteTime(result.syncedAt)} — ${summary}`,
+        description: `${absoluteTime(result.syncedAt)} · ${summary}`,
       });
     } catch (e) {
       toast.error("Refresh failed", {
